@@ -1,0 +1,11 @@
+{
+"provenance": {"r_version": "R version 4.6.1 (2026-06-24 ucrt)", "ardl_package_version": "0.2.5", "execution_date": "2026-07-07", "script": "validation/external/extract_expected_json.R"},
+"tolerance": {"coefficients": 1e-6, "note": "spec 05 §6.5"},
+"ardl_2222": {"order": [2, 2, 2, 2],
+  "coefficients": {"(Intercept)": 2.21391381905302, "L(LRM, 1)": 0.245547000529041, "L(LRM, 2)": 0.412065668736382, "LRY": 0.686617356856924, "L(LRY, 1)": -0.128231885561757, "L(LRY, 2)": -0.224245995000688, "IBO": -1.19646454809696, "L(IBO, 1)": -0.0532721643467378, "L(IBO, 2)": -0.477731668752689, "IDE": 0.495567765121592, "L(IDE, 1)": -0.117270136884608, "L(IDE, 2)": 0.718414532534402},
+  "ssr": 0.0184007712898152},
+"auto_ardl_bic": {"order": [1, 0, 0, 0],
+  "coefficients": {"(Intercept)": 2.03997065942873, "L(LRM, 1)": 0.638021228503905, "LRY": 0.403481673871074, "IBO": -1.32144116192493, "IDE": 0.274743600551466}},
+"auto_ardl_aic": {"order": [3, 1, 3, 2]}
+}
+

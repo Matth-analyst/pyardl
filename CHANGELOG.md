@@ -2,9 +2,36 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
-## [Non publié]
+## [0.1.0] — 2026-07-07
+
+Jalon de phase 1 (specs 03, 05, 10, 11 + garde-fous 09) : la
+réplication PSS 2001 passe.
 
 ### Ajouté
+- Validation externe R exécutée (R 4.6.1, package ARDL 0.2.5) : les 4
+  scripts de `validation/external/` tournent, valeurs de référence dans
+  `tests/replication/expected/*.json` (provenance + tolérances
+  contractuelles), 10 tests `external` actifs et verts :
+  - spec 03 : theta/lambda à 1e-6 (ARDL(3,1,3,2), denmark) ; cas
+    q_j=0 confirmé par R (niveau contemporain, résidus identiques) —
+    marque needs_review du test d'équivalence levée ;
+  - spec 05 : coefficients ARDL(2,2,2,2) à 1e-6 + SSR ; sélection BIC
+    identique à auto_ardl sous politique d'échantillon émulée (la
+    divergence de politique est documentée dans QUESTIONS.md) ;
+  - spec 10 (JALON) : réplication PSS 2001 salaires UK — F cas IV
+    (5.9942) et V (5.8015), t cas V (-2.8633) à 1e-4, coefficients
+    UECM à 1e-6 (tendance : reparamétrisation t/4 de R documentée),
+    décisions conformes à l'article ;
+  - spec 11 : t_BDM cas III et V à 1e-6 vs bounds_t_test.
+- `ardlpy.datasets` : load_denmark(), load_pss2001() (provenance
+  documentée).
+- `bounds_test(..., fixed_regressors=...)` : dummies hors du vecteur
+  testé (requis par la réplication PSS).
+- Corrections journalisées des scripts R (cas IV/V exigent trend()
+  dans le modèle — API du package).
+- les règles du projet : les scripts R de validation externe sont exécutés automatiquement quand
+  Rscript est disponible ; exécution humaine réservée aux outils
+  absents (Stata, EViews).
 - Spec 11 (Banerjee-Dolado-Mestre 1998) : `decision_joint` sur
   `BoundsTestResults` (concordance F+t ; « F rejette mais pas t » →
   `degenerate_suspicion` + warning renvoyant à la spec 15) ;

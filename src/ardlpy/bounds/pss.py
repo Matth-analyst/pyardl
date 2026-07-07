@@ -89,6 +89,8 @@ def _estimate_uecm(
     p: int,
     q: tuple[int, ...],
     case: int,
+    fixed: FloatArray | None = None,
+    fixed_names: tuple[str, ...] = (),
 ) -> _UECMFit:
     """Construit et estime l'UECM du cas demandé (design direct)."""
     n, k = x.shape
@@ -136,6 +138,11 @@ def _estimate_uecm(
         for i in range(q[j]):
             cols.append(dx[start - i - 1 : n - i - 1, j])
             names.append(f"D.{name}.L{i}")
+
+    if fixed is not None:
+        # z_t sans retards (ex. dummies) : hors du vecteur testé.
+        cols.extend(fixed[start:].T)
+        names.extend(fixed_names)
 
     design = np.column_stack(cols)
     y_dep = dy[start - 1 :]
@@ -339,6 +346,7 @@ def bounds_test(
     max_q: int = 4,
     alpha: float = 0.05,
     cv_source: Literal["pss", "kripfganz", "narayan"] = "pss",
+    fixed_regressors: npt.ArrayLike | None = None,
 ) -> BoundsTestResults:
     """Bounds test de cointégration PSS 2001 (spec 10 §5 — fonction phare).
 
@@ -359,6 +367,9 @@ def bounds_test(
         Source des valeurs critiques. "kripfganz" (surfaces de réponse,
         spec 13) et "narayan" (petits échantillons, spec 12) ne sont pas
         encore disponibles -> exception explicite.
+    fixed_regressors : array-like, shape (T, m), optional
+        Variables z_t sans retards (ex. dummies), hors du vecteur testé
+        (non prises en compte par la sélection d'ordre automatique).
 
     Returns
     -------
@@ -400,7 +411,22 @@ def bounds_test(
         p, q_dict = _parse_order(order, x_names)
     q = tuple(q_dict[name] for name in x_names)
 
-    fit = _estimate_uecm(y_arr, x_arr, x_names, y_name, p, q, case)
+    fixed_arr: FloatArray | None = None
+    fixed_names: tuple[str, ...] = ()
+    if fixed_regressors is not None:
+        fixed_arr = np.asarray(fixed_regressors, dtype=np.float64)
+        if fixed_arr.ndim == 1:
+            fixed_arr = fixed_arr[:, None]
+        if fixed_arr.shape[0] != y_arr.shape[0]:
+            raise ValueError("fixed_regressors : longueur incompatible avec y.")
+        if isinstance(fixed_regressors, pd.DataFrame):
+            fixed_names = tuple(str(c) for c in fixed_regressors.columns)
+        else:
+            fixed_names = tuple(f"z.{j}" for j in range(fixed_arr.shape[1]))
+
+    fit = _estimate_uecm(
+        y_arr, x_arr, x_names, y_name, p, q, case, fixed_arr, fixed_names
+    )
 
     f_stat = _wald_f(fit)
     lam_hat = float(fit.params[fit.lam_name])

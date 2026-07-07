@@ -4,6 +4,34 @@ Chaque entrée : spec concernée, point ambigu ou suspect, interprétation
 retenue (la plus standard de la littérature), test marqué
 `@pytest.mark.needs_review` correspondant.
 
+## Spec 05 §6.5 — auto_ardl : « mêmes ordres sélectionnés » non exigible
+
+**Constat (validation externe du 2026-07-07, R 4.6.1, ARDL 0.2.5)** :
+sur les données danoises (max_order = 5), R `auto_ardl` sélectionne
+(1,0,0,0) en BIC et (3,1,3,2) en AIC ; `ARDL.select_order` (échantillon
+commun) sélectionne d'autres ordres. Diagnostic complet :
+
+1. **Politique d'échantillon** : auto_ardl évalue chaque candidat via
+   `stats::BIC/AIC` sur SON échantillon maximal propre — les IC ne sont
+   pas comparables entre candidats (piège spec 02 §4 / spec 05 §3.2,
+   que ardlpy interdit par construction). En ÉMULANT cette politique
+   avec notre moteur (grille complète, hold_back propre), l'optimum BIC
+   coïncide exactement avec le choix d'auto_ardl (1,0,0,0) — ce qui
+   valide notre calcul de llf/BIC contre R.
+2. **Recherche non exhaustive** : auto_ardl utilise une recherche
+   stepwise ; son choix AIC (3,1,3,2) n'est pas l'optimum global de sa
+   propre politique (la grille complète donne (5,0,3,5) en AIC
+   échantillon-propre). Aucune concordance d'ordre n'est donc exigible
+   pour l'AIC.
+
+**Décision (conforme à la note du script spec05_r_ardl.R et à
+la correction statistique prime)** : ne PAS aligner ardlpy
+sur la politique d'auto_ardl ; l'exigence « mêmes ordres sélectionnés »
+de la spec 05 §6.5 est réinterprétée comme « même optimum sous politique
+d'échantillon identique », testée dans
+`tests/replication/test_spec05.py`. Les coefficients à ordres fixes
+concordent à 1e-6 (contrat numérique intact).
+
 ## Spec 10 §4 — DETTE : recoupement des tables PSS 2001 par simulation
 
 **Statut : dette ouverte (spec 12).** Les bornes asymptotiques PSS 2001
@@ -43,12 +71,15 @@ prévoir avec la spec 17 qui cible ce package).
 
 ## Spec 03 §2.2 — formule de ω_{j,0} et cas limite q_j = 0
 
-> **Statut (revue du 2026-07-07)** : dérivation de ω et lecture 2 pour
-> q_j = 0 **validées** par revue humaine ; formule corrigée reportée
-> dans la spec (note de révision, 03_sargan_1964.md §2.2). Le marquage
-> `needs_review` du test d'équivalence reste en place jusqu'à
-> l'exécution du script R (`validation/external/spec03_ardl_uecm.R`),
-> qui couvre désormais aussi un cas q_j = 0.
+> **Statut : CLOS (2026-07-07)** : dérivation de ω et lecture 2 pour
+> q_j = 0 validées par revue humaine (formule corrigée reportée dans la
+> spec, note de révision 03_sargan_1964.md §2.2), puis **confirmées par
+> l'exécution du script R** (`spec03_ardl_uecm.R`, R 4.6.1, ARDL 0.2.5) :
+> pour l'ordre c(2,2,2,0), R ARDL::uecm place bien le niveau IDE
+> contemporain (colonne `IDE`, pas `L(IDE,1)`), sans terme `d(IDE)`, avec
+> résidus ardl/uecm identiques (1.6e-14) et coefficients ECM concordants
+> à 1e-6 avec ardlpy (tests/replication/test_spec03.py). Marque
+> `needs_review` du test d'équivalence levée.
 
 **Point suspect.** La spec écrit elle-même la formule de ω_{j,i} comme
 provisoire et demande explicitement de la dériver et de la tester

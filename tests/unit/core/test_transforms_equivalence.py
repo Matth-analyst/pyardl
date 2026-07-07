@@ -62,13 +62,14 @@ def _simulate_ardl(
     )
 
 
-@pytest.mark.needs_review
 @pytest.mark.parametrize("seed", range(8))
 def test_ardl_ecm_regression_equivalence(seed: int) -> None:
     """Spec 03 §6.1.2 : résidus ARDL et ECM identiques (verrou n°1).
 
-    Marqué ``needs_review`` : couvre le cas limite q_j = 0 dont le
-    traitement (cf. docs/QUESTIONS.md) n'est pas explicité par la spec.
+    (Marque ``needs_review`` levée le 2026-07-07 : la convention
+    q_j = 0 est confirmée par R ARDL::uecm sur les données danoises —
+    niveau contemporain, résidus ardl/uecm identiques à 1.6e-14, cf.
+    tests/replication/test_spec03.py et docs/QUESTIONS.md.)
     """
     rng = np.random.default_rng(seed)
     t_obs = 400

@@ -22,8 +22,13 @@ str(PSS2001)
 
 # --- Modèle de l'article : ARDL(6, 0, 5, 4, 5), cas V (const + trend
 # non restreints, cf. PSS 2001 section 6) et cas IV pour le F ----------
+# CORRECTION (journal, 2026-07-07) : première version sans trend(w) ->
+# erreur "Trying to impose case 4/5 ... doesn't include one or both of
+# them" ; les cas IV/V exigent la tendance DANS le modèle sous-jacent
+# (API du package : terme trend(w) dans la formule). L'application PSS
+# 2001 inclut bien une tendance linéaire (section 6).
 ardl_wages <- ardl(
-  w ~ Prod + UR + Wedge + Union | D7475 + D7579,
+  w ~ Prod + UR + Wedge + Union + trend(w) | D7475 + D7579,
   data = PSS2001, order = c(6, 0, 5, 4, 5)
 )
 cat("=== ARDL(6,0,5,4,5) ===\n")

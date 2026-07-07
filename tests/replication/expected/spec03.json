@@ -1,0 +1,14 @@
+{
+"provenance": {"r_version": "R version 4.6.1 (2026-06-24 ucrt)", "ardl_package_version": "0.2.5", "execution_date": "2026-07-07", "script": "validation/external/extract_expected_json.R"},
+"tolerance": {"theta": 1e-6, "lambda": 1e-6, "note": "spec 03 §6.2"},
+"model_318_2": {"order": [3, 1, 3, 2],
+  "lambda": -0.416852398914192,
+  "lambda_se": 0.0916574311046242,
+  "theta": {"(Intercept)": 6.28565792601613, "LRY": 0.996467635740485, "IBO": -4.53811595875275, "IDE": 2.89152013881349}},
+"model_q_ide_0": {"order": [2, 2, 2, 0],
+  "note": "cas q_j=0 : niveau IDE contemporain dans l ECM (convention ardlpy confirmée)",
+  "resid_gap_ardl_uecm": 1.55223056630405e-14,
+  "ecm_coefficients": {"(Intercept)": 2.24380572784269, "L(LRM, 1)": -0.325238370999362, "L(LRY, 1)": 0.297130674289665, "L(IBO, 1)": -1.58493806943642, "IDE": 0.725731281199469, "d(L(LRM, 1))": -0.414126286955837, "d(LRY)": 0.69808069154543, "d(L(LRY, 1))": 0.236659571790257, "d(IBO)": -1.28317813107623, "d(L(IBO, 1))": 0.133077484360887},
+  "theta": {"(Intercept)": 6.89895758900833, "LRY": 0.9135781653827, "IBO": -4.87315830714058, "IDE": 2.23138272083169}}
+}
+
