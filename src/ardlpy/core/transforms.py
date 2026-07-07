@@ -150,6 +150,13 @@ class ECMParams:
         régression ECM — cf. docs/QUESTIONS.md pour la justification
         (dimension du sous-espace engendré) et spec 05 pour la
         construction de la matrice de dessin correspondante.
+
+        Cette convention q_j = 0 est celle de Stata ``ardl`` (qui
+        accepte q_j = 0 et fait entrer x_{j,t} contemporain dans la
+        partie de niveau de l'EC) ; ``statsmodels.tsa.ardl.UECM``, en
+        revanche, refuse q_j = 0 à la construction (``ValueError: All
+        included exog variables must have a lag length >= 1``) — ardlpy
+        le supporte.
     """
 
     p: int

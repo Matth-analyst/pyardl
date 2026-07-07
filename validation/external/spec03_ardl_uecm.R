@@ -30,3 +30,26 @@ print(coef(uecm_model))
 
 cat("Multiplicateurs de long terme (theta_j) :\n")
 print(multipliers(ardl_model))
+
+# ---------------------------------------------------------------------------
+# Cas limite q_j = 0 (docs/QUESTIONS.md, entrée spec 03 §2.2) : vérifier
+# comment R::ARDL traite un régresseur sans retard propre. Convention
+# ardlpy (validée en revue) : omega_j vide, gamma_j sur x_{j,t}
+# contemporain. Observer ici : (a) uecm() accepte-t-il l'ordre 0 ;
+# (b) le terme de niveau de IDE est-il daté t ou t-1 ; (c) les résidus
+# de ardl() et uecm() sont-ils identiques.
+# ---------------------------------------------------------------------------
+ardl_q0 <- ardl(LRM ~ LRY + IBO + IDE, data = denmark, order = c(2, 2, 2, 0))
+summary(ardl_q0)
+
+uecm_q0 <- uecm(ardl_q0)
+summary(uecm_q0)
+
+cat("Coefficients ECM du cas q_IDE = 0 :\n")
+print(coef(uecm_q0))
+
+cat("Verification residus identiques ardl/uecm (doit être ~ 0) :\n")
+print(max(abs(residuals(ardl_q0) - residuals(uecm_q0))))
+
+cat("Multiplicateurs de long terme du cas q_IDE = 0 :\n")
+print(multipliers(ardl_q0))

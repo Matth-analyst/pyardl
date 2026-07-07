@@ -58,10 +58,22 @@ Quand un régresseur x_j n'a aucun retard propre (q_j = 0), il n'existe
 pas de terme Δx_{j,t} distinct : γ_j multiplie alors x_{j,t}
 (contemporain) et non x_{j,t-1}, faute de quoi la régression ECM
 obtiendrait un degré de liberté de plus que l'ARDL d'origine (résidus
-non identiques). Ce point, non explicité par la spec, est documenté et
-justifié dans [`docs/QUESTIONS.md`](../QUESTIONS.md) — confirmé
-indépendamment par le fait que `statsmodels.tsa.ardl.UECM` **refuse**
-q_j = 0 à la construction.
+non identiques). Ce point, non explicité par la spec d'origine (note de
+révision reportée dans la spec 03 §2.2), est dérivé et justifié dans
+[`docs/QUESTIONS.md`](../QUESTIONS.md).
+
+Comparaison avec les implémentations de référence :
+
+| Implémentation | Comportement pour q_j = 0 |
+|---|---|
+| `statsmodels.tsa.ardl.UECM` | **Refuse** à la construction (`ValueError: All included exog variables must have a lag length >= 1`) |
+| Stata `ardl` | **Accepte** : x_{j,t} contemporain entre dans la partie de niveau de l'EC — même convention qu'ardlpy |
+| `ardlpy` | **Accepte** : ω_j vide, γ_j sur x_{j,t} contemporain |
+
+Noter que x_{j,t} reste I(1) : l'identité exacte x_{j,t} = x_{j,t-1} +
+Δx_{j,t} (écart stationnaire) garantit que l'asymptotique des tests sur
+la partie de niveau est inchangée — le régresseur de niveau est toujours
+intégré d'ordre 1, seule sa datation diffère d'une période.
 
 ## Cas dégénérés
 

@@ -6,6 +6,13 @@ retenue (la plus standard de la littérature), test marqué
 
 ## Spec 03 §2.2 — formule de ω_{j,0} et cas limite q_j = 0
 
+> **Statut (revue du 2026-07-07)** : dérivation de ω et lecture 2 pour
+> q_j = 0 **validées** par revue humaine ; formule corrigée reportée
+> dans la spec (note de révision, 03_sargan_1964.md §2.2). Le marquage
+> `needs_review` du test d'équivalence reste en place jusqu'à
+> l'exécution du script R (`validation/external/spec03_ardl_uecm.R`),
+> qui couvre désormais aussi un cas q_j = 0.
+
 **Point suspect.** La spec écrit elle-même la formule de ω_{j,i} comme
 provisoire et demande explicitement de la dériver et de la tester
 (« vérifier ... et TESTER numériquement, cf. §6.1, c'est la source
@@ -44,10 +51,16 @@ lectures ont été essayées :
    périmètre de la spec 03 qui ne manipule que les coefficients).
 
 **Conséquence pour la suite (spec 10, bounds test)** : le test conjoint
-sur {λ, γ_1, ..., γ_k} suppose des régresseurs de niveau retardés
-(I(1) sous H0) ; un régresseur avec q_j = 0 entre dans ce test via x_{j,t}
-(contemporain, stationnaire par construction) et non x_{j,t-1} — point à
-documenter explicitement dans la spec 10 au moment de son implémentation.
+sur {λ, γ_1, ..., γ_k} porte sur des régresseurs de niveau ; un
+régresseur avec q_j = 0 y entre via x_{j,t} (contemporain) et non
+x_{j,t-1}. x_{j,t} reste I(1) sous H0 : par l'identité exacte
+x_{j,t} = x_{j,t-1} + Δx_{j,t}, l'écart entre les deux datations est
+stationnaire, donc l'asymptotique du test est inchangée — le régresseur
+de niveau est toujours intégré d'ordre 1, seule sa datation diffère
+d'une période. Point à documenter explicitement dans la spec 10 au
+moment de son implémentation. *(Corrigé en revue le 2026-07-07 : la
+première rédaction qualifiait à tort x_{j,t} de « stationnaire par
+construction ».)*
 
 **Vérification** : `tests/unit/core/test_transforms_equivalence.py`
 (résidus identiques à 1e-10 sur 8 tirages aléatoires, dont 3 couvrant
