@@ -6,6 +6,7 @@ nav:
   - Spécifications: references/00_INDEX.md
   - Modules:
       - core.transforms: modules/core_transforms.md
+      - core.ardl: modules/core_ardl.md
   - Questions ouvertes: QUESTIONS.md
   - Écarts documentés: DEVIATIONS.md
 theme:

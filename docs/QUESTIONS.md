@@ -4,6 +4,28 @@ Chaque entrée : spec concernée, point ambigu ou suspect, interprétation
 retenue (la plus standard de la littérature), test marqué
 `@pytest.mark.needs_review` correspondant.
 
+## Spec 05 §4 — GETS : « éliminer le retard le moins significatif »
+
+**Point ambigu.** La spec ne précise pas si l'élimination itérative peut
+créer des « trous » dans la structure des retards (ex. garder x_{t} et
+x_{t-2} mais pas x_{t-1}), ou si elle doit préserver une structure
+ARDL(p, q) contiguë.
+
+**Interprétation retenue (standard)** : réduction contiguë — seul le
+retard TERMINAL de chaque variable (y.Lp, x_j.Lq_j) est candidat à
+l'élimination, ce qui fait passer de ARDL(p, q) à ARDL(p−1, q) ou
+ARDL(p, q_j−1). C'est le comportement des implémentations de référence
+(la réduction d'ordre de `gets_ardl_uecm` dans ardl.nardl, la logique de
+sélection d'EViews/statsmodels), et cela garantit que le modèle final
+reste un ARDL représentable par les conteneurs de la spec 03. Une
+élimination avec trous produirait un modèle hors du cadre ARDL(p,q) et
+casserait `.to_ecm()`.
+
+**Vérification** : `tests/unit/core/test_ardl.py::TestGETS`, test
+principal marqué `@pytest.mark.needs_review` en attente de confirmation
+(comparaison avec `ardl.nardl::gets_ardl_uecm` — script external à
+prévoir avec la spec 17 qui cible ce package).
+
 ## Spec 03 §2.2 — formule de ω_{j,0} et cas limite q_j = 0
 
 > **Statut (revue du 2026-07-07)** : dérivation de ω et lecture 2 pour

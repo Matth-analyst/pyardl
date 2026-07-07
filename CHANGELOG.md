@@ -5,6 +5,19 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 ## [Non publié]
 
 ### Ajouté
+- Spec 05 (Hendry-Pagan-Sargan 1984) : estimateur `ardlpy.core.ardl.ARDL`
+  — OLS via lstsq/QR, cov_type nonrobust/HC0-3/HAC, `is_stable`
+  (racines AR), vues spec 03 (`ardl_params`, `to_ecm`, `longrun`,
+  `adjustment`), `select_order` (grille + per_variable, échantillon
+  commun obligatoire, re-fit final sur échantillon maximal),
+  `gets` (réduction contiguë journalisée dans `reduction_path`),
+  garde-fou d'autocorrélation automatique post-fit (spec 09 §2.2).
+- Briques transversales : `utils.lag_matrix` (spec 02),
+  `utils.check_series` (spec 01).
+- Tests spec 05 : concordance statsmodels à 1e-10 (coefficients, bse,
+  résidus ; llf/IC alignés), verrou échantillon commun de select_order,
+  consistance BIC (fast_mc + slow), stabilité, pont spec 03, garde-fou
+  spec 09 (positif et négatif), covariances robustes vs statsmodels OLS.
 - Squelette du projet (`pyproject.toml`, layout `src/ardlpy`, `tests/`,
   `validation/`, configuration ruff/mypy/pytest).
 - Spec 03 (Sargan 1964) : algèbre exacte ARDL <-> ECM dans
