@@ -46,6 +46,28 @@ Cas II et IV : le déterministe restreint fait **partie du vecteur testé**
 Wald = régression contrainte à 1e-10
 ([test_pss_wald_equivalence.py](../../tests/unit/bounds/test_pss_wald_equivalence.py)).
 
+## Décision jointe F + t (spec 11, Banerjee-Dolado-Mestre 1998)
+
+La cointégration exige la concordance des deux tests — `decision_joint` :
+
+| F | t | `decision_joint` |
+|---|---|---|
+| cointegration | cointegration | `"cointegration"` |
+| cointegration | autre | `"degenerate_suspicion"` + warning → spec 15 |
+| no_cointegration | no_cointegration | `"no_cointegration"` |
+| autre discordance | | `"inconclusive"` |
+| (cas II/IV : t non tabulé) | | `None` |
+
+« F rejette mais pas t » signale une dégénérescence de type 1 (les γ
+seuls portent la relation, pas de force de rappel en y) ; la
+classification formelle arrive avec le cadre à 3 tests de
+Sam-McNown-Goh 2019 (spec 15).
+
+**IC sur la vitesse d'ajustement** : `res.adjustment(alpha)` renvoie λ̂,
+se et IC — mais l'IC n'est affiché que si `decision_joint ==
+"cointegration"` (sinon NaN + warning) : l'IC standard sur λ n'est pas
+valide sous H₀ (piège documenté dans les règles du projet).
+
 ## Avertissements méthodologiques
 
 - **t_BDM unilatéral GAUCHE** : le rejet exige λ̂ < 0 ; si λ̂ ≥ 0, un

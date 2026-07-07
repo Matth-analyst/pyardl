@@ -178,6 +178,38 @@ def _wald_f(fit: _UECMFit) -> float:
     return stat
 
 
+JointDecision = Literal[
+    "cointegration", "no_cointegration", "inconclusive", "degenerate_suspicion"
+]
+
+
+def _joint_decision(
+    decision_f: Decision, decision_t: Decision | None
+) -> JointDecision | None:
+    """Décision jointe F + t (spec 11 §2.3, préparation du cadre SMG).
+
+    La cointégration exige la concordance des DEUX tests (Banerjee-
+    Dolado-Mestre 1998 ; Sam-McNown-Goh 2019, spec 15) :
+
+    - F et t rejettent -> ``"cointegration"`` ;
+    - F rejette mais pas t -> ``"degenerate_suspicion"`` (dégénérescence
+      de type 1 : les gamma seuls portent la relation, pas de force de
+      rappel — classification complète : spec 15) ;
+    - aucun ne rejette -> ``"no_cointegration"`` ;
+    - toute autre discordance -> ``"inconclusive"`` ;
+    - t non tabulé (cas II/IV) -> ``None`` (logique jointe indisponible).
+    """
+    if decision_t is None:
+        return None
+    if decision_f == "cointegration":
+        if decision_t == "cointegration":
+            return "cointegration"
+        return "degenerate_suspicion"
+    if decision_f == "no_cointegration" and decision_t == "no_cointegration":
+        return "no_cointegration"
+    return "inconclusive"
+
+
 def _classify(stat: float, lower: float, upper: float, *, left_tail: bool) -> Decision:
     """Décision à trois états."""
     if left_tail:  # t_BDM : rejet si t < borne I(1) (plus négative)
@@ -206,9 +238,44 @@ class BoundsTestResults:
     bounds: pd.DataFrame
     decision_f: Decision
     decision_t: Decision | None
+    decision_joint: JointDecision | None
     uecm: pd.DataFrame
     cv_source: str
     _fit: _UECMFit = field(repr=False)
+
+    def adjustment(self, alpha: float = 0.05) -> pd.Series:
+        """Vitesse d'ajustement lambda avec IC conditionnel (spec 11 §2.4).
+
+        L'IC standard sur lambda n'est valide que SOUS cointégration
+        établie (distribution non standard sous H0) : si la décision
+        jointe n'est pas ``"cointegration"``, les bornes d'IC sont NaN
+        et un warning méthodologique est émis (piège connu —
+        « ne jamais afficher d'IC sur la vitesse d'ajustement avant
+        cointégration établie »). L'estimée ponctuelle et son se restent
+        consultables.
+        """
+        from scipy.stats import norm
+
+        lam = float(self._fit.params[self._fit.lam_name])
+        pos = self._fit.names.index(self._fit.lam_name)
+        se = float(np.sqrt(self._fit.cov[pos, pos]))
+        if self.decision_joint == "cointegration":
+            z = float(norm.ppf(1 - alpha / 2))
+            ci_lower, ci_upper = lam - z * se, lam + z * se
+        else:
+            warnings.warn(
+                "IC sur lambda masqué : la cointégration n'est pas établie "
+                f"(décision jointe : {self.decision_joint}) — l'IC standard "
+                "sur la vitesse d'ajustement n'est valide que sous "
+                "cointégration (spec 11 §2.4).",
+                ArdlpyMethodologyWarning,
+                stacklevel=2,
+            )
+            ci_lower = ci_upper = np.nan
+        return pd.Series(
+            {"lambda": lam, "se": se, "ci_lower": ci_lower, "ci_upper": ci_upper},
+            name="adjustment",
+        )
 
     def diagnostics(self) -> pd.DataFrame:
         """Ljung-Box, Jarque-Bera, Breusch-Pagan sur les résidus UECM
@@ -249,6 +316,12 @@ class BoundsTestResults:
                 self.decision_t
                 if self.decision_t is not None
                 else f"non tabulé (cas {self.case})"
+            ),
+            "décision jointe F+t (spec 11) : "
+            + (
+                self.decision_joint
+                if self.decision_joint is not None
+                else f"indisponible (cas {self.case}, t non tabulé)"
             ),
             "",
             self.bounds.to_string(float_format=lambda v: f"{v: .3f}"),
@@ -375,6 +448,18 @@ def bounds_test(
             stacklevel=2,
         )
 
+    decision_joint = _joint_decision(decision_f, decision_t)
+    if decision_joint == "degenerate_suspicion":
+        warnings.warn(
+            "F rejette mais pas t : suspicion de dégénérescence de type 1 "
+            "(les gamma seuls portent la relation de niveaux, pas de force "
+            "de rappel en y) — la cointégration n'est PAS établie ; le "
+            "cadre à 3 tests de Sam-McNown-Goh 2019 (spec 15) classifie "
+            "formellement ce cas.",
+            ArdlpyMethodologyWarning,
+            stacklevel=2,
+        )
+
     # garde-fou d'autocorrélation (spec 09 §2.2)
     lb_lags = max(1, min(10, fit.nobs // 5))
     lb_p = float(acorr_ljungbox(fit.resid, lags=[lb_lags])["lb_pvalue"].iloc[0])
@@ -400,6 +485,7 @@ def bounds_test(
         bounds=bounds_df,
         decision_f=decision_f,
         decision_t=decision_t,
+        decision_joint=decision_joint,
         uecm=uecm_table,
         cv_source=cv_source,
         _fit=fit,

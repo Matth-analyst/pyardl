@@ -5,6 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 ## [Non publié]
 
 ### Ajouté
+- Spec 11 (Banerjee-Dolado-Mestre 1998) : `decision_joint` sur
+  `BoundsTestResults` (concordance F+t ; « F rejette mais pas t » →
+  `degenerate_suspicion` + warning renvoyant à la spec 15) ;
+  `adjustment(alpha)` avec IC sur lambda conditionnel à la
+  cointégration établie (sinon NaN + warning) ; tests d'unilatéralité
+  (DGP explosif jamais « cointegration »), MC taille/puissance du t
+  seul (cas III/V, fast_mc + slow), concordance t avec statsmodels
+  UECM à 1e-6 ; script R external bounds_t_test (données danoises).
+- PROVENANCE.md : démonstration complète de la coquille dynamac
+  (position, valeur, triple preuve) en vue d'une issue upstream.
 - Spec 10 (PSS 2001) : `ardlpy.bounds.bounds_test` — UECM estimé
   directement pour les 5 cas déterministes (II/IV : déterministe
   restreint dans le vecteur testé, équivalence Wald/régression

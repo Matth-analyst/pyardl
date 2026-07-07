@@ -41,11 +41,30 @@ reprises, aucun code.
    jour — recoupement par simulation interne requis (spec 12).
    **Dette documentée dans docs/QUESTIONS.md.**
 
-**Note de transcription** : la branche « petit échantillon » de dynamac
-(obs <= 35, cas I) contient une coquille manifeste (10 %, I(0), k = 10 :
-`11.60` au lieu de `1.60`) ; la branche asymptotique utilisée ici porte
-la valeur correcte `1.60` (cohérente avec la monotonie en k et avec
-K&S : 1.598).
+**Coquille détectée dans dynamac (en vue d'une issue upstream)** :
+
+- **Position** : `R/dynamac.R`, fonction `pssbounds()`, branche
+  `obs <= 35`, cas I (`case == 1`), matrice `fmat`, dernière ligne
+  (k = 10), première colonne (seuil 10 %, borne I(0)).
+- **Valeur** : `11.60` ; valeur correcte : `1.60`.
+- **Démonstration** (trois preuves indépendantes) :
+  1. *Monotonie en k* : dans toutes les tables CI de PSS 2001, les
+     bornes F décroissent strictement en k (chaque restriction
+     supplémentaire dilue la statistique). La colonne 10 %/I(0) du cas I
+     décroît de 3.00 (k=0) à 1.63 (k=9) ; une valeur de 11.60 en k=10
+     est incompatible (elle dépasserait même le 1 % de k=0).
+  2. *Cohérence I(0) <= I(1)* : la borne I(0) doit être inférieure ou
+     égale à la borne I(1) du même point, ici 2.72 ; 11.60 > 2.72
+     violerait la définition même des bornes.
+  3. *Seconde source* : la valeur asymptotique Kripfganz-Schneider 2020
+     (statsmodels, clé `(10, 1, False)`, percentile 90) vaut ≈ 1.598,
+     cohérente avec 1.60 et pas avec 11.60.
+- **Confirmation interne** : la branche asymptotique du même fichier
+  (`else # asymtotic`, cas I, même position) porte la valeur correcte
+  `1.60` — la coquille est une erreur de duplication propre à la
+  branche `obs <= 35` (qui recopie les valeurs asymptotiques pour le
+  cas I, non couvert par Narayan 2005).
+- Les tables encodées ici utilisent `1.60`.
 
 **Couverture et limitations (exceptions explicites dans le code)** :
 
