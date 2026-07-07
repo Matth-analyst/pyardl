@@ -7,6 +7,7 @@ nav:
   - Modules:
       - core.transforms: modules/core_transforms.md
       - core.ardl: modules/core_ardl.md
+      - bounds (PSS 2001): modules/bounds_pss.md
   - Questions ouvertes: QUESTIONS.md
   - Écarts documentés: DEVIATIONS.md
 theme:

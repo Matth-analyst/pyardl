@@ -4,6 +4,21 @@ Chaque entrée : spec concernée, point ambigu ou suspect, interprétation
 retenue (la plus standard de la littérature), test marqué
 `@pytest.mark.needs_review` correspondant.
 
+## Spec 10 §4 — DETTE : recoupement des tables PSS 2001 par simulation
+
+**Statut : dette ouverte (spec 12).** Les bornes asymptotiques PSS 2001
+encodées dans `src/ardlpy/critical_values/pss2001.py` sont recoupées par
+une seconde source pour : (a) toutes les valeurs F, k = 1..10 (surfaces
+asymptotiques Kripfganz-Schneider via statsmodels, ±0.15) ; (b) les
+colonnes I(0) du t et la ligne k = 0 (CV Dickey-Fuller MacKinnon,
+±0.03). Restent SANS seconde source : les colonnes **I(1) du t pour
+k ≥ 1** et les lignes **k = 0 du F** (statsmodels commence à k = 1) —
+vérifiées seulement par monotonie structurelle (tests marqués
+`needs_review`). Le **seuil 2.5 %** de l'article n'est pas couvert
+(exception explicite dans `get_bounds`). À solder à la spec 12 : le
+moteur `simulate_bounds` recoupera l'intégralité des tables et ajoutera
+le seuil 2.5 %. Détail complet : `src/ardlpy/critical_values/PROVENANCE.md`.
+
 ## Spec 05 §4 — GETS : « éliminer le retard le moins significatif »
 
 **Point ambigu.** La spec ne précise pas si l'élimination itérative peut

@@ -45,6 +45,15 @@ viennent résorber).
 | IV | non restreinte | restreinte | λ, γ, c₁ |
 | V | non restreinte | non restreinte | λ, γ |
 
+> **Note d'implémentation (2026-07-07, reportée depuis la spec 03 /
+> docs/QUESTIONS.md)** : cas limite q_j = 0 — un régresseur sans retard
+> propre entre dans le vecteur testé {λ, γ_1, ..., γ_k} via son niveau
+> CONTEMPORAIN x_{j,t} (pas de terme Δx_{j,t} distinct). x_{j,t} reste
+> I(1) sous H₀ : par l'identité exacte x_{j,t} = x_{j,t-1} + Δx_{j,t}
+> (écart stationnaire), l'asymptotique du test est inchangée — seule la
+> datation du régresseur de niveau diffère d'une période. Convention
+> identique à Stata ardl ; statsmodels UECM refuse q_j = 0.
+
 Détails d'implémentation :
 1. Cas II et IV : la constante (resp. tendance) entre dans le vecteur testé
    → le F porte sur k+2 restrictions ; la régression s'écrit avec le terme

@@ -5,6 +5,25 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 ## [Non publié]
 
 ### Ajouté
+- Spec 10 (PSS 2001) : `ardlpy.bounds.bounds_test` — UECM estimé
+  directement pour les 5 cas déterministes (II/IV : déterministe
+  restreint dans le vecteur testé, équivalence Wald/régression
+  contrainte verrouillée à 1e-10), F_overall + t_BDM (unilatéral
+  gauche, garde λ̂ < 0), décision à trois états
+  (cointegration/no_cointegration/inconclusive), convention q_j=0
+  (niveau contemporain, I(1) sous H0), diagnostics, summary type
+  publication. Concordance F avec statsmodels UECM.bounds_test (5 cas).
+- `ardlpy.critical_values.pss2001` : bornes asymptotiques PSS 2001
+  (tables CI/CII, k=0..10, seuils 10/5/1 %) avec PROVENANCE.md et
+  recoupement automatisé par seconde source (F : surfaces
+  Kripfganz-Schneider ±0.15 ; t I(0) : Dickey-Fuller/MacKinnon ±0.03) ;
+  exceptions explicites pour toute couverture manquante (2.5 %, t cas
+  II/IV, k>10) ; dette de recoupement simulation documentée (spec 12).
+- Monte Carlo taille/puissance du bounds test (fast_mc 200 reps CI +
+  slow 1000 reps × 5 cas, exécuté : taille ≤ 6.5 % à la borne I(1),
+  puissance croissante en T).
+- Script R external du jalon de phase 1 (réplication PSS 2001 salaires
+  UK via R ARDL / Natsiopoulos & Tzeremes 2022).
 - Spec 05 (Hendry-Pagan-Sargan 1984) : estimateur `ardlpy.core.ardl.ARDL`
   — OLS via lstsq/QR, cov_type nonrobust/HC0-3/HAC, `is_stable`
   (racines AR), vues spec 03 (`ardl_params`, `to_ecm`, `longrun`,
