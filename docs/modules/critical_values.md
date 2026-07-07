@@ -14,11 +14,11 @@ k ≤ 7, F seulement).
 
 ## Politique de sources (spec 12 §2.4)
 
-| `cv_source` | Quand l'utiliser | Couverture |
+| `cv_source` | Fonction | Couverture |
 |---|---|---|
-| `"pss"` | reproduction d'anciens papiers ; fallback | cas I-V, k ≤ 10, F et t, 10/5/2.5*/1 % |
-| `"narayan"` | 30 ≤ T ≤ 80 (données annuelles courtes) | cas II/III/V, k ≤ 7, F seulement, 10/5/1 % |
-| `"kripfganz"` | **deviendra le défaut** (spec 13) : ajuste T continûment, p-values | à venir |
+| `"pss"` | **reproduction de la littérature** : valeurs publiées servies à l'identique, erreur MC d'origine documentée (~±0.05, jusqu'à ±0.15 à 1 %) | cas I-V, k ≤ 10, F et t, 10/5/2.5*/1 % |
+| `"narayan"` | valeurs publiées, 30 ≤ T ≤ 80 (données annuelles courtes) | cas II/III/V, k ≤ 7, F seulement, 10/5/1 % |
+| `"kripfganz"` | **précis, recommandé, deviendra le défaut** (spec 13) : ajuste T continûment, p-values | à venir |
 
 \* le seuil 2.5 % provient du moteur de simulation interne (voir
 PROVENANCE.md), pas de la transcription des tables publiées.

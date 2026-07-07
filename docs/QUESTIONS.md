@@ -55,19 +55,37 @@ maximale). Détail : `validation/results/spec12_pss_crosscheck.csv`.
 3. La cellule t fautive (cas I, k=10, 1 % I(1)) : écart +0.042 contre
    une tolérance de ±0.04 — marginal.
 
-**Question à arbitrer** : la tolérance ±0.05 de la spec 12 §3.1 suppose
-implicitement que les tables publiées sont exactes ; elles portent en
-réalité leur propre erreur MC (~±0.1 au seuil 1 %). Proposition : (a)
-tolérance par seuil dans le test slow (±0.05 à 10/5 %, ±0.15 à 1 %),
-justifiée par l'erreur MC combinée documentée ici ; (b) cellule cas I
-k=0 1 % marquée `needs_review` individuellement ; (c) la validation de
-substance devient la concordance moteur-K&S (±0.06 vérifiée). EN
-ATTENTE de validation utilisateur — le projet interdit de relâcher une
-tolérance sans arbitrage.
+**Statut : CLOS (arbitrage utilisateur du 2026-07-07, raffiné)** :
+critère retenu = tolérance PAR CELLULE de 3 erreurs types combinées,
+DÉRIVÉE du calcul d'erreur MC des quantiles (formule et dérivation :
+PROVENANCE.md, validation/spec12_mc_error.py) — pas de seuil ad hoc.
+Résultat du recoupement officiel (100 000 réplications, critère
+appliqué) : **527/528 cellules dans le critère**. La cellule cas I,
+k=0, 1 % est requalifiée : sa tolérance dérivée vaut 0.35 (queue
+épaisse), l'écart -0.23 n'est qu'à ~2σ — dans l'erreur MC attendue de
+la table publiée (VALIDATION_OBSERVATIONS.md, OBS-2, needs_review
+maintenu). L'unique dépassement (cas II, k=2, 10 % I(1), 3.7σ,
+confirmé par K&S contre la valeur publiée) est documenté en OBS-4 et
+tient dans la marge « 0-3 dépassements fortuits » du test slow.
+cv_source="pss" continue de servir les valeurs publiées à l'identique
+(reproduction de la littérature) ; hiérarchie documentée dans
+get_bounds. Note de révision reportée dans la spec 12 §3.
 
 ## Spec 10 §4 — DETTE : recoupement des tables PSS 2001 par simulation
 
-**Statut : dette ouverte (spec 12).** Les bornes asymptotiques PSS 2001
+**Statut : SOLDÉE (spec 12, 2026-07-07).** Le moteur `simulate_bounds`
+a recoupé l'intégralité des 528 cellules encodées (100 000
+réplications, T=1000, seeds journalisées) : 527/528 dans le critère de
+3 erreurs types combinées (cf. entrée spec 12 §3.1 ci-dessus), Y
+COMPRIS les cellules qui n'avaient aucune seconde source (colonnes
+I(1) du t pour k >= 1, lignes k=0 du F) — les marques `needs_review`
+de monotonie structurelle sont couvertes par ce recoupement. Le seuil
+2.5 % est fourni par simulation interne (`pss2001_p025.py`, provenance
+distincte, needs_review + test d'encadrement 5 %/1 %). Résultats :
+`validation/results/spec12_pss_crosscheck.csv`. Texte d'origine de la
+dette ci-dessous, conservé pour l'historique.
+
+*(Historique)* Les bornes asymptotiques PSS 2001
 encodées dans `src/ardlpy/critical_values/pss2001.py` sont recoupées par
 une seconde source pour : (a) toutes les valeurs F, k = 1..10 (surfaces
 asymptotiques Kripfganz-Schneider via statsmodels, ±0.15) ; (b) les

@@ -78,19 +78,27 @@ class TestEngineCrossCheck:
 @pytest.mark.slow
 @pytest.mark.parametrize(("t_obs", "case", "k"), [(40, 3, 1), (60, 2, 2), (60, 5, 3)])
 def test_engine_crosscheck_full(t_obs: int, case: int, k: int) -> None:
-    """Spec 12 §3.1 (nightly) : cellules Narayan à ±0.1, n_sims=100k."""
+    """Spec 12 §3.1 (nightly, critère révisé — même logique que pour les
+    tables PSS, cf. note de révision de la spec) : cellules Narayan
+    recoupées à n_sims=100k avec tolérance par cellule = 3 x SE combinée
+    (Narayan 2005 : 40 000 réplications, comme PSS)."""
+    from tests.unit.critical_values.test_simulate import _cell_tolerance
+
+    n_sims = 100_000
     lo = simulate_bounds(
-        case=case, k=k, t_obs=t_obs, n_sims=100_000, seed=600 + k, i1=False
+        case=case, k=k, t_obs=t_obs, n_sims=n_sims, seed=600 + k, i1=False
     )
     up = simulate_bounds(
-        case=case, k=k, t_obs=t_obs, n_sims=100_000, seed=700 + k, i1=True
+        case=case, k=k, t_obs=t_obs, n_sims=n_sims, seed=700 + k, i1=True
     )
     for alpha in (0.10, 0.05, 0.01):
         enc_lo, enc_up = get_bounds(
             "F", case=case, k=k, alpha=alpha, cv_source="narayan", t_obs=t_obs
         )
-        assert lo.f_cv(alpha) == pytest.approx(enc_lo, abs=0.1)
-        assert up.f_cv(alpha) == pytest.approx(enc_up, abs=0.1)
+        tol_lo = _cell_tolerance(lo.f_stats, 1 - alpha, n_sims)
+        tol_up = _cell_tolerance(up.f_stats, 1 - alpha, n_sims)
+        assert lo.f_cv(alpha) == pytest.approx(enc_lo, abs=tol_lo)
+        assert up.f_cv(alpha) == pytest.approx(enc_up, abs=tol_up)
 
 
 class TestInterpolationAndCoverage:

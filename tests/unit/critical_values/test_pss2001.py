@@ -74,10 +74,14 @@ class TestCrossCheckDickeyFuller:
             assert upper == pytest.approx(lower, abs=0.011)
 
 
-@pytest.mark.needs_review
 class TestStructuralMonotonicity:
-    """Colonnes I(1) du t (k >= 1) : seule vérification possible avant la
-    spec 12 = cohérence structurelle (cf. PROVENANCE.md, dette)."""
+    """Cohérences structurelles des tables encodées.
+
+    (Marque ``needs_review`` levée le 2026-07-07 : les cellules sans
+    seconde source — colonnes I(1) du t, lignes k=0 du F — sont
+    désormais recoupées par le moteur de simulation interne, spec 12 :
+    527/528 cellules dans le critère de 3 erreurs types combinées, cf.
+    QUESTIONS.md et validation/results/spec12_pss_crosscheck.csv.)"""
 
     def test_f_upper_geq_lower_everywhere(self) -> None:
         for table in F_BOUNDS.values():
@@ -113,9 +117,14 @@ class TestCoverageExceptions:
             with pytest.raises(ValueError, match="ne publie pas de bornes t"):
                 get_bounds("t", case=case, k=1, alpha=0.05)
 
-    def test_alpha_025_raises_with_debt_pointer(self) -> None:
-        with pytest.raises(ValueError, match="spec 12"):
-            get_bounds("F", case=3, k=1, alpha=0.025)
+    def test_alpha_025_served_by_internal_simulation(self) -> None:
+        """Depuis la spec 12, le seuil 2.5 % est servi (simulation
+        interne, cf. test_p025.py) ; un alpha réellement inconnu lève
+        toujours une exception explicite."""
+        lo, up = get_bounds("F", case=3, k=1, alpha=0.025)
+        assert 4.94 < lo < 6.84  # encadré par les 5 % et 1 % publiés
+        with pytest.raises(ValueError, match="non couvert"):
+            get_bounds("F", case=3, k=1, alpha=0.20)
 
     def test_k_too_large_raises(self) -> None:
         with pytest.raises(ValueError, match="hors des tables"):

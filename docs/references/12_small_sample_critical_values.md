@@ -39,6 +39,23 @@ k = 0..7.
 1. simulate_bounds (n=100k, seed fixe) reproduit les bornes PSS
    asymptotiques (T=1000) à ±0.05 et plusieurs cellules publiées de
    Narayan (T=40, 60) à ±0.1.
+
+> **Note de révision (2026-07-07, validée)** : la tolérance uniforme
+> ±0.05 du point 1 supposait implicitement que les tables publiées sont
+> exactes ; elles portent leur propre erreur MC (PSS 2001 : 40 000
+> réplications), maximale dans la queue à 1 % (SE du quantile
+> ~0.05-0.16 selon la dispersion de la cellule). Hypothèse intenable :
+> 23/528 cellules dépassaient ±0.05 alors que le moteur concorde avec
+> Kripfganz-Schneider à ±0.06 partout où K&S existe. Critère corrigé
+> (arbitrage utilisateur) : tolérance PAR CELLULE = 3 x l'erreur type
+> combinée des deux quantiles (formule et estimation de densité :
+> PROVENANCE.md ; scripts : validation/spec12_mc_error.py et
+> spec12_montecarlo.py). À 3σ sur 528 cellules, 0-3 dépassements
+> fortuits restent attendus ; seuls les dépassements persistants entre
+> seeds indépendantes sont des anomalies (registre :
+> docs/VALIDATION_OBSERVATIONS.md). La même logique s'applique au
+> « ±0.1 » du recoupement des cellules de Narayan (40 000 réplications
+> également) : critère par cellule identique.
 2. Interpolation : monotonie des CV en T ; hors plage → warning.
 3. Cas non couvert → exception documentée.
 

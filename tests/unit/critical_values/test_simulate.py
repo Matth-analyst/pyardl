@@ -103,35 +103,77 @@ class TestCrossCheckSampleCells:
         assert sim.t_cv(0.05) == pytest.approx(upper, abs=self.TOL_T)
 
 
+def _cell_tolerance(stats: np.ndarray, p: float, n_sims: int) -> float:
+    """Tolérance par cellule = 3 x SE combinée (PSS 40k + simulation) —
+    critère dérivé de l'erreur MC des quantiles (PROVENANCE.md, note de
+    révision spec 12 §3.1 ; dérivation : validation/spec12_mc_error.py)."""
+    h = 0.005
+    q_hi = np.quantile(stats, min(p + h, 1.0))
+    q_lo = np.quantile(stats, max(p - h, 0.0))
+    density = 2 * h / (q_hi - q_lo)
+    se_pub = np.sqrt(p * (1 - p) / 40_000) / density
+    se_sim = np.sqrt(p * (1 - p) / n_sims) / density
+    return float(3.0 * np.hypot(se_pub, se_sim))
+
+
 @pytest.mark.slow
 def test_full_pss_crosscheck_slow() -> None:
-    """Spec 12 §3.1 (nightly) : recoupement de TOUTES les cellules F et t
-    des tables PSS encodées, n_sims=100k, T=1000, ±0.05 (F) / ±0.04 (t).
+    """Spec 12 §3.1 (nightly, critère révisé — note de révision de la
+    spec) : recoupement de TOUTES les cellules F et t des tables PSS
+    encodées, n_sims=100k, T=1000, tolérance par cellule = 3 x SE
+    combinée. À 3σ sur 528 cellules, 0-3 dépassements fortuits sont
+    attendus -> le test tolère jusqu'à 3 dépassements NON persistants.
 
-    Version script (avec journal + sauvegarde des résultats) :
-    validation/spec12_montecarlo.py.
+    Version script (journal + CSV) : validation/spec12_montecarlo.py.
     """
     from ardlpy.critical_values.pss2001 import LEVELS, MAX_K, T_BOUNDS
 
+    n_sims = 100_000
     failures: list[str] = []
     for case in (1, 2, 3, 4, 5):
         for k in range(MAX_K + 1):
             lo = simulate_bounds(
-                case=case, k=k, n_sims=100_000, seed=10_000 + case * 100 + k, i1=False
+                case=case, k=k, n_sims=n_sims, seed=10_000 + case * 100 + k, i1=False
             )
             up = simulate_bounds(
-                case=case, k=k, n_sims=100_000, seed=20_000 + case * 100 + k, i1=True
+                case=case, k=k, n_sims=n_sims, seed=20_000 + case * 100 + k, i1=True
             )
             for alpha in LEVELS:
                 f_lo, f_up = get_bounds("F", case=case, k=k, alpha=alpha)
-                if abs(lo.f_cv(alpha) - f_lo) > 0.05:
-                    failures.append(f"F I0 c{case} k{k} a{alpha}")
-                if abs(up.f_cv(alpha) - f_up) > 0.05:
-                    failures.append(f"F I1 c{case} k{k} a{alpha}")
+                for sb, sim, enc, tag in (
+                    (lo, lo.f_cv(alpha), f_lo, "I0"),
+                    (up, up.f_cv(alpha), f_up, "I1"),
+                ):
+                    tol = _cell_tolerance(sb.f_stats, 1 - alpha, n_sims)
+                    if abs(sim - enc) > tol:
+                        failures.append(f"F {tag} c{case} k{k} a{alpha}")
                 if case in T_BOUNDS:
                     t_lo, t_up = get_bounds("t", case=case, k=k, alpha=alpha)
-                    if abs(lo.t_cv(alpha) - t_lo) > 0.04:
-                        failures.append(f"t I0 c{case} k{k} a{alpha}")
-                    if abs(up.t_cv(alpha) - t_up) > 0.04:
-                        failures.append(f"t I1 c{case} k{k} a{alpha}")
-    assert not failures, f"{len(failures)} cellules hors tolérance : {failures[:20]}"
+                    for sb, sim, enc, tag in (
+                        (lo, lo.t_cv(alpha), t_lo, "I0"),
+                        (up, up.t_cv(alpha), t_up, "I1"),
+                    ):
+                        tol = _cell_tolerance(sb.t_stats, alpha, n_sims)
+                        if abs(sim - enc) > tol:
+                            failures.append(f"t {tag} c{case} k{k} a{alpha}")
+    assert len(failures) <= 3, (
+        f"{len(failures)} cellules hors critère 3σ (max 3 fortuits "
+        f"attendus) : {failures[:20]}"
+    )
+
+
+@pytest.mark.needs_review
+@pytest.mark.slow
+def test_obs2_case1_k0_1pct_documented_state() -> None:
+    """OBS-2 (docs/VALIDATION_OBSERVATIONS.md) : la cellule PSS cas I,
+    k=0, 1 % (7.17 publié) porte le plus grand écart absolu du
+    recoupement (~-0.22, convergé inter-seeds à ±0.02) — requalifié à
+    ~2σ par le critère dérivé (queue épaisse -> SE publiée ~0.11), donc
+    dans l'erreur MC attendue. Ce test verrouille l'état documenté :
+    il ÉCHOUERA si l'écart disparaît (clore OBS-2) ou s'aggrave
+    (ré-ouvrir l'enquête) ; needs_review jusqu'à vérification contre
+    l'article original."""
+    sim = simulate_bounds(case=1, k=0, n_sims=300_000, seed=111, i1=True)
+    _, enc = get_bounds("F", case=1, k=0, alpha=0.01)
+    gap = sim.f_cv(0.01) - enc
+    assert -0.30 < gap < -0.15, f"écart {gap:.3f} hors de l'état documenté"

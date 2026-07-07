@@ -6,10 +6,14 @@ source de recoupement et limitations de couverture : voir PROVENANCE.md
 dans ce dossier — NE PAS modifier ces nombres sans mettre PROVENANCE.md
 à jour.
 
-Couverture : cas I-V, k = 0..10, seuils 10 %, 5 %, 1 %. Le seuil 2.5 %
-(présent dans l'article) et le recoupement par simulation interne sont
-différés à la spec 12 (dette documentée dans docs/QUESTIONS.md). Toute
-combinaison non couverte lève une exception explicite — jamais de substitution silencieuse.
+Couverture : cas I-V, k = 0..10, seuils 10 %, 5 %, 2.5 %, 1 %. Les
+seuils 10/5/1 % sont les valeurs PUBLIÉES par PSS 2001 (servies à
+l'identique — fonction : reproduction de la littérature) ; le seuil
+2.5 % provient du moteur de simulation interne (spec 12,
+``pss2001_p025.py``, provenance distincte — marqué needs_review jusqu'à
+vérification contre l'article original). Toute combinaison non couverte
+lève une exception explicite — jamais de
+substitution silencieuse.
 """
 
 from __future__ import annotations
@@ -203,28 +207,32 @@ def get_bounds(
             "grand, utiliser le moteur de simulation (spec 12) ou les "
             "surfaces de réponse (spec 13)."
         )
+    if stat not in ("F", "t"):
+        raise ValueError(f'stat doit être "F" ou "t", reçu {stat!r}.')
+    if stat == "t" and case not in T_BOUNDS:
+        raise ValueError(
+            f"PSS 2001 ne publie pas de bornes t pour le cas {case} "
+            "(déterministes restreints) : la statistique t_BDM n'y est "
+            "pas applicable — utiliser le F_overall (tables CI) ou les "
+            "cas III/V."
+        )
+
+    if alpha == 0.025:
+        # Seuil non transcrit des tables publiées : simulation interne
+        # (spec 12, provenance et statut needs_review : PROVENANCE.md).
+        from ardlpy.critical_values.pss2001_p025 import F_P025, T_P025
+
+        cell = (F_P025 if stat == "F" else T_P025)[case][k]
+        return float(cell[0]), float(cell[1])
+
     try:
         level_idx = LEVELS.index(alpha)
     except ValueError:
         raise ValueError(
-            f"alpha={alpha} non couvert : seuils disponibles {LEVELS}. Le "
-            "seuil 2.5 % de PSS 2001 sera ajouté avec le recoupement par "
-            "simulation (spec 12, cf. PROVENANCE.md)."
+            f"alpha={alpha} non couvert : seuils disponibles "
+            f"{(*LEVELS, 0.025)} (cf. PROVENANCE.md)."
         ) from None
 
-    if stat == "F":
-        table = F_BOUNDS[case]
-    elif stat == "t":
-        if case not in T_BOUNDS:
-            raise ValueError(
-                f"PSS 2001 ne publie pas de bornes t pour le cas {case} "
-                "(déterministes restreints) : la statistique t_BDM n'y est "
-                "pas applicable — utiliser le F_overall (tables CI) ou les "
-                "cas III/V."
-            )
-        table = T_BOUNDS[case]
-    else:
-        raise ValueError(f'stat doit être "F" ou "t", reçu {stat!r}.')
-
+    table = F_BOUNDS[case] if stat == "F" else T_BOUNDS[case]
     lower, upper = table[k, level_idx]
     return float(lower), float(upper)

@@ -3,16 +3,22 @@
 Toute table encodée cite sa source exacte dans PROVENANCE.md et est recoupée par une seconde source ou par le
 moteur de simulation interne (spec 12).
 
-Politique de sources (spec 12 §2.4) :
+Politique et hiérarchie des sources (spec 12 §2.4, arbitrage
+2026-07-07) :
 
-- ``"pss"`` : bornes asymptotiques PSS 2001 (T = 1000) — pour la
-  reproduction d'anciens papiers et comme fallback ;
+- ``"pss"`` : bornes asymptotiques PSS 2001, servies À L'IDENTIQUE des
+  valeurs publiées — leur fonction est la REPRODUCTION DE LA
+  LITTÉRATURE. Elles portent l'erreur MC d'origine de l'article
+  (40 000 réplications ; ~±0.05 aux seuils usuels, jusqu'à ~±0.15 dans
+  la queue à 1 % — quantification : PROVENANCE.md). Exception : le
+  seuil 2.5 % provient du moteur interne (non transcrit).
 - ``"narayan"`` : bornes petits échantillons de Narayan 2005
-  (30 <= T <= 80, cas II/III/V, k <= 7, F seulement) — recommandé sur
-  données annuelles courtes ;
+  (30 <= T <= 80, cas II/III/V, k <= 7, F seulement), valeurs publiées
+  à l'identique — recommandé sur données annuelles courtes.
 - ``"kripfganz"`` : surfaces de réponse (spec 13, à venir) — deviendra
-  la source PAR DÉFAUT car elle ajuste T continûment et fournit des
-  p-values.
+  la source PAR DÉFAUT et la source RECOMMANDÉE en usage courant :
+  plus précise que les tables publiées (re-simulation massive), ajuste
+  T continûment, fournit des p-values.
 """
 
 from __future__ import annotations

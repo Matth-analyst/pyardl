@@ -2,6 +2,37 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## [Non publié]
+
+### Ajouté (spec 12 — CV petits échantillons + moteur de simulation)
+- `critical_values.simulate.simulate_bounds` : moteur de simulation des
+  CV sous H0 (QR batchée, jamais d'inversion de X'X ; seed, n_sims,
+  chunk et tous paramètres journalisés dans l'objet résultat).
+- Recoupement intégral des tables PSS 2001 par le moteur (100 000
+  réplications, 528 cellules, y compris celles sans seconde source) :
+  527/528 dans le critère dérivé « 3 erreurs types combinées par
+  cellule » (formule dans PROVENANCE.md ; dérivation :
+  validation/spec12_mc_error.py) — dette QUESTIONS.md spec 10 §4
+  soldée. Note de révision dans la spec 12 (tolérance uniforme ±0.05
+  intenable). Registre docs/VALIDATION_OBSERVATIONS.md créé (OBS-1
+  coquille dynamac, OBS-2 cas I/k=0/1 % requalifiée ~2σ, OBS-3
+  non-monotonie Narayan, OBS-4 cas II/k=2/10 % à 3.7σ confirmé par
+  K&S).
+- Seuil 2.5 % des tables PSS par simulation interne
+  (`pss2001_p025.py`, needs_review + test d'encadrement 5 %/1 %).
+- Tables de Narayan 2005 (`narayan2005.py`, GÉNÉRÉ par parseur
+  programmatique depuis dynamac — jamais de recopie manuelle) :
+  cas II/III/V, T=30..80, k<=7, F ; recoupement moteur (T=40/60),
+  cohérences structurelles, PROVENANCE.md.
+- `get_bounds(stat, case, k, alpha, cv_source, t_obs)` : dispatcher
+  pss/narayan/kripfganz avec hiérarchie documentée (pss = valeurs
+  publiées à l'identique, reproduction de la littérature ; kripfganz à
+  venir = précis, recommandé, futur défaut) ; interpolation linéaire
+  en T pour Narayan, repli asymptotique + warning hors [30, 80],
+  exceptions explicites (cas I/IV, t, k>7).
+- `bounds_test(cv_source="narayan")` : bornes petits échantillons
+  (T = nobs de l'UECM) ; pas de décision t (non tabulé) + warning.
+
 ## [0.1.0] — 2026-07-07
 
 Jalon de phase 1 (specs 03, 05, 10, 11 + garde-fous 09) : la

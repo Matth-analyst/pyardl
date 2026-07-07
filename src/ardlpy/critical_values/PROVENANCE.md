@@ -37,9 +37,13 @@ reprises, aucun code.
    (sans constante pour le cas I, avec constante pour le cas III, avec
    tendance pour le cas V) — comparaison aux CV asymptotiques MacKinnon
    de `statsmodels.tsa.adfvalues.mackinnoncrit` à ±0.03.
-3. **t, colonnes I(1), k >= 1** : PAS de seconde source accessible à ce
-   jour — recoupement par simulation interne requis (spec 12).
-   **Dette documentée dans docs/QUESTIONS.md.**
+3. **t, colonnes I(1), k >= 1 et lignes k = 0 du F** : pas de seconde
+   source externe — recoupées par le **moteur de simulation interne**
+   (spec 12, 2026-07-07) : recoupement intégral des 528 cellules à
+   100 000 réplications, 527/528 dans le critère de 3 erreurs types
+   combinées (voir section « Critère de recoupement » ci-dessous ;
+   l'unique dépassement, à 3.7σ, est documenté en OBS-4 du registre
+   docs/VALIDATION_OBSERVATIONS.md). Dette QUESTIONS.md soldée.
 
 **Coquille détectée dans dynamac (en vue d'une issue upstream)** :
 
@@ -68,9 +72,11 @@ reprises, aucun code.
 
 **Couverture et limitations PSS (exceptions explicites dans le code)** :
 
-- Seuils : 10 %, 5 %, 1 %. Le seuil **2.5 %** (publié dans PSS 2001)
-  n'est pas dans la transcription dynamac ni recoupable via K&S
-  (percentiles 90/95/99/99.9) → différé à la spec 12 (simulation).
+- Seuils publiés transcrits : 10 %, 5 %, 1 %. Le seuil **2.5 %**
+  (publié dans PSS 2001 mais absent de la transcription dynamac et non
+  recoupable via K&S) est fourni par **simulation interne**
+  (`pss2001_p025.py`, section dédiée ci-dessous) — provenance
+  distincte, needs_review + test d'encadrement 5 %/1 %.
 - k = 0..10 (limite des tables PSS) ; au-delà → exception renvoyant
   vers les specs 12/13.
 - t : cas I, III, V uniquement (PSS 2001 ne publie pas de bornes t pour
@@ -110,6 +116,31 @@ publiés par Narayan → erreur orientant vers cv_source="kripfganz"
 (spec 13) ; pas de bornes t → erreur ; k <= 7 ; seuil 2.5 % non publié.
 Interpolation linéaire entre tailles adjacentes (documentée) ; hors
 plage [30, 80] → repli asymptotique PSS + warning.
+
+## Critère de recoupement par simulation (arbitrage du 2026-07-07)
+
+Le recoupement d'une table publiée par le moteur interne compare deux
+quantiles empiriques, chacun porteur d'une erreur MC. Critère retenu
+(dérivé, pas de seuil ad hoc) : **écart admissible par cellule = 3 x
+l'erreur type combinée**
+
+    SE_comb = sqrt( SE(q_p; n_pub)^2 + SE(q_p; n_sim)^2 ),
+    SE(q_p; n) = sqrt(p(1-p)/n) / f(q_p),
+
+avec n_pub = 40 000 (PSS 2001 comme Narayan 2005), n_sim = 100 000, et
+f(q_p) la densité au quantile estimée par différence finie centrée de
+fenêtre 0.005 (en probabilité) sur les tirages simulés. Dérivation et
+valeurs représentatives : `validation/spec12_mc_error.py` (ordre de
+grandeur des SE combinées : 0.01-0.05 à 10/5 %, 0.03-0.16 à 1 % selon
+la dispersion de la cellule — d'où l'intenabilité d'une tolérance
+uniforme ±0.05, cf. note de révision de la spec 12). Validation croisée
+par la dispersion inter-seeds observée (runs indépendants à 300k :
+écarts <= 0.02, cohérents avec les SE calculées).
+
+Lecture des résultats : à 3σ sur 528 cellules, 0 à 3 dépassements
+fortuits sont attendus ; seuls les dépassements PERSISTANTS entre seeds
+indépendantes sont des anomalies — registre :
+`docs/VALIDATION_OBSERVATIONS.md` (OBS-2 : cas I, k=0, 1 %).
 
 ## Seuil 2.5 % des tables PSS (spec 12, simulation interne)
 

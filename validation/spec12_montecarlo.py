@@ -24,6 +24,8 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
+
 from ardlpy.critical_values.pss2001 import LEVELS, MAX_K, T_BOUNDS, get_bounds
 from ardlpy.critical_values.simulate import simulate_bounds
 
@@ -33,12 +35,33 @@ PARAMS = {
     "chunk": 2_000,
     "seed_base_i0": 910_000,  # seed = base + case*100 + k
     "seed_base_i1": 920_000,
-    "tol_f": 0.05,
-    "tol_t": 0.04,
+    # Critère de concordance (arbitrage 2026-07-07, cf. PROVENANCE.md) :
+    # tolérance PAR CELLULE = 3 x SE combinée, SE_comb =
+    # hypot(SE(quantile, n=40k), SE(quantile, n=100k)), la densité au
+    # quantile étant estimée par différence finie centrée (h en proba).
+    "n_pss": 40_000,
+    "se_window": 0.005,
+    "n_se": 3.0,
     "alphas": (0.10, 0.05, 0.025, 0.01),
 }
 
 RESULTS_DIR = Path(__file__).parent / "results"
+
+
+def cell_tolerance(stats: np.ndarray, p: float, n_sims: int) -> float:
+    """Tolérance par cellule = n_se x SE combinée (PSS 40k + simulation).
+
+    SE(q_p) = sqrt(p(1-p)/n) / f(q_p), densité estimée par différence
+    finie centrée de fenêtre ``se_window`` (en probabilité) sur les
+    tirages simulés — cf. validation/spec12_mc_error.py et PROVENANCE.md.
+    """
+    h = PARAMS["se_window"]
+    q_hi = np.quantile(stats, min(p + h, 1.0))
+    q_lo = np.quantile(stats, max(p - h, 0.0))
+    density = 2 * h / (q_hi - q_lo)
+    se_pss = np.sqrt(p * (1 - p) / PARAMS["n_pss"]) / density
+    se_sim = np.sqrt(p * (1 - p) / n_sims) / density
+    return float(PARAMS["n_se"] * np.hypot(se_pss, se_sim))
 
 
 def main(fast: bool = False) -> int:
@@ -80,12 +103,13 @@ def main(fast: bool = False) -> int:
 
             for alpha in LEVELS:
                 f_enc = get_bounds("F", case=case, k=k, alpha=alpha)
-                for bound, sim, enc in (
-                    ("I0", lo.f_cv(alpha), f_enc[0]),
-                    ("I1", up.f_cv(alpha), f_enc[1]),
+                for bound, sb, sim, enc in (
+                    ("I0", lo, lo.f_cv(alpha), f_enc[0]),
+                    ("I1", up, up.f_cv(alpha), f_enc[1]),
                 ):
                     gap = sim - enc
-                    ok = abs(gap) <= PARAMS["tol_f"]
+                    tol = cell_tolerance(sb.f_stats, 1 - alpha, n_sims)
+                    ok = abs(gap) <= tol
                     n_fail += not ok
                     rows.append(
                         dict(
@@ -97,17 +121,19 @@ def main(fast: bool = False) -> int:
                             encoded=enc,
                             simulated=round(sim, 4),
                             gap=round(gap, 4),
+                            tol_3se=round(tol, 4),
                             ok=ok,
                         )
                     )
                 if case in T_BOUNDS:
                     t_enc = get_bounds("t", case=case, k=k, alpha=alpha)
-                    for bound, sim, enc in (
-                        ("I0", lo.t_cv(alpha), t_enc[0]),
-                        ("I1", up.t_cv(alpha), t_enc[1]),
+                    for bound, sb, sim, enc in (
+                        ("I0", lo, lo.t_cv(alpha), t_enc[0]),
+                        ("I1", up, up.t_cv(alpha), t_enc[1]),
                     ):
                         gap = sim - enc
-                        ok = abs(gap) <= PARAMS["tol_t"]
+                        tol = cell_tolerance(sb.t_stats, alpha, n_sims)
+                        ok = abs(gap) <= tol
                         n_fail += not ok
                         rows.append(
                             dict(
@@ -119,6 +145,7 @@ def main(fast: bool = False) -> int:
                                 encoded=enc,
                                 simulated=round(sim, 4),
                                 gap=round(gap, 4),
+                                tol_3se=round(tol, 4),
                                 ok=ok,
                             )
                         )
@@ -129,14 +156,15 @@ def main(fast: bool = False) -> int:
             )
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    csv_path = RESULTS_DIR / "spec12_pss_crosscheck.csv"
+    suffix = "_fast" if fast else ""  # --fast n'écrase pas les officiels
+    csv_path = RESULTS_DIR / f"spec12_pss_crosscheck{suffix}.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
 
     # tables 2.5 % prêtes à intégrer
-    py_path = RESULTS_DIR / "spec12_p025_table.py"
+    py_path = RESULTS_DIR / f"spec12_p025_table{suffix}.py"
     with py_path.open("w", encoding="utf-8") as fh:
         fh.write(
             '"""Seuil 2.5 % simulé (spec 12) — provenance : moteur interne\n'
