@@ -141,12 +141,33 @@ class TestCasesAndGuards:
         assert "D.x1.L0" not in res.uecm.index  # pas de Δ distinct
         assert np.isfinite(res.f_stat)
 
-    def test_cv_source_not_implemented(self) -> None:
+    def test_cv_source_kripfganz_not_implemented(self) -> None:
         y, x = _dgp_cointegrated(seed=6)
         with pytest.raises(NotImplementedError, match="spec 13"):
             bounds_test(y, x, case=3, order=(1, 1), cv_source="kripfganz")
-        with pytest.raises(NotImplementedError, match="spec 12"):
-            bounds_test(y, x, case=3, order=(1, 1), cv_source="narayan")
+
+    def test_cv_source_narayan_small_sample(self) -> None:
+        """Spec 12 : cv_source="narayan" utilise les bornes petits
+        échantillons (T = nobs de l'UECM), plus conservatrices que
+        l'asymptotique ; pas de décision t (Narayan ne tabule pas le t)."""
+        y, x = _dgp_cointegrated(seed=6, n=60)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            res_n = bounds_test(y, x, case=3, order=(1, 1), cv_source="narayan")
+            res_p = bounds_test(y, x, case=3, order=(1, 1), cv_source="pss")
+        assert res_n.f_stat == pytest.approx(res_p.f_stat, abs=1e-12)
+        # bornes Narayan (T~59) strictement au-dessus de l'asymptotique
+        assert res_n.bounds.loc[0.05, "F_I1"] > res_p.bounds.loc[0.05, "F_I1"]
+        assert res_n.decision_t is None
+        assert any(
+            "Narayan" in str(w.message) and "bornes t" in str(w.message) for w in caught
+        )
+
+    def test_cv_source_narayan_case1_raises(self) -> None:
+        """Cas non couvert par Narayan -> exception documentée."""
+        y, x = _dgp_cointegrated(seed=7, n=60)
+        with pytest.raises(ValueError, match="kripfganz"):
+            bounds_test(y, x, case=1, order=(1, 1), cv_source="narayan")
 
     def test_bad_case_raises(self) -> None:
         y, x = _dgp_cointegrated(seed=7)

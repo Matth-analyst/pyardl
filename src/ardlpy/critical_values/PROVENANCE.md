@@ -66,7 +66,7 @@ reprises, aucun code.
   cas I, non couvert par Narayan 2005).
 - Les tables encodées ici utilisent `1.60`.
 
-**Couverture et limitations (exceptions explicites dans le code)** :
+**Couverture et limitations PSS (exceptions explicites dans le code)** :
 
 - Seuils : 10 %, 5 %, 1 %. Le seuil **2.5 %** (publié dans PSS 2001)
   n'est pas dans la transcription dynamac ni recoupable via K&S
@@ -79,3 +79,44 @@ reprises, aucun code.
 - Les tables PSS supposent T = 1000 (asymptotique) : pour les petits
   échantillons, voir Narayan 2005 (spec 12) et les surfaces de réponse
   ajustées en T (spec 13).
+
+## `narayan2005.py` — bornes F petits échantillons (spec 12)
+
+**Source primaire** : Narayan, P. K. (2005), "The saving and investment
+nexus for China: evidence from cointegration tests", *Applied
+Economics*, 37(17), 1979–1990 — tables « Case II / III / V »
+(F seulement ; pas de bornes t), T = 30..80 par pas de 5, k = 0..7,
+seuils 10/5/1 %.
+
+**Canal de transcription** : parseur programmatique
+(`validation/external/extract_narayan_tables.py`) appliqué au source R
+public de dynamac (Jordan & Philips), fichier `R/dynamac.R`, branches
+`obs <= 30` à `obs <= 80` de `pssbounds()` (dépôt
+github.com/andyphilips/dynamac cloné le 2026-07-07). Le fichier
+`narayan2005.py` est GÉNÉRÉ (jamais édité à la main) — l'extraction
+programmatique élimine le risque d'erreur de recopie manuelle. Seules
+les données publiées sont reprises, aucun code.
+
+**Recoupement (moteur de simulation interne, règle du projet)** :
+`tests/unit/critical_values/test_narayan.py` — cellules T = 40 et 60
+recoupées par `simulate_bounds` (Narayan a utilisé le même DGP que PSS
+2001 avec T fini, 40 000 réplications) : tolérance ±0.1 à n_sims élevé
+(version slow), ±0.15 à 20 000 (version fast_mc). Cohérences
+structurelles vérifiées sur TOUTES les cellules : I(0) <= I(1),
+décroissance en k, décroissance vers l'asymptotique PSS quand T croît.
+
+**Couverture et limitations (exceptions explicites)** : cas I et IV non
+publiés par Narayan → erreur orientant vers cv_source="kripfganz"
+(spec 13) ; pas de bornes t → erreur ; k <= 7 ; seuil 2.5 % non publié.
+Interpolation linéaire entre tailles adjacentes (documentée) ; hors
+plage [30, 80] → repli asymptotique PSS + warning.
+
+## Seuil 2.5 % des tables PSS (spec 12, simulation interne)
+
+Le seuil 2.5 % publié par PSS 2001 n'étant pas transcrit par le canal
+dynamac (3 seuils seulement), il est fourni par le moteur interne :
+`validation/spec12_montecarlo.py` (T = 1000, n_sims = 100 000, seeds
+journalisées dans le script, quantiles 0.975/0.025) — tables
+`F_P025`/`T_P025` intégrées à `pss2001.py` avec cette provenance. La
+précision MC est ~±0.02 ; ces valeurs sont marquées comme
+« simulation interne » et non « PSS 2001 publié ».

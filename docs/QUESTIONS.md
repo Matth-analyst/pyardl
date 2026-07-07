@@ -32,6 +32,39 @@ d'échantillon identique », testée dans
 `tests/replication/test_spec05.py`. Les coefficients à ordres fixes
 concordent à 1e-6 (contrat numérique intact).
 
+## Spec 12 §3.1 — recoupement PSS : 23 cellules hors tolérance ±0.05 (EN ATTENTE D'ARBITRAGE)
+
+**Constat (2026-07-07, `validation/spec12_montecarlo.py`, T=1000,
+n_sims=100 000, seeds journalisées)** : 505/528 cellules des tables PSS
+2001 encodées sont reproduites à ±0.05 (F) / ±0.04 (t). 23 cellules
+dépassent, dont 17 au seuil 1 % (queue de distribution, erreur MC
+maximale). Détail : `validation/results/spec12_pss_crosscheck.csv`.
+
+**Diagnostic (triple vérification)** :
+1. Sur les 14 cellules F fautives à k >= 1, notre simulation concorde
+   avec Kripfganz-Schneider 2020 (la re-simulation la plus précise
+   publiée) à ±0.06, alors que les valeurs PSS publiées s'écartent de
+   K&S jusqu'à 0.14 — le moteur est validé ; l'écart est l'erreur MC
+   des tables PSS elles-mêmes (40 000 réplications en 2001).
+2. Cellules k=0 (sans source K&S) : deux runs indépendants à 300 000
+   réplications concordent entre eux à ±0.02 et convergent vers PSS
+   pour les cas IV/V (15.73 exact) — sauf **cas I, k=0, 1 % : écart
+   persistant -0.22** (PSS 7.17 vs ~6.95 convergé), à traiter à part
+   (valeur PSS possiblement imprécise ou de source différente ; pas de
+   seconde source disponible).
+3. La cellule t fautive (cas I, k=10, 1 % I(1)) : écart +0.042 contre
+   une tolérance de ±0.04 — marginal.
+
+**Question à arbitrer** : la tolérance ±0.05 de la spec 12 §3.1 suppose
+implicitement que les tables publiées sont exactes ; elles portent en
+réalité leur propre erreur MC (~±0.1 au seuil 1 %). Proposition : (a)
+tolérance par seuil dans le test slow (±0.05 à 10/5 %, ±0.15 à 1 %),
+justifiée par l'erreur MC combinée documentée ici ; (b) cellule cas I
+k=0 1 % marquée `needs_review` individuellement ; (c) la validation de
+substance devient la concordance moteur-K&S (±0.06 vérifiée). EN
+ATTENTE de validation utilisateur — le projet interdit de relâcher une
+tolérance sans arbitrage.
+
 ## Spec 10 §4 — DETTE : recoupement des tables PSS 2001 par simulation
 
 **Statut : dette ouverte (spec 12).** Les bornes asymptotiques PSS 2001

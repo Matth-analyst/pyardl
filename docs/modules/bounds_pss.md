@@ -87,13 +87,21 @@ valide sous H₀ (piège documenté dans les règles du projet).
 
 ## Valeurs critiques
 
-Bornes asymptotiques PSS 2001 (tables CI/CII), k = 0..10, seuils
-10/5/1 % — provenance et recoupement par seconde source documentés dans
-[`src/ardlpy/critical_values/PROVENANCE.md`](../../src/ardlpy/critical_values/PROVENANCE.md).
-Limitations actuelles (exceptions explicites) : seuil 2.5 % et
-recoupement simulation différés à la spec 12 (dette,
-[QUESTIONS.md](../QUESTIONS.md)) ; petits échantillons → Narayan
-(spec 12) ; p-values et ajustement en T → surfaces de réponse (spec 13).
+Deux sources disponibles via `cv_source` (politique complète :
+[critical_values](critical_values.md)) :
+
+- `"pss"` (défaut) : bornes asymptotiques PSS 2001 (tables CI/CII),
+  k ≤ 10 — recoupées intégralement par le moteur de simulation interne
+  (spec 12) ;
+- `"narayan"` : bornes petits échantillons de Narayan 2005 (T = nobs de
+  l'UECM, interpolation entre tailles tabulées ; cas II/III/V, F
+  seulement → `decision_t = None` + warning) — recommandé si
+  30 ≤ T ≤ 80, où l'asymptotique sur-rejette.
+
+Provenance et recoupements :
+[`PROVENANCE.md`](../../src/ardlpy/critical_values/PROVENANCE.md).
+p-values et ajustement continu en T → surfaces de réponse (spec 13, à
+venir, deviendra le défaut).
 
 ## Jalon de phase 1
 

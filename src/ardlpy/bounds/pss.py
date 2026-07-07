@@ -47,7 +47,7 @@ from statsmodels.stats.diagnostic import acorr_ljungbox, het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 
 from ardlpy.core.ardl import ARDL
-from ardlpy.critical_values.pss2001 import get_bounds
+from ardlpy.critical_values import get_bounds
 from ardlpy.exceptions import ArdlpyMethodologyWarning, DegenerateCaseWarning
 from ardlpy.utils import check_series
 
@@ -363,10 +363,14 @@ def bounds_test(
     alpha : float
         Seuil des bornes utilisé pour la décision (le tableau
         ``bounds`` rapporte tous les seuils disponibles).
-    cv_source : {"pss", "kripfganz", "narayan"}
-        Source des valeurs critiques. "kripfganz" (surfaces de réponse,
-        spec 13) et "narayan" (petits échantillons, spec 12) ne sont pas
-        encore disponibles -> exception explicite.
+    cv_source : {"pss", "narayan", "kripfganz"}
+        Source des valeurs critiques (politique : spec 12 §2.4).
+        "pss" : bornes asymptotiques PSS 2001. "narayan" : bornes petits
+        échantillons de Narayan 2005 (T = nobs de l'UECM, interpolation ;
+        cas II/III/V, F seulement -> pas de décision t), recommandé si
+        30 <= T <= 80. "kripfganz" (surfaces de réponse, spec 13) pas
+        encore disponible -> exception explicite ; il deviendra le
+        défaut.
     fixed_regressors : array-like, shape (T, m), optional
         Variables z_t sans retards (ex. dummies), hors du vecteur testé
         (non prises en compte par la sélection d'ordre automatique).
@@ -386,12 +390,14 @@ def bounds_test(
     """
     if case not in (1, 2, 3, 4, 5):
         raise ValueError(f"case doit être dans 1..5, reçu {case}.")
-    if cv_source != "pss":
-        spec_num = "13" if cv_source == "kripfganz" else "12"
+    if cv_source == "kripfganz":
         raise NotImplementedError(
-            f'cv_source="{cv_source}" arrive avec la spec {spec_num} ; '
-            'seul "pss" (bornes asymptotiques PSS 2001) est disponible.'
+            'cv_source="kripfganz" (surfaces de réponse) arrive avec la '
+            'spec 13 ; disponibles : "pss" (asymptotique) et "narayan" '
+            "(petits échantillons, spec 12)."
         )
+    if cv_source not in ("pss", "narayan"):
+        raise ValueError(f"cv_source inconnu : {cv_source!r}.")
 
     y_arr, x_arr, _, y_name, x_names = check_series(y, x)
     if x_arr is None:
@@ -435,10 +441,13 @@ def bounds_test(
     )
     t_stat = lam_hat / se_lam
 
-    # bornes à tous les seuils disponibles
+    # bornes à tous les seuils disponibles (F : source choisie ; t : tables
+    # PSS uniquement — Narayan ne publie pas de bornes t, cf. plus bas)
     rows = []
     for a in (0.10, 0.05, 0.01):
-        f_lo, f_up = get_bounds("F", case=case, k=k, alpha=a)
+        f_lo, f_up = get_bounds(
+            "F", case=case, k=k, alpha=a, cv_source=cv_source, t_obs=fit.nobs
+        )
         try:
             t_lo, t_up = get_bounds("t", case=case, k=k, alpha=a)
         except ValueError:
@@ -448,11 +457,24 @@ def bounds_test(
         )
     bounds_df = pd.DataFrame(rows).set_index("alpha")
 
-    f_lo, f_up = get_bounds("F", case=case, k=k, alpha=alpha)
+    f_lo, f_up = get_bounds(
+        "F", case=case, k=k, alpha=alpha, cv_source=cv_source, t_obs=fit.nobs
+    )
     decision_f = _classify(f_stat, f_lo, f_up, left_tail=False)
 
     decision_t: Decision | None
-    if case in (1, 3, 5):
+    if cv_source == "narayan" and case in (3, 5):
+        decision_t = None
+        warnings.warn(
+            "Narayan 2005 ne publie pas de bornes t : décision t "
+            'indisponible avec cv_source="narayan" — le t_stat est '
+            'rapporté ; utiliser cv_source="pss" pour une décision t '
+            "asymptotique (en petit échantillon elle serait trop "
+            "libérale, spec 12 §1).",
+            ArdlpyMethodologyWarning,
+            stacklevel=2,
+        )
+    elif case in (1, 3, 5):
         t_lo, t_up = get_bounds("t", case=case, k=k, alpha=alpha)
         decision_t = _classify(t_stat, t_lo, t_up, left_tail=True)
         if lam_hat >= 0:
