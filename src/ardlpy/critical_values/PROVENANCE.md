@@ -151,3 +151,42 @@ journalisées dans le script, quantiles 0.975/0.025) — tables
 `F_P025`/`T_P025` intégrées à `pss2001.py` avec cette provenance. La
 précision MC est ~±0.02 ; ces valeurs sont marquées comme
 « simulation interne » et non « PSS 2001 publié ».
+
+## `ks2020.py` — surfaces de réponse Kripfganz-Schneider (spec 13, voie A1)
+
+**Référence méthodologique** : Kripfganz, S. & Schneider, D. C. (2020),
+"Response Surface Regressions for Critical Value Bounds and Approximate
+p-values in Equilibrium Correction Models", *OBES* 82(6), 1456-1481
+(version ouverte : University of Exeter Discussion Paper 1901).
+
+**Matériel utilisé (voie A1)** : module
+`statsmodels.tsa.ardl.pss_critical_values` — qui n'est PAS une
+redistribution des coefficients publiés par K&S : statsmodels a
+RE-SIMULÉ les distributions (32 000 000 réplications par configuration,
+méthodologie PSS/K&S, scripts `pss.py`/`pss-process.py` de statsmodels)
+et ajusté ses propres polynômes de p-values asymptotiques. Licence
+BSD-3 de statsmodels (dépendance runtime déjà requise) : ardlpy ne
+redistribue rien — import à l'exécution.
+
+**Validation contre les valeurs publiées**
+(`tests/unit/critical_values/test_ks2020.py`) : intercepts theta_{0,0}
+des surfaces publiées (WP Exeter 1901, annexe D, Table 12 — CV
+asymptotiques), transcrits le 2026-07-10 depuis
+https://exetereconomics.github.io/RePEc/dpapers/DP1901.pdf ;
+concordance à ±0.03 (10/5 %) et ±0.06 (1 %) — la tolérance 1e-3 de la
+spec ne s'applique qu'à la voie A2 (mêmes coefficients), cf.
+DEVIATIONS.md. Cohérences internes : CV -> bornes PSS (±0.15, l'erreur
+MC des tables publiées), monotonies en k et alpha, aller-retour
+p-value/CV à 1e-8, seuil 2.5 % recoupé contre la table interne de la
+spec 12 (±0.05 — deux simulations indépendantes).
+
+**OBS-4 confirmée** : la surface donne 3.3084 pour la cellule cas II,
+k=2, 10 % I(1) — troisième source concordante contre la valeur publiée
+PSS 3.35 (docs/VALIDATION_OBSERVATIONS.md).
+
+**Couverture voie A1 (exceptions explicites)** : F seulement (les
+p-values et surfaces du t arriveront avec les coefficients K&S — voie
+A2, licence en cours de clarification — ou la voie B) ; k = 1..10 ;
+asymptotique (pas d'ajustement fini-T). Les bornes t servies sous
+cv_source="kripfganz" restent celles de PSS 2001 (composition
+documentée dans bounds_test).

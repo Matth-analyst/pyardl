@@ -26,7 +26,13 @@ _ORDER = (3, {"LRY": 1, "IBO": 3, "IDE": 2})
 @pytest.mark.external
 def test_t_case3_matches_r_bounds_t_test() -> None:
     data = load_denmark()
-    res = bounds_test(data["LRM"], data[["LRY", "IBO", "IDE"]], case=3, order=_ORDER)
+    res = bounds_test(
+        data["LRM"],
+        data[["LRY", "IBO", "IDE"]],
+        case=3,
+        order=_ORDER,
+        cv_source="pss",
+    )
     assert res.t_stat == pytest.approx(
         _EXPECTED["t_case3"], abs=_EXPECTED["tolerance"]["t_stat"]
     )
@@ -39,7 +45,11 @@ def test_t_case5_matches_r_bounds_t_test() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         res = bounds_test(
-            data["LRM"], data[["LRY", "IBO", "IDE"]], case=5, order=_ORDER
+            data["LRM"],
+            data[["LRY", "IBO", "IDE"]],
+            case=5,
+            order=_ORDER,
+            cv_source="pss",
         )
     assert res.t_stat == pytest.approx(
         _EXPECTED["t_case5_with_trend"], abs=_EXPECTED["tolerance"]["t_stat"]

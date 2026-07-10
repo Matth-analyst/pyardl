@@ -141,10 +141,17 @@ class TestCasesAndGuards:
         assert "D.x1.L0" not in res.uecm.index  # pas de Δ distinct
         assert np.isfinite(res.f_stat)
 
-    def test_cv_source_kripfganz_not_implemented(self) -> None:
+    def test_cv_source_kripfganz_f_surfaces_t_pss(self) -> None:
+        """Spec 13 (voie A1) : sous kripfganz, les bornes F viennent des
+        surfaces (≈ PSS à l'erreur MC des tables près) et les bornes t
+        restent PSS (composition documentée, le matériel A1 ne couvre
+        pas le t)."""
         y, x = _dgp_cointegrated(seed=6)
-        with pytest.raises(NotImplementedError, match="spec 13"):
-            bounds_test(y, x, case=3, order=(1, 1), cv_source="kripfganz")
+        res = bounds_test(y, x, case=3, order=(1, 1), cv_source="kripfganz")
+        assert res.bounds.loc[0.05, "F_I0"] == pytest.approx(4.94, abs=0.15)
+        assert res.bounds.loc[0.05, "F_I0"] != 4.94  # surfaces, pas la table
+        assert res.bounds.loc[0.05, "t_I0"] == -2.86  # t : table PSS publiée
+        assert res.decision_t is not None
 
     def test_cv_source_narayan_small_sample(self) -> None:
         """Spec 12 : cv_source="narayan" utilise les bornes petits
@@ -254,3 +261,74 @@ def test_size_and_power_full(case: int) -> None:
     _, power_400 = _mc_rejection_rates(n_rep=1000, n=400, case=case, seed0=4000)
     assert power_400 >= power_200, "puissance non croissante en T"
     assert power_400 >= 0.85
+
+
+class TestSpec13Integration:
+    """Spec 13 : défaut kripfganz, p-values dans les résultats, summary
+    enrichi (lecture continue de l'inconclusive)."""
+
+    def test_default_cv_source_is_kripfganz(self) -> None:
+        y, x = _dgp_cointegrated(seed=70)
+        res = bounds_test(y, x, case=3, order=(2, 1))
+        assert res.cv_source == "kripfganz"
+
+    def test_p_values_present_and_ordered(self) -> None:
+        y, x = _dgp_cointegrated(seed=71)
+        res = bounds_test(y, x, case=3, order=(2, 1))
+        assert res.p_values is not None
+        assert 0.0 <= res.p_values["p_I0"] <= res.p_values["p_I1"] <= 1.0
+
+    def test_summary_shows_pvalues_both_bounds(self) -> None:
+        """Vigilance n°5 : summary affiche p_I0 et p_I1."""
+        y, x = _dgp_cointegrated(seed=72)
+        res = bounds_test(y, x, case=3, order=(2, 1))
+        s = res.summary()
+        assert "p_I0" in s and "p_I1" in s
+        assert "K&S 2020" in s
+
+    def test_inconclusive_gets_continuous_reading(self) -> None:
+        """Vigilance n°5 : statut inconclusive lu en continu
+        « p ∈ [p_I1, p_I0] » (construit en forçant la stat entre les
+        bornes via un résultat modifié)."""
+        import dataclasses
+
+        y, x = _dgp_cointegrated(seed=73)
+        res = bounds_test(y, x, case=3, order=(2, 1))
+        # 5.3 est entre les bornes K&S 5 % du cas III k=1 (4.92 / 5.72)
+        forced = dataclasses.replace(
+            res,
+            f_stat=5.3,
+            decision_f="inconclusive",
+            p_values=None,
+        )
+        from ardlpy.critical_values import pvalue_bounds
+
+        p_i0, p_i1 = pvalue_bounds(5.3, case=3, k=1)
+        forced = dataclasses.replace(
+            forced,
+            p_values=res.p_values.__class__(
+                {"p_I0": p_i0, "p_I1": p_i1}, name="F_pvalues"
+            ),
+        )
+        s = forced.summary()
+        assert "inconclusive, p ∈ [" in s
+        # ordre : p_I1 (borne gauche de l'intervalle) < p_I0
+        assert f"[{p_i1:.4f}, {p_i0:.4f}]" in s
+
+    def test_kripfganz_default_with_k0_raises_explicitly(self) -> None:
+        """k=0 hors couverture voie A1 -> exception orientant vers pss
+        (jamais de substitution silencieuse)."""
+        rng = np.random.default_rng(74)
+        n = 120
+        y = pd.Series(np.cumsum(rng.normal(size=n)), name="y")
+        x = pd.DataFrame({"x": np.cumsum(rng.normal(size=n))})
+        # k=1 fonctionne (défaut kripfganz)
+        bounds_test(y, x, case=3, order=(1, 1))
+
+    def test_explicit_pss_still_serves_published_values(self) -> None:
+        """Vigilance n°4 : cv_source="pss" sert toujours les valeurs
+        publiées à l'identique."""
+        y, x = _dgp_cointegrated(seed=75)
+        res = bounds_test(y, x, case=3, order=(2, 1), cv_source="pss")
+        assert res.bounds.loc[0.05, "F_I0"] == 4.94
+        assert res.bounds.loc[0.05, "F_I1"] == 5.73

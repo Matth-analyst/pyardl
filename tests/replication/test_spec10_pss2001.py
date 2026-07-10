@@ -51,6 +51,9 @@ def _run(case: int):
             data[["Prod", "UR", "Wedge", "Union"]],
             case=case,
             order=_ORDER,
+            # réplication de la littérature -> valeurs publiées PSS
+            # explicites (le défaut est "kripfganz" depuis la spec 13)
+            cv_source="pss",
             fixed_regressors=data[["D7475", "D7579"]],
         )
 

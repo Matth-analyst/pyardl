@@ -4,6 +4,34 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
 ## [Non publié]
 
+### Modifié (spec 13 — CHANGEMENT DE COMPORTEMENT)
+- **`bounds_test` : `cv_source` par défaut passe de `"pss"` à
+  `"kripfganz"`** (surfaces de réponse, voie A1 via statsmodels). Les
+  bornes F par défaut sont désormais les CV asymptotiques précis (32M
+  de réplications) au lieu des valeurs publiées PSS 2001 ; les bornes t
+  restent celles de PSS (le matériel voie A1 ne couvre pas le t —
+  composition documentée). Pour reproduire la littérature à
+  l'identique, passer explicitement `cv_source="pss"` (les réplications
+  PSS 2001 des tests le font désormais, et restent vertes).
+
+### Ajouté (spec 13, voie A1 — surfaces de réponse et p-values)
+- `critical_values.ks2020` : CV asymptotiques du F à TOUT seuil
+  (percentiles simulés + inversion numérique des polynômes) et
+  `pvalue_bounds(f_stat, case, k)` -> (p_I0, p_I1) — méthodologie
+  Kripfganz-Schneider 2020 via le matériel re-simulé de statsmodels
+  (BSD, aucun matériel K&S redistribué — PROVENANCE.md).
+- `BoundsTestResults.p_values` + `summary()` enrichi : p-values aux
+  deux bornes et lecture continue de la zone non concluante
+  (« inconclusive, p ∈ [p_I1, p_I0] »).
+- Validation contre les valeurs publiées (WP Exeter 1901, annexe D,
+  intercepts theta_{0,0}) ; cohérences internes : bornes PSS validées
+  en spec 12, monotonies en k et alpha, aller-retour p-value/CV à 1e-8,
+  seuil 2.5 % recoupé contre la table interne spec 12 (±0.05) ; OBS-4
+  confirmée par la surface (3.3084 — troisième source concordante,
+  registre mis à jour).
+- Limitations voie A1 explicites : F seulement, k=1..10, asymptotique
+  (fini-T -> voie A2 [licence K&S en clarification] ou voie B v0.4+).
+
 ### Ajouté (spec 12 — CV petits échantillons + moteur de simulation)
 - `critical_values.simulate.simulate_bounds` : moteur de simulation des
   CV sous H0 (QR batchée, jamais d'inversion de X'X ; seed, n_sims,

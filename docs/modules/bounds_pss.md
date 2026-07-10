@@ -90,9 +90,14 @@ valide sous H₀ (piège documenté dans les règles du projet).
 Deux sources disponibles via `cv_source` (politique complète :
 [critical_values](critical_values.md)) :
 
-- `"pss"` (défaut) : bornes asymptotiques PSS 2001 (tables CI/CII),
-  k ≤ 10 — recoupées intégralement par le moteur de simulation interne
-  (spec 12) ;
+- `"kripfganz"` (défaut depuis la spec 13) : surfaces de réponse —
+  CV F asymptotiques précis à tout seuil et p-values aux deux bornes
+  (`res.p_values`, affichées par `summary()` avec lecture continue de
+  l'inconclusive « p ∈ [p_I1, p_I0] ») ; bornes t : PSS (composition
+  documentée) ;
+- `"pss"` : bornes publiées PSS 2001 à l'identique (reproduction de la
+  littérature), k ≤ 10 — recoupées intégralement par le moteur de
+  simulation interne (spec 12) ;
 - `"narayan"` : bornes petits échantillons de Narayan 2005 (T = nobs de
   l'UECM, interpolation entre tailles tabulées ; cas II/III/V, F
   seulement → `decision_t = None` + warning) — recommandé si

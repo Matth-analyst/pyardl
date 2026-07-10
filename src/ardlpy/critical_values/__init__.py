@@ -15,10 +15,12 @@ Politique et hiérarchie des sources (spec 12 §2.4, arbitrage
 - ``"narayan"`` : bornes petits échantillons de Narayan 2005
   (30 <= T <= 80, cas II/III/V, k <= 7, F seulement), valeurs publiées
   à l'identique — recommandé sur données annuelles courtes.
-- ``"kripfganz"`` : surfaces de réponse (spec 13, à venir) — deviendra
-  la source PAR DÉFAUT et la source RECOMMANDÉE en usage courant :
-  plus précise que les tables publiées (re-simulation massive), ajuste
-  T continûment, fournit des p-values.
+- ``"kripfganz"`` : surfaces de réponse (spec 13, voie A1 via
+  statsmodels) — source PAR DÉFAUT et RECOMMANDÉE : plus précise que
+  les tables publiées (32M de réplications par configuration contre
+  40k), tout seuil alpha, p-values aux deux bornes
+  (:func:`pvalue_bounds`). Limites voie A1 : asymptotique (ajustement
+  fini-T -> voie A2/B), F seulement, k = 1..10.
 """
 
 from __future__ import annotations
@@ -28,6 +30,8 @@ from typing import Literal
 
 import numpy as np
 
+from ardlpy.critical_values.ks2020 import crit_value_bounds as _ks_bounds
+from ardlpy.critical_values.ks2020 import pvalue_bounds
 from ardlpy.critical_values.narayan2005 import (
     F_NARAYAN,
     MAX_K_NARAYAN,
@@ -37,7 +41,7 @@ from ardlpy.critical_values.pss2001 import get_bounds as _pss_bounds
 from ardlpy.critical_values.simulate import SimulatedBounds, simulate_bounds
 from ardlpy.exceptions import ArdlpyMethodologyWarning
 
-__all__ = ["get_bounds", "simulate_bounds", "SimulatedBounds"]
+__all__ = ["get_bounds", "pvalue_bounds", "simulate_bounds", "SimulatedBounds"]
 
 _NARAYAN_LEVELS = {0.10: 0, 0.05: 1, 0.01: 2}
 
@@ -133,7 +137,16 @@ def get_bounds(
             raise ValueError('cv_source="narayan" requiert t_obs.')
         return _narayan_bounds(stat, case, k, alpha, t_obs)
     if cv_source == "kripfganz":
-        raise NotImplementedError(
-            'cv_source="kripfganz" (surfaces de réponse) arrive avec la spec 13.'
-        )
+        # Voie A1 : asymptotique, F seulement (t -> exception explicite
+        # de ks2020 pointant vers "pss") ; t_obs ignoré à ce stade
+        # (ajustement fini-T : voie A2/B, cf. PROVENANCE.md).
+        return _ks_bounds(case, k, alpha) if stat == "F" else _ks_t_error()
     raise ValueError(f"cv_source inconnu : {cv_source!r}.")
+
+
+def _ks_t_error() -> tuple[float, float]:
+    raise ValueError(
+        'cv_source="kripfganz" (voie A1) ne couvre pas le t_BDM : '
+        'utiliser cv_source="pss" pour les bornes t (surfaces t : voie '
+        "A2/B, cf. PROVENANCE.md)."
+    )

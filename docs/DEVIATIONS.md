@@ -18,3 +18,21 @@ grilles volumineuses du moteur de simulation (spec 12) et sera adopté
 là-bas.
 
 **Commit** : spec 10 (bounds test PSS 2001).
+
+## Spec 13 §3.1 — tolérance de validation « 1e-3 » inapplicable à la voie A1
+
+**Écart** : la spec exige la reproduction des CV affichés par Stata ardl
+« à 1e-3 » ; les tests de la voie A1 utilisent ±0.03 (10/5 %) et ±0.06
+(1 %) contre les intercepts theta_{0,0} publiés (WP Exeter 1901,
+annexe D).
+
+**Justification** : le 1e-3 suppose l'évaluation des MÊMES coefficients
+publiés (voie A2). La voie A1 s'appuie sur la re-simulation indépendante
+de statsmodels (32M de réplications, licence BSD — aucun matériel K&S
+redistribué) : deux estimateurs indépendants de haute précision du même
+quantile diffèrent structurellement de ~0.01-0.02 (designs de
+simulation), plus un léger biais fini-T résiduel dans la queue à 1 %
+(theta_{0,0} = intercept T→inf extrapolé vs simulation directe). Le
+critère 1e-3 redeviendra applicable à la voie A2 (mêmes coefficients).
+
+**Commit** : spec 13 (voie A1).

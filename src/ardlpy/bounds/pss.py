@@ -248,6 +248,7 @@ class BoundsTestResults:
     decision_joint: JointDecision | None
     uecm: pd.DataFrame
     cv_source: str
+    p_values: pd.Series | None  # (p_I0, p_I1) du F — None si indisponible
     _fit: _UECMFit = field(repr=False)
 
     def adjustment(self, alpha: float = 0.05) -> pd.Series:
@@ -308,16 +309,33 @@ class BoundsTestResults:
         )
 
     def summary(self) -> str:
-        """Présentation type publication (stat, bornes aux 3 seuils,
-        décision)."""
+        """Présentation type publication : stats, p-values aux deux
+        bornes (spec 13), bornes aux 3 seuils, décisions (avec lecture
+        continue de la zone non concluante)."""
         p, q = self.order
         q_desc = ", ".join(f"{n}:{v}" for n, v in q.items())
+
+        decision_f_txt: str = self.decision_f
+        if self.decision_f == "inconclusive" and self.p_values is not None:
+            # lecture continue de la zone non concluante (spec 13 §2.1.4)
+            decision_f_txt = (
+                f"inconclusive, p ∈ [{self.p_values['p_I1']:.4f}, "
+                f"{self.p_values['p_I0']:.4f}]"
+            )
+        p_line = (
+            f"p-values F (K&S 2020) : p_I0 = {self.p_values['p_I0']:.4f}, "
+            f"p_I1 = {self.p_values['p_I1']:.4f}"
+            if self.p_values is not None
+            else "p-values F : indisponibles (k hors couverture des surfaces)"
+        )
+
         lines = [
             f"Bounds test PSS 2001 — cas {self.case}, k={self.k}, "
             f"UECM({p}; {q_desc}), cv_source={self.cv_source}",
             "",
             f"F_overall = {self.f_stat:.4f}   décision ({self.alpha:.0%}) : "
-            f"{self.decision_f}",
+            f"{decision_f_txt}",
+            p_line,
             f"t_BDM     = {self.t_stat:.4f}   décision ({self.alpha:.0%}) : "
             + (
                 self.decision_t
@@ -345,7 +363,7 @@ def bounds_test(
     max_p: int = 4,
     max_q: int = 4,
     alpha: float = 0.05,
-    cv_source: Literal["pss", "kripfganz", "narayan"] = "pss",
+    cv_source: Literal["kripfganz", "pss", "narayan"] = "kripfganz",
     fixed_regressors: npt.ArrayLike | None = None,
 ) -> BoundsTestResults:
     """Bounds test de cointégration PSS 2001 (spec 10 §5 — fonction phare).
@@ -363,14 +381,17 @@ def bounds_test(
     alpha : float
         Seuil des bornes utilisé pour la décision (le tableau
         ``bounds`` rapporte tous les seuils disponibles).
-    cv_source : {"pss", "narayan", "kripfganz"}
-        Source des valeurs critiques (politique : spec 12 §2.4).
-        "pss" : bornes asymptotiques PSS 2001. "narayan" : bornes petits
-        échantillons de Narayan 2005 (T = nobs de l'UECM, interpolation ;
-        cas II/III/V, F seulement -> pas de décision t), recommandé si
-        30 <= T <= 80. "kripfganz" (surfaces de réponse, spec 13) pas
-        encore disponible -> exception explicite ; il deviendra le
-        défaut.
+    cv_source : {"kripfganz", "pss", "narayan"}
+        Source des valeurs critiques (politique : spec 12 §2.4 ;
+        hiérarchie : ardlpy.critical_values). "kripfganz" (DÉFAUT
+        depuis la spec 13) : surfaces de réponse via statsmodels — CV F
+        asymptotiques précis à tout seuil + p-values aux deux bornes ;
+        les bornes t restent celles de PSS 2001 (composition
+        documentée : le matériel voie A1 ne couvre pas le t ; k=0 non
+        couvert). "pss" : valeurs publiées à l'identique (reproduction
+        de la littérature). "narayan" : petits échantillons (T = nobs
+        de l'UECM, interpolation ; cas II/III/V, F seulement),
+        recommandé si 30 <= T <= 80.
     fixed_regressors : array-like, shape (T, m), optional
         Variables z_t sans retards (ex. dummies), hors du vecteur testé
         (non prises en compte par la sélection d'ordre automatique).
@@ -390,13 +411,7 @@ def bounds_test(
     """
     if case not in (1, 2, 3, 4, 5):
         raise ValueError(f"case doit être dans 1..5, reçu {case}.")
-    if cv_source == "kripfganz":
-        raise NotImplementedError(
-            'cv_source="kripfganz" (surfaces de réponse) arrive avec la '
-            'spec 13 ; disponibles : "pss" (asymptotique) et "narayan" '
-            "(petits échantillons, spec 12)."
-        )
-    if cv_source not in ("pss", "narayan"):
+    if cv_source not in ("kripfganz", "pss", "narayan"):
         raise ValueError(f"cv_source inconnu : {cv_source!r}.")
 
     y_arr, x_arr, _, y_name, x_names = check_series(y, x)
@@ -520,6 +535,16 @@ def bounds_test(
             stacklevel=2,
         )
 
+    # p-values approchées du F aux deux bornes (spec 13, surfaces K&S)
+    p_values: pd.Series | None
+    if 1 <= k <= 10:
+        from ardlpy.critical_values import pvalue_bounds
+
+        p_i0, p_i1 = pvalue_bounds(f_stat, case=case, k=k)
+        p_values = pd.Series({"p_I0": p_i0, "p_I1": p_i1}, name="F_pvalues")
+    else:
+        p_values = None  # k hors couverture des surfaces (k = 0)
+
     se = np.sqrt(np.diag(fit.cov))
     uecm_table = pd.DataFrame({"coef": fit.params, "se": se, "t": fit.params / se})
 
@@ -536,5 +561,6 @@ def bounds_test(
         decision_joint=decision_joint,
         uecm=uecm_table,
         cv_source=cv_source,
+        p_values=p_values,
         _fit=fit,
     )

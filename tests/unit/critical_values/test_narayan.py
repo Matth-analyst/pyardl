@@ -151,6 +151,9 @@ class TestInterpolationAndCoverage:
         with pytest.raises(ValueError, match="t_obs"):
             get_bounds("F", case=3, k=1, alpha=0.05, cv_source="narayan")
 
-    def test_kripfganz_not_implemented(self) -> None:
-        with pytest.raises(NotImplementedError, match="spec 13"):
-            get_bounds("F", case=3, k=1, alpha=0.05, cv_source="kripfganz")
+    def test_kripfganz_now_available(self) -> None:
+        """Depuis la spec 13 (voie A1), kripfganz sert les CV F —
+        proches de PSS à l'erreur MC des tables publiées près."""
+        lo, up = get_bounds("F", case=3, k=1, alpha=0.05, cv_source="kripfganz")
+        assert lo == pytest.approx(4.94, abs=0.15)
+        assert up == pytest.approx(5.73, abs=0.15)

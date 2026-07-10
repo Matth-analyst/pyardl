@@ -75,4 +75,8 @@ et pour la section validation de l'article JOSS.
   reproduction de la littérature) ; comptée dans la marge « 0-3
   dépassements fortuits » du test slow ; les surfaces K&S (spec 13)
   fourniront la valeur précise.
-- **Statut** : documentée (2026-07-07).
+- **Confirmation (spec 13, 2026-07-10 — première utilisation du
+  registre)** : la surface de réponse K&S (voie A1, statsmodels) redonne
+  3.3084 pour cette cellule — troisième source indépendante concordante
+  (simulation interne 3.299, K&S 3.308) contre la valeur publiée 3.35.
+- **Statut** : confirmée par trois sources (2026-07-10).
