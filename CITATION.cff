@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: >-
+  Si vous utilisez ardlpy dans vos travaux, merci de citer le logiciel
+  comme ci-dessous, ainsi que les articles méthodologiques sous-jacents
+  (Pesaran, Shin & Smith 2001 pour le bounds test ; Kripfganz &
+  Schneider 2020 pour les surfaces de réponse et p-values ; Narayan
+  2005 pour les bornes petits échantillons), référencés dans
+  docs/ardl_references.pdf et src/ardlpy/critical_values/PROVENANCE.md.
+type: software
+title: "ardlpy: ARDL models and bounds-test cointegration in Python"
+authors:
+  - family-names: Adjoh
+    given-names: Komlan Matthania
+    email: komlanadjohmatthania@gmail.com
+version: 0.1.0
+date-released: "2026-07-07"
+license: MIT
+keywords:
+  - econometrics
+  - time series
+  - ARDL
+  - cointegration
+  - bounds test
+  - error correction model
+abstract: >-
+  Bibliothèque Python d'économétrie des séries temporelles pour les
+  modèles ARDL : estimation ARDL/UECM, bounds tests de cointégration de
+  Pesaran-Shin-Smith (5 cas déterministes, décision jointe F+t),
+  valeurs critiques multi-sources avec provenance documentée (tables
+  PSS 2001, Narayan 2005, surfaces de réponse Kripfganz-Schneider avec
+  p-values) et moteur de simulation Monte Carlo reproductible.
