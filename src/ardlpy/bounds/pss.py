@@ -328,6 +328,12 @@ class BoundsTestResults:
             if self.p_values is not None
             else "p-values F : indisponibles (k hors couverture des surfaces)"
         )
+        if self.p_values is not None and "t_p_I0" in self.p_values.index:
+            p_line += (
+                f"\np-values t (K&S 2020) : p_I0 = "
+                f"{self.p_values['t_p_I0']:.4f}, "
+                f"p_I1 = {self.p_values['t_p_I1']:.4f}"
+            )
 
         lines = [
             f"Bounds test PSS 2001 — cas {self.case}, k={self.k}, "
@@ -354,6 +360,53 @@ class BoundsTestResults:
         return "\n".join(lines)
 
 
+def _finalize_results(
+    case: int,
+    k: int,
+    p: int,
+    q_dict: dict[str, int],
+    f_stat: float,
+    t_stat: float,
+    alpha: float,
+    bounds_df: pd.DataFrame,
+    decision_f: Decision,
+    decision_t: Decision | None,
+    decision_joint: JointDecision | None,
+    cv_source: str,
+    p_values: pd.Series | None,
+    fit: _UECMFit,
+) -> BoundsTestResults:
+    """Garde-fou d'autocorrélation (spec 09 §2.2) + assemblage du résultat."""
+    lb_lags = max(1, min(10, fit.nobs // 5))
+    lb_p = float(acorr_ljungbox(fit.resid, lags=[lb_lags])["lb_pvalue"].iloc[0])
+    if lb_p < 0.05:
+        warnings.warn(
+            f"Erreurs autocorrélées (Ljung-Box p={lb_p:.4f} < 0.05) : le "
+            "bounds test n'est pas fiable ; augmenter p/q (Pesaran-Shin "
+            "1998, spec 09 §2.2).",
+            ArdlpyMethodologyWarning,
+            stacklevel=3,
+        )
+    se = np.sqrt(np.diag(fit.cov))
+    uecm_table = pd.DataFrame({"coef": fit.params, "se": se, "t": fit.params / se})
+    return BoundsTestResults(
+        case=case,
+        k=k,
+        order=(p, q_dict),
+        f_stat=f_stat,
+        t_stat=t_stat,
+        alpha=alpha,
+        bounds=bounds_df,
+        decision_f=decision_f,
+        decision_t=decision_t,
+        decision_joint=decision_joint,
+        uecm=uecm_table,
+        cv_source=cv_source,
+        p_values=p_values,
+        _fit=fit,
+    )
+
+
 def bounds_test(
     y: npt.ArrayLike,
     x: npt.ArrayLike,
@@ -364,6 +417,7 @@ def bounds_test(
     max_q: int = 4,
     alpha: float = 0.05,
     cv_source: Literal["kripfganz", "pss", "narayan"] = "kripfganz",
+    finite_t: bool = False,
     fixed_regressors: npt.ArrayLike | None = None,
 ) -> BoundsTestResults:
     """Bounds test de cointégration PSS 2001 (spec 10 §5 — fonction phare).
@@ -392,6 +446,17 @@ def bounds_test(
         de la littérature). "narayan" : petits échantillons (T = nobs
         de l'UECM, interpolation ; cas II/III/V, F seulement),
         recommandé si 30 <= T <= 80.
+    finite_t : bool
+        Si True (avec ``cv_source="kripfganz"``) : bornes F ET t et
+        p-values AJUSTÉES À LA TAILLE D'ÉCHANTILLON par les surfaces de
+        réponse complètes de K&S (voie A2) — nécessite le
+        téléchargement préalable des coefficients depuis le site des
+        auteurs (``ardlpy.critical_values.ks2020_finite.
+        download_surface_coefs()``, non redistribués par ardlpy). Le t
+        devient disponible pour TOUS les cas (les cas 2/4 sont servis
+        par les surfaces 3/5 : la distribution du t n'est pas affectée
+        par la restriction des déterministes — convention K&S, validée
+        à 1e-3 contre la sortie publiée du Stata Journal 2023).
     fixed_regressors : array-like, shape (T, m), optional
         Variables z_t sans retards (ex. dummies), hors du vecteur testé
         (non prises en compte par la sélection d'ordre automatique).
@@ -413,6 +478,11 @@ def bounds_test(
         raise ValueError(f"case doit être dans 1..5, reçu {case}.")
     if cv_source not in ("kripfganz", "pss", "narayan"):
         raise ValueError(f"cv_source inconnu : {cv_source!r}.")
+    if finite_t and cv_source != "kripfganz":
+        raise ValueError(
+            'finite_t=True requiert cv_source="kripfganz" (surfaces de '
+            "réponse complètes, voie A2)."
+        )
 
     y_arr, x_arr, _, y_name, x_names = check_series(y, x)
     if x_arr is None:
@@ -456,8 +526,75 @@ def bounds_test(
     )
     t_stat = lam_hat / se_lam
 
+    decision_t: Decision | None
+
     # bornes à tous les seuils disponibles (F : source choisie ; t : tables
-    # PSS uniquement — Narayan ne publie pas de bornes t, cf. plus bas)
+    # PSS, sauf finite_t=True où les surfaces K&S couvrent aussi le t)
+    if finite_t:
+        from ardlpy.critical_values.ks2020_finite import (
+            crit_value_bounds_finite,
+            pvalue_bounds_finite,
+        )
+
+        # sr = coefficients de court terme, régresseurs fixes inclus
+        # (convention Stata ardl, validée contre la sortie SJ 2023)
+        sr = (p - 1) + sum(q) + len(fixed_names)
+        rows = []
+        for a in (0.10, 0.05, 0.01):
+            f_lo, f_up = crit_value_bounds_finite(case, k, fit.nobs, sr, a)
+            t_lo, t_up = crit_value_bounds_finite(case, k, fit.nobs, sr, a, stat="t")
+            rows.append(
+                {"alpha": a, "F_I0": f_lo, "F_I1": f_up, "t_I0": t_lo, "t_I1": t_up}
+            )
+        bounds_df = pd.DataFrame(rows).set_index("alpha")
+
+        f_lo, f_up = crit_value_bounds_finite(case, k, fit.nobs, sr, alpha)
+        decision_f = _classify(f_stat, f_lo, f_up, left_tail=False)
+        t_lo, t_up = crit_value_bounds_finite(case, k, fit.nobs, sr, alpha, stat="t")
+        decision_t = _classify(t_stat, t_lo, t_up, left_tail=True)
+        if lam_hat >= 0:
+            warnings.warn(
+                f"lambda_hat = {lam_hat:.4f} >= 0 : pas de force de rappel "
+                "vers l'équilibre ; le t_BDM (unilatéral GAUCHE) n'a pas "
+                "d'interprétation de cointégration.",
+                DegenerateCaseWarning,
+                stacklevel=2,
+            )
+            decision_t = "no_cointegration"
+
+        decision_joint = _joint_decision(decision_f, decision_t)
+        if decision_joint == "degenerate_suspicion":
+            warnings.warn(
+                "F rejette mais pas t : suspicion de dégénérescence de "
+                "type 1 (spec 15).",
+                ArdlpyMethodologyWarning,
+                stacklevel=2,
+            )
+        p_f = pvalue_bounds_finite(f_stat, case, k, fit.nobs, sr, fit.df_resid)
+        p_t = pvalue_bounds_finite(
+            t_stat, case, k, fit.nobs, sr, fit.df_resid, stat="t"
+        )
+        p_values_fin = pd.Series(
+            {"p_I0": p_f[0], "p_I1": p_f[1], "t_p_I0": p_t[0], "t_p_I1": p_t[1]},
+            name="pvalues_finite_t",
+        )
+        return _finalize_results(
+            case,
+            k,
+            p,
+            q_dict,
+            f_stat,
+            t_stat,
+            alpha,
+            bounds_df,
+            decision_f,
+            decision_t,
+            decision_joint,
+            cv_source,
+            p_values_fin,
+            fit,
+        )
+
     rows = []
     for a in (0.10, 0.05, 0.01):
         f_lo, f_up = get_bounds(
@@ -477,7 +614,6 @@ def bounds_test(
     )
     decision_f = _classify(f_stat, f_lo, f_up, left_tail=False)
 
-    decision_t: Decision | None
     if cv_source == "narayan" and case in (3, 5):
         decision_t = None
         warnings.warn(
@@ -523,18 +659,6 @@ def bounds_test(
             stacklevel=2,
         )
 
-    # garde-fou d'autocorrélation (spec 09 §2.2)
-    lb_lags = max(1, min(10, fit.nobs // 5))
-    lb_p = float(acorr_ljungbox(fit.resid, lags=[lb_lags])["lb_pvalue"].iloc[0])
-    if lb_p < 0.05:
-        warnings.warn(
-            f"Erreurs autocorrélées (Ljung-Box p={lb_p:.4f} < 0.05) : le "
-            "bounds test n'est pas fiable ; augmenter p/q (Pesaran-Shin "
-            "1998, spec 09 §2.2).",
-            ArdlpyMethodologyWarning,
-            stacklevel=2,
-        )
-
     # p-values approchées du F aux deux bornes (spec 13, surfaces K&S)
     p_values: pd.Series | None
     if 1 <= k <= 10:
@@ -545,22 +669,19 @@ def bounds_test(
     else:
         p_values = None  # k hors couverture des surfaces (k = 0)
 
-    se = np.sqrt(np.diag(fit.cov))
-    uecm_table = pd.DataFrame({"coef": fit.params, "se": se, "t": fit.params / se})
-
-    return BoundsTestResults(
-        case=case,
-        k=k,
-        order=(p, q_dict),
-        f_stat=f_stat,
-        t_stat=t_stat,
-        alpha=alpha,
-        bounds=bounds_df,
-        decision_f=decision_f,
-        decision_t=decision_t,
-        decision_joint=decision_joint,
-        uecm=uecm_table,
-        cv_source=cv_source,
-        p_values=p_values,
-        _fit=fit,
+    return _finalize_results(
+        case,
+        k,
+        p,
+        q_dict,
+        f_stat,
+        t_stat,
+        alpha,
+        bounds_df,
+        decision_f,
+        decision_t,
+        decision_joint,
+        cv_source,
+        p_values,
+        fit,
     )

@@ -14,6 +14,28 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
   l'identique, passer explicitement `cv_source="pss"` (les réplications
   PSS 2001 des tests le font désormais, et restent vertes).
 
+### Ajouté (spec 13, voie A2 — surfaces K&S complètes, finies-T)
+- `critical_values.ks2020_finite` : évaluateur des COEFFICIENTS PUBLIÉS
+  de Kripfganz-Schneider (ardl_surfreg_coefs.dta) — CV F et t ajustés
+  à (T, k, sr) pour tout seuil, p-values finies-T aux deux bornes
+  (MacKinnon 1996 eq. 12). Téléchargeur premier-usage explicite
+  (`download_surface_coefs()`) avec cache local, SHA-256 et journal de
+  provenance — AUCUNE redistribution par ardlpy (licence non statuée,
+  demande aux auteurs en cours, voie A3).
+- `bounds_test(finite_t=True)` : bornes et p-values finies-T pour F ET
+  t — le t devient disponible pour TOUS les cas (2/4 servis par les
+  surfaces 3/5 : la distribution du t est insensible à la restriction
+  des déterministes, convention K&S validée) ; summary() affiche les
+  p-values du t.
+- Validation contractuelle 1e-3 ATTEINTE (mêmes coefficients) :
+  24 cellules de CV et 8 p-values de la sortie Stata publiée
+  (Stata Journal 2023, preprint Tohoku TUPD-2022-006, exemple salaires
+  UK — cas 3 et 4, k=4, T=104, sr=26) reproduites, y compris bout-en-
+  bout via bounds_test(finite_t=True) sur nos données (F=5.421,
+  t=-3.475, p-values exactes aux 3 décimales). Conventions établies et
+  documentées : colonne p = niveau de signification ; sr inclut les
+  régresseurs fixes ; mapping t cas 2->3, 4->5.
+
 ### Ajouté (spec 13, voie A1 — surfaces de réponse et p-values)
 - `critical_values.ks2020` : CV asymptotiques du F à TOUT seuil
   (percentiles simulés + inversion numérique des polynômes) et

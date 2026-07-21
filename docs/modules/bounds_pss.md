@@ -105,8 +105,14 @@ Deux sources disponibles via `cv_source` (politique complète :
 
 Provenance et recoupements :
 [`PROVENANCE.md`](../../src/ardlpy/critical_values/PROVENANCE.md).
-p-values et ajustement continu en T → surfaces de réponse (spec 13, à
-venir, deviendra le défaut).
+
+**Ajustement fini-T (F et t) : `bounds_test(..., finite_t=True)`** —
+évalue les coefficients publiés de Kripfganz & Schneider (surfaces
+complètes, voie A2, spec 13) : bornes et p-values pour les deux
+statistiques, ajustées à (T, k, coefficients de court terme).
+Nécessite un téléchargement explicite préalable (fichier non
+redistribué par ardlpy, licence non statuée — voir
+[critical_values](critical_values.md#surfaces-finies-t-voie-a2-spec-13)).
 
 ## Jalon de phase 1
 

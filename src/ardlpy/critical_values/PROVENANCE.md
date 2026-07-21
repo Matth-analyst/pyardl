@@ -190,3 +190,45 @@ A2, licence en cours de clarification — ou la voie B) ; k = 1..10 ;
 asymptotique (pas d'ajustement fini-T). Les bornes t servies sous
 cv_source="kripfganz" restent celles de PSS 2001 (composition
 documentée dans bounds_test).
+
+## `ks2020_finite.py` — surfaces K&S complètes, finies-T (spec 13, voie A2)
+
+**Matériel** : fichier `ardl_surfreg_coefs.dta` distribué avec le
+package Stata ardl de Kripfganz & Schneider (kripfganz.de) — 3 536
+lignes de coefficients de surface (F : cas I-V ; t : cas I/III/V ;
+2 bornes ; grille de 221 quantiles en 1/10000e).
+
+**Licence / distribution** : aucune licence explicite publiée -> ardlpy
+NE REDISTRIBUE PAS ce fichier. Téléchargement au premier usage depuis
+le site des auteurs (`download_surface_coefs()`, appel explicite —
+jamais silencieux), cache local (`ARDLPY_CACHE` ou `~/.ardlpy`) avec
+SHA-256 et journal de provenance (provenance.json). Demande de
+permission envoyée aux auteurs (voie A3,
+docs/correspondence/2026-07-10_ks_license_draft.md) — l'intégration
+directe remplacera le téléchargeur si elle est accordée.
+
+**Forme fonctionnelle** : réimplémentation indépendante de l'algorithme
+publié (K&S 2020 §3.2 + Supplementary Appendix ; aucun code Stata
+copié — règle du projet) : polynôme en 1/(k+1) (ordres 0..4) avec
+termes finis-T en 1/n, sr/n, 1/n², sr/n², 1/n³, sr/n³, où sr = nombre
+de coefficients de court terme de l'UECM, RÉGRESSEURS FIXES INCLUS
+(convention Stata ardl, établie par la validation ci-dessous).
+p-values : approximation locale de MacKinnon (1996, eq. 12) sur les 9
+quantiles les plus proches, échelle F(df1, df_resid) / t(df_resid).
+Convention établie par validation : la colonne `p` du fichier est le
+NIVEAU DE SIGNIFICATION (queue droite pour F, gauche pour t). Pour le
+t, les cas 2/4 sont servis par les surfaces 3/5 (la distribution du t
+n'est pas affectée par la restriction des déterministes — convention
+documentée dans ardlbounds.ado et vérifiée numériquement).
+
+**Validation CONTRACTUELLE (1e-3, mêmes coefficients — spec 13 §3.1)**,
+`tests/unit/critical_values/test_ks2020_finite.py` : reproduction de la
+sortie Stata imprimée dans Kripfganz & Schneider (2023, *Stata Journal*
+23(4) ; preprint ouvert Tohoku TUPD-2022-006, §5 — exemple salaires UK
+de PSS 2001, k=4, T=104, sr=26) : 24 cellules de CV (F et t, cas 3 et
+4, 3 seuils) à ±1.5e-3 (arrondi d'impression inclus) et 8 p-values
+exactes aux 3 décimales publiées ; reproduction bout-en-bout via
+`bounds_test(finite_t=True)` (F=5.421, t=-3.475, nobs=104, les 4
+p-values). Cohérences internes : limite T->inf vs voie A1 (±0.05),
+décroissance des bornes vers l'asymptotique en T, effet positif de sr
+à T petit, aller-retour p-value/CV.
