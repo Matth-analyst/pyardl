@@ -447,16 +447,20 @@ def bounds_test(
         de l'UECM, interpolation ; cas II/III/V, F seulement),
         recommandé si 30 <= T <= 80.
     finite_t : bool
-        Si True (avec ``cv_source="kripfganz"``) : bornes F ET t et
-        p-values AJUSTÉES À LA TAILLE D'ÉCHANTILLON par les surfaces de
-        réponse complètes de K&S (voie A2) — nécessite le
-        téléchargement préalable des coefficients depuis le site des
-        auteurs (``ardlpy.critical_values.ks2020_finite.
-        download_surface_coefs()``, non redistribués par ardlpy). Le t
-        devient disponible pour TOUS les cas (les cas 2/4 sont servis
-        par les surfaces 3/5 : la distribution du t n'est pas affectée
-        par la restriction des déterministes — convention K&S, validée
-        à 1e-3 contre la sortie publiée du Stata Journal 2023).
+        **EXPÉRIMENTAL, NON VALIDÉ (bloqué par une demande de
+        permission en cours auprès des auteurs — voie A3, cf.
+        ``docs/correspondence/2026-07-10_ks_license_draft.md`` et
+        ``docs/DEVIATIONS.md``).** Si True (avec
+        ``cv_source="kripfganz"``) : bornes F ET t et p-values
+        ajustées à la taille d'échantillon par les surfaces de réponse
+        complètes de K&S (voie A2) — nécessite le téléchargement
+        préalable des coefficients depuis le site des auteurs
+        (``ardlpy.critical_values.ks2020_finite.
+        download_surface_coefs()``, NE PAS APPELER avant réception de
+        l'autorisation ; non redistribués par ardlpy). Le mapping des
+        cas 2/4 vers les surfaces 3/5 pour le t est lu dans le source
+        des auteurs mais n'est pas revalidé empiriquement. Ne pas
+        utiliser en production.
     fixed_regressors : array-like, shape (T, m), optional
         Variables z_t sans retards (ex. dummies), hors du vecteur testé
         (non prises en compte par la sélection d'ordre automatique).
@@ -482,6 +486,17 @@ def bounds_test(
         raise ValueError(
             'finite_t=True requiert cv_source="kripfganz" (surfaces de '
             "réponse complètes, voie A2)."
+        )
+    if finite_t:
+        warnings.warn(
+            "finite_t=True (voie A2, surfaces K&S complètes) est "
+            "EXPÉRIMENTAL et NON VALIDÉ : la demande de permission "
+            "d'usage auprès des auteurs est en cours (voie A3, cf. "
+            "docs/DEVIATIONS.md) et aucune comparaison recevable à une "
+            "sortie Stata de référence n'a été effectuée. Ne pas "
+            "utiliser en production.",
+            ArdlpyMethodologyWarning,
+            stacklevel=2,
         )
 
     y_arr, x_arr, _, y_name, x_names = check_series(y, x)

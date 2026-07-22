@@ -30,36 +30,25 @@ get_bounds("F", case=3, k=1, alpha=0.05)                                # PSS
 get_bounds("F", case=3, k=1, alpha=0.05, cv_source="narayan", t_obs=47) # interpolé
 ```
 
-## Surfaces finies-T (voie A2, spec 13)
+## Surfaces finies-T (voie A2, spec 13) — EXPÉRIMENTAL, NON VALIDÉ
 
-`bounds_test(finite_t=True)` évalue directement les **coefficients
-publiés** de Kripfganz & Schneider (fichier `ardl_surfreg_coefs.dta`,
-distribué avec leur package Stata `ardl`) : CV et p-values pour F **et
-t**, ajustés à la taille d'échantillon réelle et au nombre de
-coefficients de court terme — c'est la source la plus précise
-disponible, et la seule à couvrir le t pour tous les cas (les cas
-restreints 2/4 sont servis par les surfaces non restreintes 3/5, la
-distribution du t n'étant pas affectée par la restriction des
-déterministes).
+**Statut (2026-07-19) : bloqué par une demande de permission en cours
+auprès des auteurs (voie A3) — ne pas utiliser en production.**
 
-Ce fichier n'a pas de licence explicite : ardlpy ne le redistribue pas.
-Premier usage :
-
-```python
-from ardlpy.critical_values.ks2020_finite import download_surface_coefs
-download_surface_coefs()   # télécharge depuis kripfganz.de, met en cache localement
-```
-
-```python
-res = bounds_test(y, x, case=3, order=(6, {...}), finite_t=True,
-                   fixed_regressors=dummies)
-res.p_values   # p_I0, p_I1 (F) + t_p_I0, t_p_I1 (t)
-```
-
-Validé à 1e-3 contre la sortie Stata publiée (Kripfganz & Schneider
-2023, *Stata Journal* — exemple salaires UK) : voir PROVENANCE.md. Sans
-téléchargement préalable, une erreur explicite indique la marche à
-suivre (jamais de téléchargement silencieux).
+`bounds_test(finite_t=True)` est câblé pour évaluer directement les
+**coefficients publiés** de Kripfganz & Schneider (fichier
+`ardl_surfreg_coefs.dta`, distribué avec leur package Stata `ardl`) :
+CV et p-values pour F **et** t, ajustés à la taille d'échantillon
+réelle et au nombre de coefficients de court terme. Ce fichier n'a pas
+de licence explicite ; une demande de permission est en cours auprès
+des auteurs (`docs/correspondence/2026-07-10_ks_license_draft.md`).
+**`download_surface_coefs()` ne doit pas être appelé tant que la
+réponse n'est pas reçue** — voir la docstring de
+`ardlpy.critical_values.ks2020_finite` et `docs/DEVIATIONS.md` pour
+l'historique (une validation antérieure s'appuyait sur du matériel
+obtenu de façon prématurée et a été retirée). Une fois l'autorisation
+obtenue et une revalidation effectuée contre une source légitime,
+cette section sera mise à jour.
 
 Interpolation linéaire entre les tailles tabulées adjacentes ; hors
 plage [30, 80] → repli asymptotique + warning ; toute combinaison non
