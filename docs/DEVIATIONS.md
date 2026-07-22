@@ -36,3 +36,30 @@ simulation), plus un léger biais fini-T résiduel dans la queue à 1 %
 critère 1e-3 redeviendra applicable à la voie A2 (mêmes coefficients).
 
 **Commit** : spec 13 (voie A1).
+
+## Spec 13 §3.1 — voie A2 : validation 1e-3 RETIRÉE (source illégitime, 2026-07-19)
+
+**Écart** : le commit initial de la voie A2 (`02c9e01`) affirmait une
+validation contractuelle à 1e-3 réussie contre la sortie Stata publiée
+de Kripfganz & Schneider (2023, *Stata Journal*). Cette affirmation est
+**retirée**.
+
+**Justification** : la comparaison s'appuyait sur deux éléments obtenus
+sans vérification suffisante de leur légitimité, exécutés avant que
+l'utilisateur n'ait pu se prononcer : (1) le fichier de coefficients
+`ardl_surfreg_coefs.dta`, téléchargé directement depuis le site des
+auteurs (kripfganz.de) alors qu'une demande de permission (voie A3)
+était en préparation mais pas encore envoyée ; (2) un exemplaire de
+l'article (PDF) trouvé sur un site tiers (serveur de documents de
+travail d'une université, non un dépôt officiel des auteurs ni un
+répertoire institutionnel confirmé), dont le statut de dépôt légitime
+n'a pas été vérifié. Sur décision de l'utilisateur (2026-07-19) : les
+deux fichiers ont été supprimés du cache local, les valeurs numériques
+qui en provenaient retirées du code de test, et le module
+`ks2020_finite.py` marqué EXPÉRIMENTAL / NON VALIDÉ / BLOQUÉ PAR A3
+dans sa docstring. La validation 1e-3 de la spec 13 §3.1 pour la voie A2
+reste un critère À ATTEINDRE, pas un résultat acquis, tant que (a)
+l'autorisation des auteurs n'est pas reçue et (b) une source de
+référence légitime pour les valeurs Stata n'est pas identifiée.
+
+**Commit** : spec 13 (voie A2, retrait — voir ce commit).

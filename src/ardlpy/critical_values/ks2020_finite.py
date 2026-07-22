@@ -1,5 +1,17 @@
 r"""Surfaces de réponse K&S finies-T — voie A2 (spec 13 §2.1).
 
+STATUT (2026-07-19) : **EXPÉRIMENTAL, NON VALIDÉ, BLOQUÉ PAR A3.**
+Le code de ce module implémente la forme fonctionnelle publiée, mais
+sa concordance avec les valeurs Stata n'a PAS été confirmée par une
+comparaison recevable : une comparaison antérieure s'appuyait sur un
+exemplaire téléchargé sans autorisation confirmée, et sur un
+"preprint" trouvé sur un site tiers dont la légitimité n'a pas été
+établie — les deux ont été retirés (voir docs/DEVIATIONS.md,
+CHANGELOG). N'UTILISER CE MODULE EN PRODUCTION QU'APRÈS :
+(1) autorisation des auteurs (voie A3,
+docs/correspondence/2026-07-10_ks_license_draft.md) et
+(2) revalidation contre une source de référence légitime.
+
 Valeurs critiques ajustées à la taille d'échantillon et p-values
 approchées pour les statistiques F ET t du bounds test, en évaluant les
 COEFFICIENTS PUBLIÉS de Kripfganz & Schneider (fichier
@@ -7,11 +19,11 @@ COEFFICIENTS PUBLIÉS de Kripfganz & Schneider (fichier
 
 Licence / distribution (voie A2, arbitrage utilisateur) : les
 coefficients ne portent pas de licence explicite -> ardlpy ne les
-REDISTRIBUE PAS. Ils sont téléchargés depuis le site des auteurs au
-premier usage (:func:`download_surface_coefs`, appel explicite), mis en
-cache localement avec empreinte SHA-256 et provenance journalisée. Une
-demande de permission est en cours (voie A3,
-docs/correspondence/2026-07-10_ks_license_draft.md).
+REDISTRIBUE PAS. ``download_surface_coefs()`` NE DOIT PAS être appelé
+tant que la réponse des auteurs n'est pas reçue (voie A3 en attente).
+Une fois l'autorisation obtenue, le téléchargement se fait au premier
+usage (appel explicite), mis en cache localement avec empreinte
+SHA-256 et provenance journalisée.
 
 Forme fonctionnelle (algorithme publié — Kripfganz & Schneider 2020
 §3.2 et Supplementary Appendix ; réimplémentation indépendante, aucun
@@ -148,9 +160,9 @@ def _check(stat: str, case: int, k: int, t_obs: int, sr: int) -> int:
     par les surfaces du cas non restreint correspondant (2 -> 3,
     4 -> 5) : la distribution du t n'est pas affectée par la
     restriction des déterministes (elle ne modifie que le vecteur testé
-    par le F) — convention documentée de Kripfganz & Schneider (le
-    Stata ardl affiche ces bornes pour les cas 2/4 ; vérifié à 1e-3
-    contre la sortie publiée du Stata Journal 2023, cas 4).
+    par le F) — convention lue dans le source ``ardlbounds.ado`` des
+    auteurs. NON REVALIDÉE contre une sortie Stata de référence
+    légitime (bloqué par A3, cf. docstring du module).
     """
     if stat not in ("F", "t"):
         raise ValueError(f'stat doit être "F" ou "t", reçu {stat!r}.')

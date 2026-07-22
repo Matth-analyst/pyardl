@@ -14,27 +14,32 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
   l'identique, passer explicitement `cv_source="pss"` (les réplications
   PSS 2001 des tests le font désormais, et restent vertes).
 
-### Ajouté (spec 13, voie A2 — surfaces K&S complètes, finies-T)
+### Ajouté (spec 13, voie A2 — surfaces K&S complètes, finies-T) — EXPÉRIMENTAL, NON VALIDÉ
 - `critical_values.ks2020_finite` : évaluateur des COEFFICIENTS PUBLIÉS
   de Kripfganz-Schneider (ardl_surfreg_coefs.dta) — CV F et t ajustés
   à (T, k, sr) pour tout seuil, p-values finies-T aux deux bornes
   (MacKinnon 1996 eq. 12). Téléchargeur premier-usage explicite
-  (`download_surface_coefs()`) avec cache local, SHA-256 et journal de
-  provenance — AUCUNE redistribution par ardlpy (licence non statuée,
-  demande aux auteurs en cours, voie A3).
-- `bounds_test(finite_t=True)` : bornes et p-values finies-T pour F ET
-  t — le t devient disponible pour TOUS les cas (2/4 servis par les
-  surfaces 3/5 : la distribution du t est insensible à la restriction
-  des déterministes, convention K&S validée) ; summary() affiche les
-  p-values du t.
-- Validation contractuelle 1e-3 ATTEINTE (mêmes coefficients) :
-  24 cellules de CV et 8 p-values de la sortie Stata publiée
-  (Stata Journal 2023, preprint Tohoku TUPD-2022-006, exemple salaires
-  UK — cas 3 et 4, k=4, T=104, sr=26) reproduites, y compris bout-en-
-  bout via bounds_test(finite_t=True) sur nos données (F=5.421,
-  t=-3.475, p-values exactes aux 3 décimales). Conventions établies et
-  documentées : colonne p = niveau de signification ; sr inclut les
-  régresseurs fixes ; mapping t cas 2->3, 4->5.
+  (`download_surface_coefs()`), NON APPELÉ (bloqué par A3, voir
+  ci-dessous) — cache local, SHA-256 et journal de provenance prévus
+  une fois l'autorisation reçue. AUCUNE redistribution par ardlpy.
+- `bounds_test(finite_t=True)` : câblage prêt pour bornes et p-values
+  finies-T (F et t, tous les cas via le mapping 2->3, 4->5 lu dans le
+  source des auteurs) ; summary() affiche les p-values du t si
+  disponibles.
+- **STATUT DE VALIDATION (mise à jour du 2026-07-19)** : la validation
+  1e-3 précédemment annoncée « atteinte » dans ce changelog est
+  **retirée**. Elle s'appuyait sur un fichier de coefficients
+  téléchargé et sur un exemplaire d'article trouvé sur un site tiers
+  dont la légitimité n'a pas été confirmée, tous deux obtenus avant
+  qu'une décision utilisateur n'ait tranché la question ; les deux ont
+  été supprimés du cache local, toute valeur numérique en provenant a
+  été retirée des tests, et le module est marqué EXPÉRIMENTAL / BLOQUÉ
+  PAR A3 dans sa docstring (docs/DEVIATIONS.md, entrée dédiée). Le code
+  reste dans le dépôt (implémentation de la forme fonctionnelle
+  publiée) mais N'EST PAS validé et ne doit pas être utilisé en
+  production. Aucun nouveau téléchargement ne sera effectué avant
+  réception de la réponse à la demande de permission (voie A3,
+  `docs/correspondence/2026-07-10_ks_license_draft.md`).
 
 ### Ajouté (spec 13, voie A1 — surfaces de réponse et p-values)
 - `critical_values.ks2020` : CV asymptotiques du F à TOUT seuil

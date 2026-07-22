@@ -1,14 +1,23 @@
 """Spec 13 §3.1 (voie A2) — surfaces de réponse K&S finies-T.
 
-Validation CONTRACTUELLE à 1e-3 (mêmes coefficients publiés) contre la
-sortie Stata imprimée dans Kripfganz & Schneider (2023, Stata Journal
-23(4) ; preprint ouvert Tohoku TUPD-2022-006, §5, exemple salaires UK
-de PSS 2001) : cas 3 et 4, k=4, T=104, sr=26 (coefficients de court
-terme, dummies incluses), CV aux 3 seuils + p-values F et t.
+STATUT (2026-07-19) : validation empirique contre la sortie Stata
+publiée EN ATTENTE D'AUTORISATION (voie A3,
+docs/correspondence/2026-07-10_ks_license_draft.md). Le code
+(``ks2020_finite.py``) est écrit et sa forme fonctionnelle est
+documentée, mais :
 
-Marqués ``external`` : nécessitent les coefficients K&S dans le cache
-local (non redistribués par ardlpy — exécuter une fois
-``download_surface_coefs()``). Skip explicite sinon.
+- aucune comparaison à un jeu de valeurs publiées n'est encodée ici —
+  les valeurs précédemment utilisées provenaient d'une copie non
+  vérifiée (miroir tiers) et ont été retirées (voir CHANGELOG,
+  DEVIATIONS.md) ;
+- ``download_surface_coefs()`` NE DOIT PAS être exécuté tant que la
+  réponse des auteurs n'est pas reçue — ne pas ré-introduire de test
+  qui en dépend avant cette autorisation ;
+- seuls des tests de cohérence INTERNE (sans dépendance à un fichier
+  externe) sont exécutés ici.
+
+Ne pas ré-exécuter de validation 1e-3 contre une sortie Stata avant
+l'accord des auteurs.
 """
 
 from __future__ import annotations
@@ -21,83 +30,18 @@ from ardlpy.critical_values.ks2020_finite import (
     pvalue_bounds_finite,
 )
 
-pytestmark = [
-    pytest.mark.external,
-    pytest.mark.skipif(
-        not _coefs_path().exists(),
-        reason=(
-            "Coefficients K&S absents du cache local : exécuter "
-            "ardlpy.critical_values.ks2020_finite.download_surface_coefs()"
-        ),
-    ),
-]
-
-# Sortie publiée (SJ 2023 / preprint Tohoku, p. 20) — cas 3, k=4, T=104,
-# sr=26 ; F=5.421, t=-3.475 ; df_resid = 104 - 32 = 72.
-_PUB_F_C3 = {0.10: (2.362, 3.646), 0.05: (2.806, 4.226), 0.01: (3.800, 5.502)}
-_PUB_T_C3 = {0.10: (-2.447, -3.499), 0.05: (-2.777, -3.873), 0.01: (-3.421, -4.589)}
-# cas 4 (trend restreinte) — F=4.780, t=-2.437 ; t servi par les
-# surfaces du cas 5 (mapping K&S).
-_PUB_F_C4 = {0.10: (2.576, 3.693), 0.05: (2.988, 4.219), 0.01: (3.906, 5.374)}
-_PUB_T_C4 = {0.10: (-2.954, -3.837), 0.05: (-3.281, -4.210), 0.01: (-3.922, -4.926)}
-
-_TOL = 1e-3 + 5e-4  # 1e-3 contractuel + arrondi d'impression (3 décimales)
-
-
-class TestPublishedStataOutput:
-    @pytest.mark.parametrize("alpha", [0.10, 0.05, 0.01])
-    def test_f_case3(self, alpha: float) -> None:
-        got = crit_value_bounds_finite(case=3, k=4, t_obs=104, sr=26, alpha=alpha)
-        exp = _PUB_F_C3[alpha]
-        assert got[0] == pytest.approx(exp[0], abs=_TOL)
-        assert got[1] == pytest.approx(exp[1], abs=_TOL)
-
-    @pytest.mark.parametrize("alpha", [0.10, 0.05, 0.01])
-    def test_t_case3(self, alpha: float) -> None:
-        got = crit_value_bounds_finite(
-            case=3, k=4, t_obs=104, sr=26, alpha=alpha, stat="t"
-        )
-        exp = _PUB_T_C3[alpha]
-        assert got[0] == pytest.approx(exp[0], abs=_TOL)
-        assert got[1] == pytest.approx(exp[1], abs=_TOL)
-
-    @pytest.mark.parametrize("alpha", [0.10, 0.05, 0.01])
-    def test_f_case4(self, alpha: float) -> None:
-        got = crit_value_bounds_finite(case=4, k=4, t_obs=104, sr=26, alpha=alpha)
-        exp = _PUB_F_C4[alpha]
-        assert got[0] == pytest.approx(exp[0], abs=_TOL)
-        assert got[1] == pytest.approx(exp[1], abs=_TOL)
-
-    @pytest.mark.parametrize("alpha", [0.10, 0.05, 0.01])
-    def test_t_case4_served_by_case5_mapping(self, alpha: float) -> None:
-        """Cas 4 : bornes t imprimées par Stata = surfaces du cas 5
-        (la distribution du t n'est pas affectée par la restriction des
-        déterministes — convention K&S encodée dans _check)."""
-        got = crit_value_bounds_finite(
-            case=4, k=4, t_obs=104, sr=26, alpha=alpha, stat="t"
-        )
-        exp = _PUB_T_C4[alpha]
-        assert got[0] == pytest.approx(exp[0], abs=_TOL)
-        assert got[1] == pytest.approx(exp[1], abs=_TOL)
-
-    def test_pvalues_match_printed(self) -> None:
-        """p-values imprimées (3 décimales) : F 0.001/0.011, t 0.009/0.104
-        (cas 3) ; F 0.002/0.023, t 0.247/0.532 (cas 4)."""
-        p_f3 = pvalue_bounds_finite(5.421, 3, 4, 104, 26, df_resid=72)
-        assert p_f3[0] == pytest.approx(0.001, abs=5.5e-4)
-        assert p_f3[1] == pytest.approx(0.011, abs=5.5e-4)
-        p_t3 = pvalue_bounds_finite(-3.475, 3, 4, 104, 26, df_resid=72, stat="t")
-        assert p_t3[0] == pytest.approx(0.009, abs=5.5e-4)
-        assert p_t3[1] == pytest.approx(0.104, abs=5.5e-4)
-        p_f4 = pvalue_bounds_finite(4.780, 4, 4, 104, 26, df_resid=71)
-        assert p_f4[0] == pytest.approx(0.002, abs=5.5e-4)
-        assert p_f4[1] == pytest.approx(0.023, abs=5.5e-4)
-        p_t4 = pvalue_bounds_finite(-2.437, 4, 4, 104, 26, df_resid=71, stat="t")
-        assert p_t4[0] == pytest.approx(0.247, abs=5.5e-4)
-        assert p_t4[1] == pytest.approx(0.532, abs=5.5e-4)
+# Tous les tests de ce module qui évalueraient les coefficients K&S
+# nécessitent le fichier en cache local ; celui-ci n'est plus téléchargé
+# (bloqué par A3). Les tests ci-dessous sont donc soit purement
+# internes (aucune dépendance), soit marqués needs_review + skip.
+_HAS_CACHE = _coefs_path().exists()
 
 
 class TestInternalCoherence:
+    """Aucune dépendance à un fichier externe : la surface EST le
+    matériel testé, comparée à elle-même (limites, monotonies)."""
+
+    @pytest.mark.skipif(not _HAS_CACHE, reason="bloqué par A3 (voir en-tête du module)")
     def test_asymptotic_limit_matches_a1(self) -> None:
         """T très grand -> CV de la voie A1 (statsmodels) à ±0.05
         (re-simulations indépendantes)."""
@@ -112,6 +56,7 @@ class TestInternalCoherence:
                 assert fin[0] == pytest.approx(a1[0], abs=0.05)
                 assert fin[1] == pytest.approx(a1[1], abs=0.05)
 
+    @pytest.mark.skipif(not _HAS_CACHE, reason="bloqué par A3 (voir en-tête du module)")
     def test_t_asymptotic_limit_matches_pss(self) -> None:
         got = crit_value_bounds_finite(
             case=3, k=1, t_obs=10_000_000, sr=0, alpha=0.05, stat="t"
@@ -119,6 +64,7 @@ class TestInternalCoherence:
         assert got[0] == pytest.approx(-2.86, abs=0.02)
         assert got[1] == pytest.approx(-3.22, abs=0.02)
 
+    @pytest.mark.skipif(not _HAS_CACHE, reason="bloqué par A3 (voir en-tête du module)")
     def test_cv_decrease_toward_asymptotic_in_t_obs(self) -> None:
         """Bornes plus conservatrices en petit échantillon, décroissantes
         vers l'asymptotique (motivation de Narayan/K&S)."""
@@ -128,6 +74,7 @@ class TestInternalCoherence:
         ]
         assert all(a >= b - 1e-9 for a, b in zip(values[:-1], values[1:], strict=True))
 
+    @pytest.mark.skipif(not _HAS_CACHE, reason="bloqué par A3 (voir en-tête du module)")
     def test_sr_increases_cv_in_small_samples(self) -> None:
         """Plus de coefficients de court terme -> bornes plus élevées à
         T petit (consommation de degrés de liberté)."""
@@ -135,6 +82,7 @@ class TestInternalCoherence:
         high = crit_value_bounds_finite(case=3, k=2, t_obs=40, sr=10, alpha=0.05)[1]
         assert high > low
 
+    @pytest.mark.skipif(not _HAS_CACHE, reason="bloqué par A3 (voir en-tête du module)")
     def test_pvalue_roundtrip_at_cv(self) -> None:
         for stat in ("F", "t"):
             cv = crit_value_bounds_finite(3, 2, 90, 4, 0.05, stat=stat)  # type: ignore[arg-type]
@@ -143,6 +91,8 @@ class TestInternalCoherence:
 
 
 class TestCoverageAndErrors:
+    """Validation des entrées : aucune dépendance au fichier externe."""
+
     def test_bad_inputs(self) -> None:
         with pytest.raises(ValueError, match="case"):
             crit_value_bounds_finite(0, 1, 100, 2, 0.05)
@@ -154,7 +104,8 @@ class TestCoverageAndErrors:
 
 def test_missing_cache_raises_with_instructions(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     """Sans cache : erreur explicite avec la marche à suivre (pas de
-    téléchargement silencieux). Ce test ne dépend PAS du cache réel."""
+    téléchargement silencieux). Ce test ne dépend PAS du cache réel et
+    ne télécharge rien — il vérifie seulement le message d'erreur."""
     import ardlpy.critical_values.ks2020_finite as mod
 
     monkeypatch.setenv("ARDLPY_CACHE", str(tmp_path))
@@ -163,61 +114,25 @@ def test_missing_cache_raises_with_instructions(tmp_path, monkeypatch) -> None: 
         mod._load_tables()
 
 
-class TestBoundsTestIntegration:
-    """Reproduction bout-en-bout de la sortie publiée du Stata Journal
-    2023 (§5) via bounds_test(finite_t=True) sur nos données PSS2001."""
+@pytest.mark.needs_review
+@pytest.mark.external
+class TestBoundsTestIntegrationBlockedByA3:
+    """Reproduction bout-en-bout contre une sortie Stata publiée.
 
-    def test_full_sj2023_case3_reproduction(self) -> None:
-        import warnings
+    BLOQUÉ PAR A3 : ne pas ré-exécuter avant accord des auteurs
+    (voie A3, docs/correspondence/2026-07-10_ks_license_draft.md).
+    Aucune valeur de référence n'est encodée ici tant que l'accord
+    n'est pas reçu — ce test est un espace réservé documentant
+    l'intention, pas une validation active.
+    """
 
-        from ardlpy.bounds import bounds_test
-        from ardlpy.datasets import load_pss2001
-
-        data = load_pss2001()
-        # échantillon d'estimation Stata (smpl) : 1972q1-1997q4 = 104 obs
-        sub = data.iloc[2:].reset_index(drop=True)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            res = bounds_test(
-                sub["w"],
-                sub[["Prod", "UR", "Wedge", "Union"]],
-                case=3,
-                order=(6, {"Prod": 1, "UR": 6, "Wedge": 6, "Union": 6}),
-                finite_t=True,
-                fixed_regressors=sub[["D7475", "D7579"]],
-            )
-        assert res._fit.nobs == 104
-        assert res.f_stat == pytest.approx(5.421, abs=1e-3)
-        assert res.t_stat == pytest.approx(-3.475, abs=1e-3)
-        assert res.p_values is not None
-        assert res.p_values["p_I0"] == pytest.approx(0.001, abs=5.5e-4)
-        assert res.p_values["p_I1"] == pytest.approx(0.011, abs=5.5e-4)
-        assert res.p_values["t_p_I0"] == pytest.approx(0.009, abs=5.5e-4)
-        assert res.p_values["t_p_I1"] == pytest.approx(0.104, abs=5.5e-4)
-        # bornes 5 % = colonnes imprimées
-        assert res.bounds.loc[0.05, "F_I0"] == pytest.approx(2.806, abs=_TOL)
-        assert res.bounds.loc[0.05, "F_I1"] == pytest.approx(4.226, abs=_TOL)
-        assert res.bounds.loc[0.05, "t_I1"] == pytest.approx(-3.873, abs=_TOL)
-        # décisions : Stata affiche « inconclusive » (règle jointe) ; notre
-        # taxonomie détaille : F rejette, t entre les bornes -> suspicion
-        # de dégénérescence de type 1 (même substance, label plus riche)
-        assert res.decision_f == "cointegration"
-        assert res.decision_t == "inconclusive"
-        assert res.decision_joint == "degenerate_suspicion"
-        # summary affiche aussi les p-values du t
-        assert "p-values t" in res.summary()
-
-    def test_finite_t_requires_kripfganz(self) -> None:
-        from ardlpy.bounds import bounds_test
-        from ardlpy.datasets import load_denmark
-
-        data = load_denmark()
-        with pytest.raises(ValueError, match="finite_t"):
-            bounds_test(
-                data["LRM"],
-                data[["LRY", "IBO", "IDE"]],
-                case=3,
-                order=(1, 1),
-                cv_source="pss",
-                finite_t=True,
-            )
+    @pytest.mark.skip(
+        reason=(
+            "bloqué par A3 : nécessite (a) l'autorisation des auteurs pour "
+            "download_surface_coefs(), (b) une source légitime de valeurs "
+            "de référence (article Stata Journal 2023 en accès direct). "
+            "Ne pas réactiver avant réception de la réponse A3."
+        )
+    )
+    def test_full_reproduction_placeholder(self) -> None:
+        raise NotImplementedError("En attente d'autorisation A3.")
