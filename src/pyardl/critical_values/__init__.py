@@ -30,16 +30,16 @@ from typing import Literal
 
 import numpy as np
 
-from ardlpy.critical_values.ks2020 import crit_value_bounds as _ks_bounds
-from ardlpy.critical_values.ks2020 import pvalue_bounds
-from ardlpy.critical_values.narayan2005 import (
+from pyardl.critical_values.ks2020 import crit_value_bounds as _ks_bounds
+from pyardl.critical_values.ks2020 import pvalue_bounds
+from pyardl.critical_values.narayan2005 import (
     F_NARAYAN,
     MAX_K_NARAYAN,
     T_GRID,
 )
-from ardlpy.critical_values.pss2001 import get_bounds as _pss_bounds
-from ardlpy.critical_values.simulate import SimulatedBounds, simulate_bounds
-from ardlpy.exceptions import ArdlpyMethodologyWarning
+from pyardl.critical_values.pss2001 import get_bounds as _pss_bounds
+from pyardl.critical_values.simulate import SimulatedBounds, simulate_bounds
+from pyardl.exceptions import PyardlMethodologyWarning
 
 __all__ = ["get_bounds", "pvalue_bounds", "simulate_bounds", "SimulatedBounds"]
 
@@ -81,7 +81,7 @@ def _narayan_bounds(
             f"T={t_obs} hors de la plage des tables de Narayan "
             f"({T_GRID[0]}-{T_GRID[-1]}) : repli sur les bornes "
             "asymptotiques PSS 2001 (spec 12 §2.1).",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=3,
         )
         return _pss_bounds("F", case, k, alpha)
@@ -115,7 +115,7 @@ def get_bounds(
     Parameters
     ----------
     stat, case, k, alpha
-        Voir :func:`ardlpy.critical_values.pss2001.get_bounds`.
+        Voir :func:`pyardl.critical_values.pss2001.get_bounds`.
     cv_source : {"pss", "narayan", "kripfganz"}
         Source des valeurs critiques (voir la politique du module).
     t_obs : int, optional

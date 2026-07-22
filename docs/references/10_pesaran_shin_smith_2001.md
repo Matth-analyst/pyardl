@@ -3,7 +3,7 @@
 ## Référence
 PSS (2001), *Journal of Applied Econometrics*, 16(3), 289–326.
 DOI: 10.1002/jae.616. Clé : `pesaran2001bounds` · Branche : **3. Noyau**.
-Module : `ardlpy.bounds` · Priorité : **v0.1** — la raison d'être du package.
+Module : `pyardl.bounds` · Priorité : **v0.1** — la raison d'être du package.
 
 ## 1. Le cadre
 
@@ -68,7 +68,7 @@ Détails d'implémentation :
 ## 4. Valeurs critiques asymptotiques
 
 1. Encoder les tables de bornes asymptotiques (F et t, cas I-V,
-   k = 0..10, seuils 1/2.5/5/10 %) dans `ardlpy.critical_values.pss2001`
+   k = 0..10, seuils 1/2.5/5/10 %) dans `pyardl.critical_values.pss2001`
    (données numériques — fichiers .npz versionnés + provenance documentée).
 2. Interface : `get_bounds(stat="F"|"t", case, k, alpha)` → (lower, upper).
 3. Ces tables sont le fallback ; les surfaces de réponse (spec 13)
@@ -77,7 +77,7 @@ Détails d'implémentation :
 ## 5. Workflow utilisateur complet (la fonction phare)
 
 ```python
-res = ardlpy.bounds_test(y, X, case=3, p=..., q=... | ic="aic",
+res = pyardl.bounds_test(y, X, case=3, p=..., q=... | ic="aic",
                           cv_source="kripfganz"|"pss"|"narayan")
 # BoundsTestResults:
 #   f_stat, t_stat, bounds (df), decision_f, decision_t ∈

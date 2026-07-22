@@ -8,8 +8,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ardlpy.critical_values import get_bounds, pvalue_bounds
-from ardlpy.critical_values.ks2020 import MAX_K_KS, crit_value_bounds
+from pyardl.critical_values import get_bounds, pvalue_bounds
+from pyardl.critical_values.ks2020 import MAX_K_KS, crit_value_bounds
 
 # ---------------------------------------------------------------------------
 # Valeurs PUBLIÉES : Kripfganz & Schneider, "Response Surface Regressions
@@ -120,7 +120,7 @@ class TestInternalCoherence:
     def test_p025_consistent_with_spec12_internal_table(self) -> None:
         """Le seuil 2.5 % par inversion K&S recoupe la table interne de
         la spec 12 (simulation indépendante) à ±0.05."""
-        from ardlpy.critical_values.pss2001_p025 import F_P025
+        from pyardl.critical_values.pss2001_p025 import F_P025
 
         for case in (1, 2, 3, 4, 5):
             for k in (1, 3, 7, 10):

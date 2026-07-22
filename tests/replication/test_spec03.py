@@ -14,8 +14,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ardlpy.core.ardl import ARDL
-from ardlpy.datasets import load_denmark
+from pyardl.core.ardl import ARDL
+from pyardl.datasets import load_denmark
 
 _EXPECTED = json.loads(
     (Path(__file__).parent / "expected" / "spec03.json").read_text(encoding="utf-8")
@@ -45,7 +45,7 @@ def test_longrun_and_lambda_match_r_ardl() -> None:
 @pytest.mark.external
 def test_q_zero_case_matches_r_ardl() -> None:
     """Cas q_IDE = 0 (docs/QUESTIONS.md) : R ARDL confirme la convention
-    ardlpy (niveau IDE contemporain, résidus ardl/uecm identiques) et
+    pyardl (niveau IDE contemporain, résidus ardl/uecm identiques) et
     les coefficients ECM concordent à 1e-6."""
     data = load_denmark()
     expected = _EXPECTED["model_q_ide_0"]

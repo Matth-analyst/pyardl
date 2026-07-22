@@ -4,7 +4,7 @@
 Chudik & Pesaran (2015), *Journal of Econometrics*, 188(2), 393–420
 (CCE dynamique) ; Chudik, Mohaddes, Pesaran & Raissi (2016), *Advances in
 Econometrics* 36 (CS-DL). Clés : `chudik2015csardl`, `chudik2016csdl`.
-Branche : **9. Panel** · Module : `ardlpy.panel` · Priorité : v0.8 —
+Branche : **9. Panel** · Module : `pyardl.panel` · Priorité : v0.8 —
 absent de R comme de Python (référence : Stata xtdcce2) → seconde grande
 zone vierge après le noyau.
 
@@ -54,9 +54,9 @@ rend l'approximation statique insuffisante).
 
 ## 3. API
 ```python
-res = ardlpy.panel.CSARDL(df, y=..., X=..., id=..., time=...,
+res = pyardl.panel.CSARDL(df, y=..., X=..., id=..., time=...,
         order=(1,1), cs_lags="auto").fit()
-res = ardlpy.panel.CSDL(df, ..., trunc_lags="auto").fit()
+res = pyardl.panel.CSDL(df, ..., trunc_lags="auto").fit()
 res.longrun; res.cd_test(); res.summary()
 ```
 

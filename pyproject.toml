@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ardlpy"
+name = "pyardl"
 version = "0.1.0.dev0"
 description = "Économétrie des modèles ARDL : estimation, bounds tests de cointégration, inférence bootstrap, NARDL/QARDL/Fourier, panels hétérogènes."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "ardlpy contributors" }]
+authors = [{ name = "pyardl contributors" }]
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
@@ -28,7 +28,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ardlpy"]
+packages = ["src/pyardl"]
 
 [tool.ruff]
 line-length = 88
@@ -46,7 +46,7 @@ quote-style = "double"
 
 [tool.mypy]
 python_version = "3.11"
-packages = ["ardlpy"]
+packages = ["pyardl"]
 mypy_path = "src"
 strict = true
 warn_return_any = true
@@ -64,7 +64,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/ardlpy"]
+source = ["src/pyardl"]
 
 [tool.coverage.report]
 fail_under = 90

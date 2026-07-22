@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 from statsmodels.tsa.ardl import ARDL, UECM
 
-from ardlpy.core.transforms import ARDLParams, ardl_to_ecm
+from pyardl.core.transforms import ARDLParams, ardl_to_ecm
 
 
 @pytest.mark.parametrize("seed", range(5))

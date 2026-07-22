@@ -40,7 +40,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from ardlpy.exceptions import DegenerateCaseWarning
+from pyardl.exceptions import DegenerateCaseWarning
 
 _LAMBDA_TOL = 1e-8
 
@@ -155,7 +155,7 @@ class ECMParams:
         accepte q_j = 0 et fait entrer x_{j,t} contemporain dans la
         partie de niveau de l'EC) ; ``statsmodels.tsa.ardl.UECM``, en
         revanche, refuse q_j = 0 à la construction (``ValueError: All
-        included exog variables must have a lag length >= 1``) — ardlpy
+        included exog variables must have a lag length >= 1``) — pyardl
         le supporte.
     """
 
@@ -303,7 +303,7 @@ def speed_of_adjustment(params: ARDLParams) -> float:
 def longrun_coefs(params: ARDLParams, *, tol: float = _LAMBDA_TOL) -> pd.Series:
     """Coefficients de long terme theta_j = sum_i beta_{j,i} / (1 - sum_i phi_i).
 
-    Émet :class:`~ardlpy.exceptions.DegenerateCaseWarning` et renvoie des
+    Émet :class:`~pyardl.exceptions.DegenerateCaseWarning` et renvoie des
     NaN si |lambda| < tol (absence de force de rappel, spec 03 §3.4).
     """
     lam = speed_of_adjustment(params)
@@ -373,7 +373,7 @@ def half_life(params: ARDLParams) -> float:
     """Demi-vie du retour à l'équilibre : ln(0.5) / ln(1 + lambda).
 
     Valide uniquement si -1 < lambda < 0 (spec 03 §3, point 3) ; NaN +
-    :class:`~ardlpy.exceptions.DegenerateCaseWarning` sinon.
+    :class:`~pyardl.exceptions.DegenerateCaseWarning` sinon.
     """
     lam = speed_of_adjustment(params)
     if not (-1.0 < lam < 0.0):

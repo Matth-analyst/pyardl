@@ -9,7 +9,7 @@ recopie manuelle ; le recoupement statistique est fait par le moteur
 interne (tests spec 12).
 
 Usage : python validation/external/extract_narayan_tables.py <dynamac.R>
-Écrit src/ardlpy/critical_values/narayan2005.py.
+Écrit src/pyardl/critical_values/narayan2005.py.
 """
 
 from __future__ import annotations
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     out_path = (
         Path(__file__).parents[2]
         / "src"
-        / "ardlpy"
+        / "pyardl"
         / "critical_values"
         / "narayan2005.py"
     )

@@ -46,10 +46,10 @@ import scipy.linalg
 from statsmodels.stats.diagnostic import acorr_ljungbox, het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 
-from ardlpy.core.ardl import ARDL
-from ardlpy.critical_values import get_bounds
-from ardlpy.exceptions import ArdlpyMethodologyWarning, DegenerateCaseWarning
-from ardlpy.utils import check_series
+from pyardl.core.ardl import ARDL
+from pyardl.critical_values import get_bounds
+from pyardl.exceptions import DegenerateCaseWarning, PyardlMethodologyWarning
+from pyardl.utils import check_series
 
 FloatArray = npt.NDArray[np.float64]
 
@@ -151,7 +151,7 @@ def _estimate_uecm(
     if rank < design.shape[1]:
         warnings.warn(
             "Design UECM singulier : covariance non fiable.",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=3,
         )
     resid = y_dep - design @ coefs
@@ -276,7 +276,7 @@ class BoundsTestResults:
                 f"(décision jointe : {self.decision_joint}) — l'IC standard "
                 "sur la vitesse d'ajustement n'est valide que sous "
                 "cointégration (spec 11 §2.4).",
-                ArdlpyMethodologyWarning,
+                PyardlMethodologyWarning,
                 stacklevel=2,
             )
             ci_lower = ci_upper = np.nan
@@ -384,7 +384,7 @@ def _finalize_results(
             f"Erreurs autocorrélées (Ljung-Box p={lb_p:.4f} < 0.05) : le "
             "bounds test n'est pas fiable ; augmenter p/q (Pesaran-Shin "
             "1998, spec 09 §2.2).",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=3,
         )
     se = np.sqrt(np.diag(fit.cov))
@@ -437,7 +437,7 @@ def bounds_test(
         ``bounds`` rapporte tous les seuils disponibles).
     cv_source : {"kripfganz", "pss", "narayan"}
         Source des valeurs critiques (politique : spec 12 §2.4 ;
-        hiérarchie : ardlpy.critical_values). "kripfganz" (DÉFAUT
+        hiérarchie : pyardl.critical_values). "kripfganz" (DÉFAUT
         depuis la spec 13) : surfaces de réponse via statsmodels — CV F
         asymptotiques précis à tout seuil + p-values aux deux bornes ;
         les bornes t restent celles de PSS 2001 (composition
@@ -455,9 +455,9 @@ def bounds_test(
         ajustées à la taille d'échantillon par les surfaces de réponse
         complètes de K&S (voie A2) — nécessite le téléchargement
         préalable des coefficients depuis le site des auteurs
-        (``ardlpy.critical_values.ks2020_finite.
+        (``pyardl.critical_values.ks2020_finite.
         download_surface_coefs()``, NE PAS APPELER avant réception de
-        l'autorisation ; non redistribués par ardlpy). Le mapping des
+        l'autorisation ; non redistribués par pyardl). Le mapping des
         cas 2/4 vers les surfaces 3/5 pour le t est lu dans le source
         des auteurs mais n'est pas revalidé empiriquement. Ne pas
         utiliser en production.
@@ -495,7 +495,7 @@ def bounds_test(
             "docs/DEVIATIONS.md) et aucune comparaison recevable à une "
             "sortie Stata de référence n'a été effectuée. Ne pas "
             "utiliser en production.",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=2,
         )
 
@@ -508,11 +508,11 @@ def bounds_test(
         det = _CASE_DET[case]
         sel_det: Literal["const", "trend"] = "trend" if det == "trend" else "const"
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ArdlpyMethodologyWarning)
+            warnings.simplefilter("ignore", PyardlMethodologyWarning)
             sel = ARDL.select_order(y, x, max_p=max_p, max_q=max_q, ic=ic, det=sel_det)
         p, q_dict = sel.best_order
     else:
-        from ardlpy.core.ardl import _parse_order
+        from pyardl.core.ardl import _parse_order
 
         p, q_dict = _parse_order(order, x_names)
     q = tuple(q_dict[name] for name in x_names)
@@ -546,7 +546,7 @@ def bounds_test(
     # bornes à tous les seuils disponibles (F : source choisie ; t : tables
     # PSS, sauf finite_t=True où les surfaces K&S couvrent aussi le t)
     if finite_t:
-        from ardlpy.critical_values.ks2020_finite import (
+        from pyardl.critical_values.ks2020_finite import (
             crit_value_bounds_finite,
             pvalue_bounds_finite,
         )
@@ -582,7 +582,7 @@ def bounds_test(
             warnings.warn(
                 "F rejette mais pas t : suspicion de dégénérescence de "
                 "type 1 (spec 15).",
-                ArdlpyMethodologyWarning,
+                PyardlMethodologyWarning,
                 stacklevel=2,
             )
         p_f = pvalue_bounds_finite(f_stat, case, k, fit.nobs, sr, fit.df_resid)
@@ -637,7 +637,7 @@ def bounds_test(
             'rapporté ; utiliser cv_source="pss" pour une décision t '
             "asymptotique (en petit échantillon elle serait trop "
             "libérale, spec 12 §1).",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=2,
         )
     elif case in (1, 3, 5):
@@ -658,7 +658,7 @@ def bounds_test(
             f"Cas {case} : PSS 2001 ne tabule pas le t_BDM pour les cas à "
             "déterministes restreints — décision t indisponible, utiliser "
             "le F_overall.",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=2,
         )
 
@@ -670,14 +670,14 @@ def bounds_test(
             "de rappel en y) — la cointégration n'est PAS établie ; le "
             "cadre à 3 tests de Sam-McNown-Goh 2019 (spec 15) classifie "
             "formellement ce cas.",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=2,
         )
 
     # p-values approchées du F aux deux bornes (spec 13, surfaces K&S)
     p_values: pd.Series | None
     if 1 <= k <= 10:
-        from ardlpy.critical_values import pvalue_bounds
+        from pyardl.critical_values import pvalue_bounds
 
         p_i0, p_i1 = pvalue_bounds(f_stat, case=case, k=k)
         p_values = pd.Series({"p_I0": p_i0, "p_I1": p_i1}, name="F_pvalues")

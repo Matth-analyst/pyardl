@@ -3,7 +3,7 @@
 ## Référence
 Kripfganz & Schneider (2020), *Oxford Bulletin of Economics and Statistics*,
 82(6), 1456–1481. DOI: 10.1111/obes.12377. Clé : `kripfganz2020response`.
-Branche : **4** · Module : `ardlpy.critical_values.ks2020` ·
+Branche : **4** · Module : `pyardl.critical_values.ks2020` ·
 Priorité : **v0.2** — différenciateur majeur (natif dans Stata, absent de
 Python, partiel en R).
 

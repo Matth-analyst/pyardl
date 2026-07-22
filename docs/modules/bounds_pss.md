@@ -1,4 +1,4 @@
-# `ardlpy.bounds` — le bounds test PSS 2001
+# `pyardl.bounds` — le bounds test PSS 2001
 
 Référence : Pesaran, Shin & Smith (2001), "Bounds Testing Approaches to
 the Analysis of Level Relationships", *JAE* 16(3), 289-326 — spec
@@ -22,7 +22,7 @@ Jamais un booléen.
 ## Exemple
 
 ```python
-from ardlpy.bounds import bounds_test
+from pyardl.bounds import bounds_test
 
 res = bounds_test(y, x, case=3, order=(2, 1))     # ou order=None -> sélection
 print(res.summary())        # stat, bornes aux 3 seuils, décisions
@@ -33,7 +33,7 @@ res.diagnostics()           # Ljung-Box, Jarque-Bera, Breusch-Pagan
 
 ## Les 5 cas déterministes (spec 10 §3)
 
-| Cas | Constante | Tendance | Vecteur testé | ardlpy | R ARDL | Stata ardl | EViews |
+| Cas | Constante | Tendance | Vecteur testé | pyardl | R ARDL | Stata ardl | EViews |
 |---|---|---|---|---|---|---|---|
 | I | — | — | λ, γ | `case=1` | `case=1` | `noconstant` | None |
 | II | restreinte | — | λ, γ, c₀ | `case=2` | `case=2` | `restricted` (défaut CV) | Rest. constant |
@@ -104,7 +104,7 @@ Deux sources disponibles via `cv_source` (politique complète :
   30 ≤ T ≤ 80, où l'asymptotique sur-rejette.
 
 Provenance et recoupements :
-[`PROVENANCE.md`](../../src/ardlpy/critical_values/PROVENANCE.md).
+[`PROVENANCE.md`](../../src/pyardl/critical_values/PROVENANCE.md).
 
 **Ajustement fini-T (F et t) : `bounds_test(..., finite_t=True)` —
 EXPÉRIMENTAL, NON VALIDÉ, bloqué par une demande de permission en cours

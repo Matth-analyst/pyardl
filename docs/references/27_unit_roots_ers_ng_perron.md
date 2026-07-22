@@ -4,7 +4,7 @@
 ERS (1996), *Econometrica*, 64(4), 813–836 (DF-GLS) ; Ng & Perron (2001),
 *Econometrica*, 69(6), 1519–1554 (statistiques M et sélection de retards
 MAIC). Clés : `elliott1996ers`, `ng2001lag` · Branche : **11** ·
-Module : `ardlpy.unitroot` · Priorité : v0.2 — étape 0 de tout workflow
+Module : `pyardl.unitroot` · Priorité : v0.2 — étape 0 de tout workflow
 bounds (garantir l'absence d'I(2)).
 
 ## 1. Rôle dans la bibliothèque
@@ -33,7 +33,7 @@ par défaut.
    **sélection de retards MAIC** (le critère modifié — implémenter, c'est
    le cœur de leur contribution : l'AIC standard sous-sélectionne en
    présence de MA négative) ; CV tabulés à encoder.
-3. **Rapport intégré** : `ardlpy.unitroot.report(df, det=...)` → tableau
+3. **Rapport intégré** : `pyardl.unitroot.report(df, det=...)` → tableau
    par variable : niveau et première différence, DF-GLS + MZ_t (+ ADF/KPSS
    standard via statsmodels pour complétude, + option fourier_kpss de
    spec 19), verdict I(0)/I(1)/I(2)-suspect. Warning bloquant du bounds

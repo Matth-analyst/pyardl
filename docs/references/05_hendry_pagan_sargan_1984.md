@@ -3,7 +3,7 @@
 ## Référence
 Hendry, Pagan & Sargan (1984), "Dynamic Specification", *Handbook of
 Econometrics*, vol. 2, ch. 18. Clé : `hendry1984dynamic` · Branche : **1**.
-Module : `ardlpy.core` · Classes : `ARDL`, `ARDLOrderSelection`.
+Module : `pyardl.core` · Classes : `ARDL`, `ARDLOrderSelection`.
 Priorité : **v0.1** — c'est l'estimateur central de la bibliothèque.
 
 ## 1. Apport

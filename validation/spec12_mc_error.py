@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ardlpy.critical_values.simulate import simulate_bounds
+from pyardl.critical_values.simulate import simulate_bounds
 
 PARAMS = {
     "n_sims": 100_000,

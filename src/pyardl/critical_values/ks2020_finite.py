@@ -18,7 +18,7 @@ COEFFICIENTS PUBLIÉS de Kripfganz & Schneider (fichier
 ``ardl_surfreg_coefs.dta`` distribué avec leur package Stata ardl).
 
 Licence / distribution (voie A2, arbitrage utilisateur) : les
-coefficients ne portent pas de licence explicite -> ardlpy ne les
+coefficients ne portent pas de licence explicite -> pyardl ne les
 REDISTRIBUE PAS. ``download_surface_coefs()`` NE DOIT PAS être appelé
 tant que la réponse des auteurs n'est pas reçue (voie A3 en attente).
 Une fois l'autorisation obtenue, le téléchargement se fait au premier
@@ -82,9 +82,9 @@ _T_CASES = (1, 3, 5)
 
 
 def cache_dir() -> Path:
-    """Dossier de cache local (``ARDLPY_CACHE`` ou ``~/.ardlpy``)."""
-    base = os.environ.get("ARDLPY_CACHE")
-    return (Path(base) if base else Path.home() / ".ardlpy") / "ks2020"
+    """Dossier de cache local (``PYARDL_CACHE`` ou ``~/.pyardl``)."""
+    base = os.environ.get("PYARDL_CACHE")
+    return (Path(base) if base else Path.home() / ".pyardl") / "ks2020"
 
 
 def _coefs_path() -> Path:
@@ -93,7 +93,7 @@ def _coefs_path() -> Path:
 
 def download_surface_coefs(force: bool = False, url: str = _URL) -> Path:
     """Télécharge les coefficients K&S depuis le site des auteurs
-    (premier usage ; aucun matériel redistribué par ardlpy).
+    (premier usage ; aucun matériel redistribué par pyardl).
 
     Écrit le fichier dans :func:`cache_dir` avec un journal de
     provenance (URL, date, SHA-256). Les usages suivants lisent le
@@ -118,7 +118,7 @@ def download_surface_coefs(force: bool = False, url: str = _URL) -> Path:
         "bytes": len(payload),
         "downloaded": datetime.date.today().isoformat(),
         "source": "Kripfganz & Schneider, package Stata ardl "
-        "(kripfganz.de) — non redistribué par ardlpy, cf. PROVENANCE.md",
+        "(kripfganz.de) — non redistribué par pyardl, cf. PROVENANCE.md",
     }
     (path.parent / "provenance.json").write_text(
         json.dumps(meta, indent=2), encoding="utf-8"
@@ -138,9 +138,9 @@ def _load_tables() -> dict[tuple[str, int, int], pd.DataFrame]:
     if not path.exists():
         raise FileNotFoundError(
             "Coefficients K&S finis-T absents du cache local "
-            f"({path}). Ils ne sont pas distribués avec ardlpy (licence, "
+            f"({path}). Ils ne sont pas distribués avec pyardl (licence, "
             "cf. PROVENANCE.md) : exécuter une fois\n"
-            "    from ardlpy.critical_values.ks2020_finite import "
+            "    from pyardl.critical_values.ks2020_finite import "
             "download_surface_coefs\n"
             "    download_surface_coefs()\n"
             "pour les télécharger depuis le site des auteurs."

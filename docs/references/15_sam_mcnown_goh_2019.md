@@ -3,7 +3,7 @@
 ## Référence
 SMG (2019), *Economic Modelling*, 80, 130–141.
 DOI: 10.1016/j.econmod.2018.11.001. Clé : `sam2019augmented`.
-Branche : **5** · Module : `ardlpy.bounds` (extension) ·
+Branche : **5** · Module : `pyardl.bounds` (extension) ·
 Priorité : **v0.3** — avec spec 14, le duo différenciateur du package.
 
 ## 1. Apport

@@ -8,11 +8,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ardlpy.critical_values import get_bounds
-from ardlpy.critical_values.narayan2005 import F_NARAYAN, T_GRID
-from ardlpy.critical_values.pss2001 import get_bounds as pss_bounds
-from ardlpy.critical_values.simulate import simulate_bounds
-from ardlpy.exceptions import ArdlpyMethodologyWarning
+from pyardl.critical_values import get_bounds
+from pyardl.critical_values.narayan2005 import F_NARAYAN, T_GRID
+from pyardl.critical_values.pss2001 import get_bounds as pss_bounds
+from pyardl.critical_values.simulate import simulate_bounds
+from pyardl.exceptions import PyardlMethodologyWarning
 
 
 class TestStructuralConsistency:
@@ -125,7 +125,7 @@ class TestInterpolationAndCoverage:
 
     def test_out_of_range_falls_back_to_pss_with_warning(self) -> None:
         """Spec 12 §3.2 : hors plage -> warning + asymptotique."""
-        with pytest.warns(ArdlpyMethodologyWarning, match="hors de la plage"):
+        with pytest.warns(PyardlMethodologyWarning, match="hors de la plage"):
             got = get_bounds(
                 "F", case=3, k=1, alpha=0.05, cv_source="narayan", t_obs=200
             )

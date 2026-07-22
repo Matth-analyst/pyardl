@@ -1,4 +1,4 @@
-# `ardlpy.core.ardl` — l'estimateur ARDL(p, q)
+# `pyardl.core.ardl` — l'estimateur ARDL(p, q)
 
 Référence : Hendry, Pagan & Sargan (1984), "Dynamic Specification",
 *Handbook of Econometrics*, vol. 2, ch. 18 — spec
@@ -19,7 +19,7 @@ spec 03, consommée sans conversion manuelle).
 
 ```python
 import numpy as np, pandas as pd
-from ardlpy.core.ardl import ARDL
+from pyardl.core.ardl import ARDL
 
 # estimation à ordres fixes
 res = ARDL(y, x, order=(2, {"rev": 1, "px": 2}), det="const").fit()
@@ -42,7 +42,7 @@ g.reduction_path         # chemin journalisé (transparence)
 
 - **Garde-fou d'autocorrélation (spec 09 §2.2)** : après chaque
   `.fit()`, un test de Ljung-Box est exécuté automatiquement ; si
-  p < 0.05, un `ArdlpyMethodologyWarning` signale que l'inférence de
+  p < 0.05, un `PyardlMethodologyWarning` signale que l'inférence de
   long terme n'est pas fiable (condition de validité centrale de
   Pesaran-Shin 1998). Ce n'est pas une option.
 - **Échantillon commun dans `select_order` (spec 05 §3.2)** : tous les
@@ -61,7 +61,7 @@ g.reduction_path         # chemin journalisé (transparence)
 
 Les coefficients, se et résidus concordent à 1e-10 avec
 `statsmodels.tsa.ardl.ARDL` (testé). En revanche `statsmodels` rapporte
-`nobs = T − p` et calcule llf/IC dessus même quand max(qⱼ) > p ; ardlpy
+`nobs = T − p` et calcule llf/IC dessus même quand max(qⱼ) > p ; pyardl
 utilise partout la taille de l'échantillon d'estimation réel
 (T − hold_back), condition de comparabilité des IC dans `select_order`.
 Les deux conventions coïncident dès que p ≥ max(qⱼ).

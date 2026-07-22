@@ -12,9 +12,9 @@ import pandas as pd
 import pytest
 from statsmodels.tsa.ardl import UECM as SM_UECM
 
-from ardlpy.bounds import bounds_test
-from ardlpy.bounds.pss import _classify
-from ardlpy.exceptions import ArdlpyMethodologyWarning, DegenerateCaseWarning
+from pyardl.bounds import bounds_test
+from pyardl.bounds.pss import _classify
+from pyardl.exceptions import DegenerateCaseWarning, PyardlMethodologyWarning
 
 
 def _dgp_cointegrated(
@@ -107,7 +107,7 @@ class TestCasesAndGuards:
     def test_t_decision_none_for_cases_ii_iv_with_warning(self) -> None:
         y, x = _dgp_cointegrated(seed=3)
         for case in (2, 4):
-            with pytest.warns(ArdlpyMethodologyWarning, match="ne tabule pas"):
+            with pytest.warns(PyardlMethodologyWarning, match="ne tabule pas"):
                 res = bounds_test(y, x, case=case, order=(2, 1))
             assert res.decision_t is None
             assert np.isfinite(res.t_stat)  # la stat est calculée quand même
@@ -197,7 +197,7 @@ class TestCasesAndGuards:
         for t in range(1, n):
             u[t] = 0.8 * u[t - 1] + rng.normal(scale=0.3)
         y = pd.Series(0.5 * x + u, name="y")
-        with pytest.warns(ArdlpyMethodologyWarning, match="Ljung-Box"):
+        with pytest.warns(PyardlMethodologyWarning, match="Ljung-Box"):
             bounds_test(y, pd.DataFrame({"x": x}), case=3, order=(1, 0))
 
 
@@ -301,7 +301,7 @@ class TestSpec13Integration:
             decision_f="inconclusive",
             p_values=None,
         )
-        from ardlpy.critical_values import pvalue_bounds
+        from pyardl.critical_values import pvalue_bounds
 
         p_i0, p_i1 = pvalue_bounds(5.3, case=3, k=1)
         forced = dataclasses.replace(

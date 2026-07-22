@@ -3,7 +3,7 @@
 ## Référence
 Engle & Granger (1987), *Econometrica*, 55(2), 251–276. DOI: 10.2307/1913236.
 Clé : `engle1987cointegration` · Branche : **2. Cointégration classique**.
-Module : `ardlpy.cointegration` · Priorité : v0.2 (contexte + test de
+Module : `pyardl.cointegration` · Priorité : v0.2 (contexte + test de
 référence pour comparaisons).
 
 ## 1. Apport et rôle dans la bibliothèque
@@ -27,7 +27,7 @@ de comparaison (le cœur restant l'approche bounds).
 3. **Valeurs critiques spéciales** (dépendent de k et du cas déterministe
    de l'étape 1) : utiliser les surfaces de réponse de MacKinnon (2010) —
    implémenter la table des coefficients de surface (τ_∞ + b₁/T + b₂/T²)
-   dans `ardlpy.critical_values.mackinnon` ; p-values approchées incluses.
+   dans `pyardl.critical_values.mackinnon` ; p-values approchées incluses.
 4. **ECM en deuxième étape** (option `fit_ecm=True`) : régresser Δy sur
    Δx et û_{t-1} → vitesse d'ajustement à la Engle-Granger.
 

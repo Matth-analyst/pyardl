@@ -62,7 +62,7 @@ cat("Coefficients UECM :\n")
 print(coef(uecm_wages), digits = 12)
 cat("SSR UECM :", sum(residuals(uecm_wages)^2), "\n")
 
-# Export CSV du dataset pour intégration dans src/ardlpy/datasets/
+# Export CSV du dataset pour intégration dans src/pyardl/datasets/
 # (données publiques de l'article, redistribuées par le package ARDL —
 # vérifier la licence du package avant redistribution ; sinon documenter
 # la source primaire ONS/Bank of England dans le loader).

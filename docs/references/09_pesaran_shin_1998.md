@@ -3,7 +3,7 @@
 ## Référence
 Pesaran & Shin (1998), chapitre du volume du centenaire Ragnar Frisch,
 Cambridge University Press. Clé : `pesaran1998ardl` · Branche : **3. Noyau**.
-Module : `ardlpy.core` (propriétés d'inférence) · Priorité : v0.1-v0.2.
+Module : `pyardl.core` (propriétés d'inférence) · Priorité : v0.1-v0.2.
 
 ## 1. Apport théorique (ce que la doc doit expliquer)
 Résultats qui fondent l'usage de l'ARDL sur séries non stationnaires :

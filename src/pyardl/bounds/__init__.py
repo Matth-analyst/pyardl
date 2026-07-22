@@ -1,5 +1,5 @@
 """Bounds tests de cointégration (specs 10, 11, 15)."""
 
-from ardlpy.bounds.pss import BoundsTestResults, bounds_test
+from pyardl.bounds.pss import BoundsTestResults, bounds_test
 
 __all__ = ["BoundsTestResults", "bounds_test"]

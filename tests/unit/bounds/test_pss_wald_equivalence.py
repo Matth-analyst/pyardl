@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ardlpy.bounds import bounds_test
+from pyardl.bounds import bounds_test
 
 
 def _dgp(seed: int, n: int = 250, k: int = 2) -> tuple[pd.Series, pd.DataFrame]:

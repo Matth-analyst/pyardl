@@ -3,7 +3,7 @@
 ## Référence
 McNown, Sam & Goh (2018), *Applied Economics*, 50(13), 1509–1521.
 DOI: 10.1080/00036846.2017.1366643. Clé : `mcnown2018bootstrap`.
-Branche : **5** · Module : `ardlpy.bootstrap` · Priorité : **v0.3** —
+Branche : **5** · Module : `pyardl.bootstrap` · Priorité : **v0.3** —
 première grande fonctionnalité absente de Python.
 
 ## 1. Apport
@@ -58,7 +58,7 @@ Détails critiques :
 
 ## 3. API
 ```python
-res = ardlpy.bootstrap_bounds_test(y, X, case=3, order=..., B=2999,
+res = pyardl.bootstrap_bounds_test(y, X, case=3, order=..., B=2999,
         resample="iid"|"wild", seed=..., backend="numpy"|"rust")
 # ajoute à BoundsTestResults : boot_cv (df), boot_pvalues,
 # decisions bootstrap par test, distribution stockée (option)

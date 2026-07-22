@@ -12,10 +12,10 @@ import pandas as pd
 import pytest
 import statsmodels.api as sm
 
-from ardlpy.core.ardl import ARDL
-from ardlpy.core.transforms import ardl_to_ecm
-from ardlpy.exceptions import ArdlpyMethodologyWarning
-from ardlpy.utils import lag_matrix
+from pyardl.core.ardl import ARDL
+from pyardl.core.transforms import ardl_to_ecm
+from pyardl.exceptions import PyardlMethodologyWarning
+from pyardl.utils import lag_matrix
 
 
 def _dgp_clean(seed: int, n: int = 300) -> tuple[pd.Series, pd.DataFrame]:
@@ -143,7 +143,7 @@ class TestStability:
         for t in range(1, n):
             y[t] = 1.05 * y[t - 1] + 0.1 * xv[t] + rng.normal(scale=0.1)
         res = ARDL(pd.Series(y, name="y"), pd.DataFrame({"x": xv}), order=(1, 0))._fit()
-        with pytest.warns(ArdlpyMethodologyWarning, match="instable"):
+        with pytest.warns(PyardlMethodologyWarning, match="instable"):
             assert res.is_stable is False
 
     def test_stationary_dgp_is_stable_true(self) -> None:
@@ -171,14 +171,14 @@ class TestSpec09Guard:
         for t in range(1, n):
             u[t] = 0.8 * u[t - 1] + rng.normal(scale=0.3)
         y = pd.Series(0.5 * xv + u, name="y")
-        with pytest.warns(ArdlpyMethodologyWarning, match="Ljung-Box"):
+        with pytest.warns(PyardlMethodologyWarning, match="Ljung-Box"):
             ARDL(y, pd.DataFrame({"x": xv}), order=(1, 0)).fit()
 
     def test_silent_on_clean_dgp(self) -> None:
         """Pas de warning sur le DGP propre correctement spécifié."""
         y, x = _dgp_clean(seed=31)
         with warnings.catch_warnings():
-            warnings.simplefilter("error", ArdlpyMethodologyWarning)
+            warnings.simplefilter("error", PyardlMethodologyWarning)
             ARDL(y, x, order=(1, 1)).fit()
 
 

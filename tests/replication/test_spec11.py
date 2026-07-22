@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from ardlpy.bounds import bounds_test
-from ardlpy.datasets import load_denmark
+from pyardl.bounds import bounds_test
+from pyardl.datasets import load_denmark
 
 _EXPECTED = json.loads(
     (Path(__file__).parent / "expected" / "spec11.json").read_text(encoding="utf-8")

@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ardlpy.core.transforms import (
+from pyardl.core.transforms import (
     ARDLParams,
     ardl_to_ecm,
     ecm_to_ardl,
@@ -17,8 +17,8 @@ from ardlpy.core.transforms import (
     longrun_covariance,
     speed_of_adjustment,
 )
-from ardlpy.exceptions import DegenerateCaseWarning
-from ardlpy.utils import _delta_method
+from pyardl.exceptions import DegenerateCaseWarning
+from pyardl.utils import _delta_method
 
 
 @pytest.mark.fast_mc
@@ -225,7 +225,7 @@ def test_ardlparams_x_names_length_mismatch() -> None:
     ],
 )
 def test_ecmparams_validation(kwargs: dict, match: str) -> None:
-    from ardlpy.core.transforms import ECMParams
+    from pyardl.core.transforms import ECMParams
 
     base = {
         "p": 1,

@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ardlpy.exceptions import ArdlpyMethodologyWarning
-from ardlpy.utils import check_series, lag_matrix
+from pyardl.exceptions import PyardlMethodologyWarning
+from pyardl.utils import check_series, lag_matrix
 
 
 class TestLagMatrix:
@@ -56,7 +56,7 @@ class TestCheckSeries:
     def test_edge_nan_trimmed_with_warning(self) -> None:
         """Spec 01 §6 : NaN de bord -> trim avec warning."""
         y = np.array([np.nan, 1.0, 2.0, 3.0] + list(np.linspace(4, 20, 17)))
-        with pytest.warns(ArdlpyMethodologyWarning, match="NaN de bord"):
+        with pytest.warns(PyardlMethodologyWarning, match="NaN de bord"):
             y_arr, *_ = check_series(y)
         assert y_arr.shape[0] == 20
         assert not np.isnan(y_arr).any()
@@ -68,7 +68,7 @@ class TestCheckSeries:
             check_series(y)
 
     def test_small_sample_warning(self) -> None:
-        with pytest.warns(ArdlpyMethodologyWarning, match="petit"):
+        with pytest.warns(PyardlMethodologyWarning, match="petit"):
             check_series(np.arange(10.0))
 
     def test_zero_variance_raises(self) -> None:

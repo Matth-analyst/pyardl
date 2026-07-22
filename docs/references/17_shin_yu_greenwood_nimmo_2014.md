@@ -3,7 +3,7 @@
 ## Référence
 Shin, Yu & Greenwood-Nimmo (2014), Festschrift Peter Schmidt, Springer,
 281–314. DOI: 10.1007/978-1-4899-8008-3_9. Clé : `shin2014nardl`.
-Branche : **6** · Module : `ardlpy.nardl` · Priorité : **v0.4** — la
+Branche : **6** · Module : `pyardl.nardl` · Priorité : **v0.4** — la
 fonctionnalité la plus demandée absente de Python.
 
 ## 1. Le modèle
@@ -66,7 +66,7 @@ m⁺ − m⁻ avec son IC (le graphique canonique des papiers NARDL).
 
 ## 3. API
 ```python
-res = ardlpy.NARDL(y, X, asym=["price"], order="auto", case=3).fit()
+res = pyardl.NARDL(y, X, asym=["price"], order="auto", case=3).fit()
 res.longrun_asym        # θ+, θ− et se
 res.asymmetry_tests()   # LR/SR, les 2 variantes
 res.bounds_test(cv="kripfganz"|"bootstrap")

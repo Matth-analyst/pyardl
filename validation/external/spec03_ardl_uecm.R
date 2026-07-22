@@ -3,7 +3,7 @@
 # documenté par la spec (Natsiopoulos & Tzeremes, package "ARDL").
 #
 # À exécuter manuellement par un humain (R + package ARDL installés) ;
-# ardlpy ne doit JAMAIS fabriquer les valeurs de référence produites ici
+# pyardl ne doit JAMAIS fabriquer les valeurs de référence produites ici
 #.
 #
 # Sortie attendue : coller les valeurs numériques (lambda, gamma_j,
@@ -34,7 +34,7 @@ print(multipliers(ardl_model))
 # ---------------------------------------------------------------------------
 # Cas limite q_j = 0 (docs/QUESTIONS.md, entrée spec 03 §2.2) : vérifier
 # comment R::ARDL traite un régresseur sans retard propre. Convention
-# ardlpy (validée en revue) : omega_j vide, gamma_j sur x_{j,t}
+# pyardl (validée en revue) : omega_j vide, gamma_j sur x_{j,t}
 # contemporain. Observer ici : (a) uecm() accepte-t-il l'ordre 0 ;
 # (b) le terme de niveau de IDE est-il daté t ou t-1 ; (c) les résidus
 # de ardl() et uecm() sont-ils identiques.

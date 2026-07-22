@@ -9,7 +9,7 @@ redistribution des coefficients publiés par K&S — statsmodels a
 RE-SIMULÉ les distributions (32 000 000 de réplications par
 configuration, méthodologie PSS/K&S) et ajusté ses propres polynômes de
 p-values asymptotiques. Licence BSD-3 de statsmodels, dépendance
-runtime déjà requise : aucune redistribution par ardlpy.
+runtime déjà requise : aucune redistribution par pyardl.
 
 Forme fonctionnelle des p-values (docstring statsmodels) :
 

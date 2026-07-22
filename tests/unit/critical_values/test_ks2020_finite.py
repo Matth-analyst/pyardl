@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import pytest
 
-from ardlpy.critical_values.ks2020_finite import (
+from pyardl.critical_values.ks2020_finite import (
     _coefs_path,
     crit_value_bounds_finite,
     pvalue_bounds_finite,
@@ -45,7 +45,7 @@ class TestInternalCoherence:
     def test_asymptotic_limit_matches_a1(self) -> None:
         """T très grand -> CV de la voie A1 (statsmodels) à ±0.05
         (re-simulations indépendantes)."""
-        from ardlpy.critical_values.ks2020 import crit_value_bounds
+        from pyardl.critical_values.ks2020 import crit_value_bounds
 
         for case in (1, 3, 5):
             for k in (1, 3):
@@ -106,9 +106,9 @@ def test_missing_cache_raises_with_instructions(tmp_path, monkeypatch) -> None: 
     """Sans cache : erreur explicite avec la marche à suivre (pas de
     téléchargement silencieux). Ce test ne dépend PAS du cache réel et
     ne télécharge rien — il vérifie seulement le message d'erreur."""
-    import ardlpy.critical_values.ks2020_finite as mod
+    import pyardl.critical_values.ks2020_finite as mod
 
-    monkeypatch.setenv("ARDLPY_CACHE", str(tmp_path))
+    monkeypatch.setenv("PYARDL_CACHE", str(tmp_path))
     monkeypatch.setattr(mod, "_TABLES", None)
     with pytest.raises(FileNotFoundError, match="download_surface_coefs"):
         mod._load_tables()

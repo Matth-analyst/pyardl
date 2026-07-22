@@ -13,7 +13,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from ardlpy.exceptions import ArdlpyMethodologyWarning
+from pyardl.exceptions import PyardlMethodologyWarning
 
 
 def _delta_method(
@@ -208,7 +208,7 @@ def check_series(
             raise ValueError("NaN interne détecté (seuls les NaN de bord sont trimés).")
         warnings.warn(
             f"NaN de bord : {int((~valid).sum())} observation(s) retirée(s).",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=2,
         )
         y_arr = y_arr[first : last + 1]
@@ -221,7 +221,7 @@ def check_series(
         warnings.warn(
             f"Échantillon très petit (n={y_arr.shape[0]} < {min_obs}) : "
             "l'inférence asymptotique n'est pas fiable.",
-            ArdlpyMethodologyWarning,
+            PyardlMethodologyWarning,
             stacklevel=2,
         )
     if np.var(y_arr) == 0.0:

@@ -1,6 +1,6 @@
 """Verrou n°1 (piège connu) : équivalence des régressions
 ARDL <-> ECM. Ce test doit être écrit AVANT l'implémentation de
-``ardlpy.core.transforms`` et verrouille les formules de passage de la
+``pyardl.core.transforms`` et verrouille les formules de passage de la
 spec 03 §2.2 (source d'erreurs n°1 du projet).
 
 Spec 03 §6.1.2 : sur données simulées, estimer par OLS (a) la forme ARDL
@@ -8,7 +8,7 @@ et (b) la forme ECM -> résidus identiques (1e-10), SSR identique, et
 coefficients liés exactement par les formules de passage.
 
 Les deux régressions ci-dessous sont construites indépendamment de
-``ardlpy.core.transforms`` (matrices de dessin bâties à la main dans ce
+``pyardl.core.transforms`` (matrices de dessin bâties à la main dans ce
 fichier de test), afin que la comparaison soit une vérification croisée
 réelle et non une tautologie.
 """
@@ -18,7 +18,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ardlpy.core.transforms import ARDLParams, ardl_to_ecm
+from pyardl.core.transforms import ARDLParams, ardl_to_ecm
 
 
 def _simulate_ardl(

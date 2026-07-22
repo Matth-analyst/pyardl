@@ -3,7 +3,7 @@
 ## Référence
 BDM (1998), *Journal of Time Series Analysis*, 19(3), 267–283.
 DOI: 10.1111/1467-9892.00091. Clé : `banerjee1998ecm` · Branche : **3**.
-Module : `ardlpy.bounds` (intégré au bounds test) · Priorité : v0.1.
+Module : `pyardl.bounds` (intégré au bounds test) · Priorité : v0.1.
 
 ## 1. Apport
 Test de cointégration en équation unique fondé sur la statistique t du

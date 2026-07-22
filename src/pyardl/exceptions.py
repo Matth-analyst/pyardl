@@ -2,7 +2,7 @@
 
 Toute limitation méthodologique (cas dégénéré, échantillon trop petit,
 instrument faible, non-convergence...) doit être signalée via une sous-classe
-de :class:`ArdlpyMethodologyWarning`, jamais via ``UserWarning`` nu, afin que
+de :class:`PyardlMethodologyWarning`, jamais via ``UserWarning`` nu, afin que
 l'utilisateur puisse filtrer ces avertissements spécifiquement
 (``warnings.filterwarnings``) et que les tests puissent les cibler
 (``pytest.warns``).
@@ -11,11 +11,11 @@ l'utilisateur puisse filtrer ces avertissements spécifiquement
 from __future__ import annotations
 
 
-class ArdlpyMethodologyWarning(UserWarning):
-    """Classe de base pour tout avertissement méthodologique émis par ardlpy."""
+class PyardlMethodologyWarning(UserWarning):
+    """Classe de base pour tout avertissement méthodologique émis par pyardl."""
 
 
-class DegenerateCaseWarning(ArdlpyMethodologyWarning):
+class DegenerateCaseWarning(PyardlMethodologyWarning):
     """Cas dégénéré : absence de force de rappel (lambda proche de 0) ou de
     convergence vers l'équilibre de long terme (lambda hors de ]-1, 0[).
 

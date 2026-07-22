@@ -3,7 +3,7 @@
 ## Référence
 Jordan & Philips (2018), *The Stata Journal*, 18(4), 902–923 (commande
 dynardl + pssbounds ; package R dynamac). Clé : `jordan2018dynamac`.
-Branche : **10** · Module : `ardlpy.simulate` (couche interprétation) ·
+Branche : **10** · Module : `pyardl.simulate` (couche interprétation) ·
 Priorité : v0.5 — forte valeur d'usage (science politique, papiers
 appliqués), coût faible (compose l'existant).
 

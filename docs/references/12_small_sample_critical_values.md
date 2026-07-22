@@ -4,7 +4,7 @@
 Narayan (2005), *Applied Economics*, 37(17), 1979–1990 (les tables petits
 échantillons les plus citées) ; Narayan & Smyth (2004) ; Mills & Pentecost
 (2001) ; Kanioura & Turner (2005). Clés : `narayan2005saving` etc.
-Branche : **4** · Module : `ardlpy.critical_values` · Priorité : v0.2.
+Branche : **4** · Module : `pyardl.critical_values` · Priorité : v0.2.
 
 ## 1. Problème traité
 Les bornes asymptotiques de PSS (spec 10) sont trop libérales quand
@@ -24,7 +24,7 @@ k = 0..7.
    Narayan → erreur explicite orientant vers cv_source="kripfganz"
    (spec 13) ; jamais de substitution silencieuse.
 3. **Moteur maison de simulation de CV** (la vraie valeur ajoutée de cette
-   spec) : `ardlpy.critical_values.simulate_bounds(case, k, T, n_sims,
+   spec) : `pyardl.critical_values.simulate_bounds(case, k, T, n_sims,
    seed)` — générer sous H₀ (y : marche aléatoire/proc. I(0) selon la
    borne ; x : marches aléatoires indépendantes), estimer l'UECM, stocker
    F et t, retourner les quantiles. Usages : (a) reproduire les tables

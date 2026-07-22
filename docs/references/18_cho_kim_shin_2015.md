@@ -2,7 +2,7 @@
 
 ## Référence
 Cho, Kim & Shin (2015), *Journal of Econometrics*, 188(1), 281–300.
-Clé : `cho2015qardl` · Branche : **7** · Module : `ardlpy.qardl` ·
+Clé : `cho2015qardl` · Branche : **7** · Module : `pyardl.qardl` ·
 Priorité : v0.6 (après le noyau et NARDL) — quasi absent hors GAUSS.
 
 ## 1. Le modèle
@@ -48,7 +48,7 @@ dans les queues, l'ajustement être plus rapide en bas de distribution, etc.
 
 ## 3. API
 ```python
-res = ardlpy.QARDL(y, X, order=..., taus=np.arange(.05,.96,.05),
+res = pyardl.QARDL(y, X, order=..., taus=np.arange(.05,.96,.05),
                    asym=None, case=3).fit(inference="mbb", B=999)
 res.longrun(tau=None)      # DataFrame θ_j(τ)
 res.wald_constancy("x1"); res.quantile_cointegration_test(tau=0.5)

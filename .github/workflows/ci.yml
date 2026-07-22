@@ -25,9 +25,9 @@ jobs:
           ruff check src tests validation
           ruff format --check src tests validation
       - name: Mypy (strict)
-        run: mypy src/ardlpy
+        run: mypy src/pyardl
       - name: Pytest (suite CI + réplications sur valeurs pré-générées)
-        run: pytest -m "not slow" --doctest-modules src/ardlpy tests --cov=ardlpy
+        run: pytest -m "not slow" --doctest-modules src/pyardl tests --cov=pyardl
 
   nightly-slow:
     # Monte Carlo complets (recoupement des tables de CV, taille/puissance)

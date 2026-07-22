@@ -2,7 +2,7 @@
 
 ## Référence
 PSS (1999), *JASA*, 94(446), 621–634. DOI: 10.1080/01621459.1999.10474156.
-Clé : `pesaran1999pmg` · Branche : **9. Panel** · Module : `ardlpy.panel` ·
+Clé : `pesaran1999pmg` · Branche : **9. Panel** · Module : `pyardl.panel` ·
 Priorité : v0.7 — l'estimateur panel ARDL le plus utilisé en pratique.
 
 ## 1. Le modèle
@@ -48,10 +48,10 @@ utile pour le tableau comparatif MG/PMG/DFE standard des papiers.
 
 ## 5. API
 ```python
-res = ardlpy.panel.PMG(df, y="lnc", X=["lny","inf"], id="country",
+res = pyardl.panel.PMG(df, y="lnc", X=["lny","inf"], id="country",
                         time="year", order=(1,1), det="const").fit()
 res.longrun; res.adjustment_i; res.hausman_vs_mg(); res.summary()
-ardlpy.panel.compare(df, ...) -> tableau MG/PMG/DFE + Hausman
+pyardl.panel.compare(df, ...) -> tableau MG/PMG/DFE + Hausman
 ```
 
 ## 6. Tests

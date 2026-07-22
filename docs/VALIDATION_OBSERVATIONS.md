@@ -1,7 +1,7 @@
 # Registre des observations de validation
 
 Anomalies détectées dans des sources EXTERNES au cours des validations
-d'ardlpy (tables publiées, packages de référence). Chaque entrée :
+d'pyardl (tables publiées, packages de référence). Chaque entrée :
 source, position exacte, preuve, action. Les anomalies de nos propres
 implémentations ne vont pas ici (ce sont des bugs, traités par les
 tests) ; ce registre documente ce que nos protocoles de recoupement ont
@@ -17,7 +17,7 @@ et pour la section validation de l'article JOSS.
 - **Preuve** : triple démonstration (monotonie en k, cohérence
   I(0) <= I(1), seconde source K&S ≈ 1.598) + confirmation interne (la
   branche asymptotique du même fichier porte 1.60) — détail complet
-  dans `src/ardlpy/critical_values/PROVENANCE.md`.
+  dans `src/pyardl/critical_values/PROVENANCE.md`.
 - **Action** : valeur corrigée dans notre encodage ; issue upstream à
   ouvrir sur github.com/andyphilips/dynamac.
 - **Statut** : documentée (2026-07-07), issue non encore ouverte.

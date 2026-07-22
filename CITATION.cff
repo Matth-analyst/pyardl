@@ -1,13 +1,13 @@
 cff-version: 1.2.0
 message: >-
-  Si vous utilisez ardlpy dans vos travaux, merci de citer le logiciel
+  Si vous utilisez pyardl dans vos travaux, merci de citer le logiciel
   comme ci-dessous, ainsi que les articles méthodologiques sous-jacents
   (Pesaran, Shin & Smith 2001 pour le bounds test ; Kripfganz &
   Schneider 2020 pour les surfaces de réponse et p-values ; Narayan
   2005 pour les bornes petits échantillons), référencés dans
-  docs/ardl_references.pdf et src/ardlpy/critical_values/PROVENANCE.md.
+  docs/ardl_references.pdf et src/pyardl/critical_values/PROVENANCE.md.
 type: software
-title: "ardlpy: ARDL models and bounds-test cointegration in Python"
+title: "pyardl: ARDL models and bounds-test cointegration in Python"
 authors:
   - family-names: Adjoh
     given-names: Komlan Matthania

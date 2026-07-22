@@ -220,7 +220,7 @@ def get_bounds(
     if alpha == 0.025:
         # Seuil non transcrit des tables publiées : simulation interne
         # (spec 12, provenance et statut needs_review : PROVENANCE.md).
-        from ardlpy.critical_values.pss2001_p025 import F_P025, T_P025
+        from pyardl.critical_values.pss2001_p025 import F_P025, T_P025
 
         cell = (F_P025 if stat == "F" else T_P025)[case][k]
         return float(cell[0]), float(cell[1])

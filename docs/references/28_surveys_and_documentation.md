@@ -23,7 +23,7 @@ pédagogique.
    vitesse (03) → diagnostics et stabilité (26) → robustesse
    (FMOLS/DOLS 08, bootstrap 14/16, NARDL 17, Fourier 19-21) →
    interprétation par simulation (25). Chaque étape : le pourquoi, le
-   comment dans ardlpy, les erreurs courantes.
+   comment dans pyardl, les erreurs courantes.
 2. **Page « erreurs fréquentes de la littérature appliquée »** (forte
    valeur pédagogique et de citation) : conclure sur le seul F global
    (ignorer les dégénérescences), IC sur λ hors cointégration établie,

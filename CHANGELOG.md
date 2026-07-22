@@ -4,6 +4,22 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
 ## [Non publié]
 
+### Modifié (renommage du package — CHANGEMENT DE COMPORTEMENT)
+- **Le package est renommé `ardlpy` → `pyardl`** (décision utilisateur,
+  2026-07-19), pour éviter la confusion visuelle/orale avec les
+  packages existants `arlpy`/`ardpy`/`arpy`. Renommage complet :
+  répertoire `src/ardlpy/` → `src/pyardl/`, tous les imports internes
+  et de test, `pyproject.toml` (nom du projet), classe
+  `ArdlpyMethodologyWarning` → `PyardlMethodologyWarning`,
+  documentation (README, CITATION.cff, mkdocs.yml, toutes
+  les pages docs/), CI GitHub Actions, scripts de validation, et la
+  lettre de demande de permission A3 (`docs/correspondence/`).
+  **Aucun code n'importe plus `ardlpy`** : `import pyardl` partout.
+  Les entrées historiques de ce CHANGELOG, de `docs/QUESTIONS.md` et
+  de `docs/DEVIATIONS.md` antérieures à cette entrée mentionnent
+  volontairement encore `ardlpy` : elles documentent des décisions
+  prises sous l'ancien nom et ne sont pas réécrites rétroactivement.
+
 ### Modifié (spec 13 — CHANGEMENT DE COMPORTEMENT)
 - **`bounds_test` : `cv_source` par défaut passe de `"pss"` à
   `"kripfganz"`** (surfaces de réponse, voie A1 via statsmodels). Les

@@ -16,7 +16,7 @@ import pytest
 from statsmodels.tsa.adfvalues import mackinnoncrit
 from statsmodels.tsa.ardl import pss_critical_values as sm_pss
 
-from ardlpy.critical_values.pss2001 import (
+from pyardl.critical_values.pss2001 import (
     F_BOUNDS,
     LEVELS,
     MAX_K,

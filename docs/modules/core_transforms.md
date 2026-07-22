@@ -1,4 +1,4 @@
-# `ardlpy.core.transforms` — algèbre ARDL ↔ ECM
+# `pyardl.core.transforms` — algèbre ARDL ↔ ECM
 
 Référence : Sargan, J. D. (1964). *Wages and Prices in the United
 Kingdom: A Study in Econometric Methodology* — spec
@@ -67,8 +67,8 @@ Comparaison avec les implémentations de référence :
 | Implémentation | Comportement pour q_j = 0 |
 |---|---|
 | `statsmodels.tsa.ardl.UECM` | **Refuse** à la construction (`ValueError: All included exog variables must have a lag length >= 1`) |
-| Stata `ardl` | **Accepte** : x_{j,t} contemporain entre dans la partie de niveau de l'EC — même convention qu'ardlpy |
-| `ardlpy` | **Accepte** : ω_j vide, γ_j sur x_{j,t} contemporain |
+| Stata `ardl` | **Accepte** : x_{j,t} contemporain entre dans la partie de niveau de l'EC — même convention qu'pyardl |
+| `pyardl` | **Accepte** : ω_j vide, γ_j sur x_{j,t} contemporain |
 
 Noter que x_{j,t} reste I(1) : l'identité exacte x_{j,t} = x_{j,t-1} +
 Δx_{j,t} (écart stationnaire) garantit que l'asymptotique des tests sur
@@ -78,7 +78,7 @@ intégré d'ordre 1, seule sa datation diffère d'une période.
 ## Cas dégénérés
 
 - `abs(lambda) < tol` (pas de force de rappel) : `longrun_coefs` renvoie
-  des `NaN` et émet `ArdlpyMethodologyWarning` (sous-classe
+  des `NaN` et émet `PyardlMethodologyWarning` (sous-classe
   `DegenerateCaseWarning`). La classification complète de ces cas relève
   des specs 14-15 (bootstrap, cadre à 3 tests).
 - `lambda` hors de `]-1, 0[` : `half_life` n'est pas défini (pas de
@@ -88,7 +88,7 @@ intégré d'ordre 1, seule sa datation diffère d'une période.
 
 ```python
 import numpy as np
-from ardlpy.core.transforms import ARDLParams, ardl_to_ecm, longrun_coefs
+from pyardl.core.transforms import ARDLParams, ardl_to_ecm, longrun_coefs
 
 params = ARDLParams(
     p=1, q=(1,),

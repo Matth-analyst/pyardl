@@ -3,7 +3,7 @@
 ## Référence
 Pesaran & Smith (1995), *Journal of Econometrics*, 68(1), 79–113.
 DOI: 10.1016/0304-4076(94)01644-F. Clé : `pesaran1995mg`.
-Branche : **9. Panel** · Module : `ardlpy.panel` · Priorité : v0.7.
+Branche : **9. Panel** · Module : `pyardl.panel` · Priorité : v0.7.
 
 ## 1. Apport
 Dans un panel dynamique à coefficients hétérogènes entre individus,

@@ -165,7 +165,7 @@ redistribution des coefficients publiés par K&S : statsmodels a
 RE-SIMULÉ les distributions (32 000 000 réplications par configuration,
 méthodologie PSS/K&S, scripts `pss.py`/`pss-process.py` de statsmodels)
 et ajusté ses propres polynômes de p-values asymptotiques. Licence
-BSD-3 de statsmodels (dépendance runtime déjà requise) : ardlpy ne
+BSD-3 de statsmodels (dépendance runtime déjà requise) : pyardl ne
 redistribue rien — import à l'exécution.
 
 **Validation contre les valeurs publiées**
@@ -210,10 +210,10 @@ docs/correspondence/2026-07-10_ks_license_draft.md).**
 `ardl_surfreg_coefs.dta` distribué avec le package Stata ardl de
 Kripfganz & Schneider (kripfganz.de) — 3 536 lignes de coefficients de
 surface (F : cas I-V ; t : cas I/III/V ; 2 bornes ; grille de 221
-quantiles en 1/10000e). Aucune licence explicite publiée -> ardlpy ne
+quantiles en 1/10000e). Aucune licence explicite publiée -> pyardl ne
 redistribuera pas ce fichier ; téléchargement prévu au premier usage
-explicite (`download_surface_coefs()`), cache local (`ARDLPY_CACHE` ou
-`~/.ardlpy`) avec SHA-256 et journal de provenance.
+explicite (`download_surface_coefs()`), cache local (`PYARDL_CACHE` ou
+`~/.pyardl`) avec SHA-256 et journal de provenance.
 
 **Forme fonctionnelle implémentée** (non revalidée) : polynôme en
 1/(k+1) (ordres 0..4) avec termes finis-T en 1/n, sr/n, 1/n², sr/n²,

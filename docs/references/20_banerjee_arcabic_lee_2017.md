@@ -3,7 +3,7 @@
 ## Référence
 Banerjee, Arčabić & Lee (2017), *Economic Modelling* (test Fourier-ADL de
 cointégration). Clé : `banerjee2017fourieradl` · Branche : **8** ·
-Module : `ardlpy.fourier` · Priorité : v0.5.
+Module : `pyardl.fourier` · Priorité : v0.5.
 
 ## 1. Apport
 Injecte les termes de Fourier (spec 19) dans un test de cointégration en

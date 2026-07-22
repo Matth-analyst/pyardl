@@ -17,7 +17,7 @@ Conventions numériques (spec 05 §6.5, concordance statsmodels) :
   à 1e-10 en test) ;
 - ``nobs`` = taille de l'échantillon d'estimation réel (T - hold_back).
   Attention : ``statsmodels.tsa.ardl.ARDL`` rapporte ``nobs = T - p``
-  et calcule llf/IC dessus, même quand max(q_j) > p ; ardlpy utilise
+  et calcule llf/IC dessus, même quand max(q_j) > p ; pyardl utilise
   l'échantillon d'estimation réel partout (llf, IC, sigma2), condition
   de comparabilité des critères dans ``select_order``. Les deux
   conventions coïncident dès que p >= max(q_j).
@@ -45,7 +45,7 @@ import scipy.linalg
 from statsmodels.stats.diagnostic import acorr_ljungbox, het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 
-from ardlpy.core.transforms import (
+from pyardl.core.transforms import (
     ARDLParams,
     ECMParams,
     ardl_to_ecm,
@@ -54,8 +54,8 @@ from ardlpy.core.transforms import (
     longrun_covariance,
     speed_of_adjustment,
 )
-from ardlpy.exceptions import ArdlpyMethodologyWarning
-from ardlpy.utils import check_series, lag_matrix
+from pyardl.exceptions import PyardlMethodologyWarning
+from pyardl.utils import check_series, lag_matrix
 
 FloatArray = npt.NDArray[np.float64]
 
@@ -245,7 +245,7 @@ class ARDL:
                 "l'inférence de long terme n'est pas fiable ; augmenter "
                 "p/q ou revoir la spécification (Pesaran-Shin 1998, "
                 "spec 09 §2.2).",
-                ArdlpyMethodologyWarning,
+                PyardlMethodologyWarning,
                 stacklevel=2,
             )
         return results
@@ -264,7 +264,7 @@ class ARDL:
             warnings.warn(
                 "Design singulier (colinéarité parfaite) : coefficients "
                 "de norme minimale via lstsq, covariance non fiable.",
-                ArdlpyMethodologyWarning,
+                PyardlMethodologyWarning,
                 stacklevel=3,
             )
         resid = y_dep - design @ coefs
@@ -703,7 +703,7 @@ class ARDLResults:
                 "Dynamique instable : au moins une racine du polynôme AR "
                 "est sur ou dans le cercle unité ; les quantités de long "
                 "terme n'ont pas d'interprétation d'équilibre.",
-                ArdlpyMethodologyWarning,
+                PyardlMethodologyWarning,
                 stacklevel=2,
             )
         return stable

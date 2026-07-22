@@ -1,4 +1,4 @@
-# ardlpy
+# pyardl
 
 Bibliothèque Python d'économétrie des séries temporelles couvrant la
 généalogie complète des modèles ARDL : estimation ARDL/UECM, bounds
@@ -9,7 +9,7 @@ NARDL, QARDL, Fourier ARDL et panels hétérogènes (MG/PMG/CS-ARDL).
 **Rigueur méthodologique d'abord** : chaque table de valeurs critiques
 cite sa source exacte et est recoupée par une seconde source publiée ou
 par le moteur de simulation interne
-([PROVENANCE.md](src/ardlpy/critical_values/PROVENANCE.md)) ; chaque
+([PROVENANCE.md](src/pyardl/critical_values/PROVENANCE.md)) ; chaque
 estimateur est validé contre statsmodels, le package R `ARDL` et les
 résultats publiés (réplication de l'application salaires UK de Pesaran,
 Shin & Smith 2001 incluse en test de non-régression) ; les anomalies
@@ -28,8 +28,8 @@ Dépendances : numpy, scipy, pandas, statsmodels (Python ≥ 3.11).
 
 ```python
 import pandas as pd
-from ardlpy.bounds import bounds_test
-from ardlpy.datasets import load_denmark
+from pyardl.bounds import bounds_test
+from pyardl.datasets import load_denmark
 
 data = load_denmark()          # données danoises (Johansen & Juselius 1990)
 res = bounds_test(
@@ -58,7 +58,7 @@ décision jointe F+t (spec 11) : cointegration
   `"pss"` (valeurs publiées PSS 2001, reproduction de la littérature),
   `"narayan"` (petits échantillons 30 ≤ T ≤ 80).
 - L'estimateur sous-jacent est accessible directement :
-  `ardlpy.core.ardl.ARDL` (sélection d'ordre sur échantillon commun,
+  `pyardl.core.ardl.ARDL` (sélection d'ordre sur échantillon commun,
   GETS, vues ECM/long terme exactes).
 
 ## État des phases (feuille de route : [00_INDEX](docs/references/00_INDEX.md))
@@ -87,5 +87,5 @@ pytest -m slow                           # Monte Carlo complets (nightly)
 
 MIT — voir [LICENSE](LICENSE). Les valeurs critiques encodées
 proviennent de tables publiées (provenance et licences documentées dans
-[PROVENANCE.md](src/ardlpy/critical_values/PROVENANCE.md)) ; aucun
+[PROVENANCE.md](src/pyardl/critical_values/PROVENANCE.md)) ; aucun
 matériel tiers non licencié n'est redistribué.

@@ -3,7 +3,7 @@
 ## Référence
 Brown, Durbin & Evans (1975), *JRSS B*, 37(2), 149–192.
 DOI: 10.1111/j.2517-6161.1975.tb01532.x. Clé : `brown1975cusum`.
-Branche : **11. Diagnostics** · Module : `ardlpy.diagnostics` ·
+Branche : **11. Diagnostics** · Module : `pyardl.diagnostics` ·
 Priorité : v0.2 — standard obligatoire de tout papier ARDL appliqué.
 
 ## 1. Rôle

@@ -10,7 +10,7 @@ les seeds sont dérivées déterministiquement de (case, k, bound). Sorties :
   ±0.04 pour t — spec 12 §3.1) ;
 - ``validation/results/spec12_p025_table.py`` : tables du seuil 2.5 %
   (F cas I-V, t cas I/III/V, k=0..10) prêtes à intégrer dans
-  ``src/ardlpy/critical_values/pss2001.py``, provenance incluse.
+  ``src/pyardl/critical_values/pss2001.py``, provenance incluse.
 
 Usage : python validation/spec12_montecarlo.py [--fast]
 (--fast : n_sims=5000 pour un fumigène rapide, ne pas utiliser pour
@@ -26,8 +26,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ardlpy.critical_values.pss2001 import LEVELS, MAX_K, T_BOUNDS, get_bounds
-from ardlpy.critical_values.simulate import simulate_bounds
+from pyardl.critical_values.pss2001 import LEVELS, MAX_K, T_BOUNDS, get_bounds
+from pyardl.critical_values.simulate import simulate_bounds
 
 PARAMS = {
     "t_obs": 1000,  # convention asymptotique PSS 2001

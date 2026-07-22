@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ardlpy.core.ardl import ARDL
+from pyardl.core.ardl import ARDL
 
 
 def _dgp(seed: int, n: int = 300) -> tuple[pd.Series, pd.DataFrame]:

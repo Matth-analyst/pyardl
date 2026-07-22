@@ -3,7 +3,7 @@
 ## Références
 Roudane (2026), module Stata AARDL (SSC S459609) ; package CRAN fbardl
 (2026). Clés : `roudane2026aardl`, `fbardl2026` · Branche : **8** ·
-Module : `ardlpy.unified` (couche d'orchestration) · Priorité : v0.6 —
+Module : `pyardl.unified` (couche d'orchestration) · Priorité : v0.6 —
 l'aboutissement de la feuille de route.
 
 ## 1. Apport
@@ -18,7 +18,7 @@ cible fonctionnelle de notre couche d'orchestration.
 Toute la valeur des specs 03-20 se compose ici. Définir l'API produit :
 
 ```python
-res = ardlpy.cointegration_analysis(
+res = pyardl.cointegration_analysis(
     y, X,
     asym=None | [...],          # NARDL on/off (17)
     fourier=None | dict(k=1, freq="auto"),   # 19-20

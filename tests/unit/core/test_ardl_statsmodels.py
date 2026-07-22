@@ -1,6 +1,6 @@
 """Verrou spec 05 §6.5 (validation externe critique) : concordance totale
 avec ``statsmodels.tsa.ardl.ARDL`` — mêmes données, mêmes ordres ->
-coefficients à 1e-10. Écrit AVANT l'implémentation de ardlpy.core.ardl.
+coefficients à 1e-10. Écrit AVANT l'implémentation de pyardl.core.ardl.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from statsmodels.tsa.ardl import ARDL as SM_ARDL
 
-from ardlpy.core.ardl import ARDL
+from pyardl.core.ardl import ARDL
 
 _TREND_MAP = {"none": "n", "const": "c", "trend": "ct"}
 

@@ -1,4 +1,4 @@
-# `ardlpy.critical_values` — valeurs critiques et moteur de simulation
+# `pyardl.critical_values` — valeurs critiques et moteur de simulation
 
 Références : Pesaran, Shin & Smith (2001) — spec 10 ; Narayan (2005),
 *Applied Economics* 37(17) — spec
@@ -24,7 +24,7 @@ k ≤ 7, F seulement).
 PROVENANCE.md), pas de la transcription des tables publiées.
 
 ```python
-from ardlpy.critical_values import get_bounds
+from pyardl.critical_values import get_bounds
 
 get_bounds("F", case=3, k=1, alpha=0.05)                                # PSS
 get_bounds("F", case=3, k=1, alpha=0.05, cv_source="narayan", t_obs=47) # interpolé
@@ -44,7 +44,7 @@ de licence explicite ; une demande de permission est en cours auprès
 des auteurs (`docs/correspondence/2026-07-10_ks_license_draft.md`).
 **`download_surface_coefs()` ne doit pas être appelé tant que la
 réponse n'est pas reçue** — voir la docstring de
-`ardlpy.critical_values.ks2020_finite` et `docs/DEVIATIONS.md` pour
+`pyardl.critical_values.ks2020_finite` et `docs/DEVIATIONS.md` pour
 l'historique (une validation antérieure s'appuyait sur du matériel
 obtenu de façon prématurée et a été retirée). Une fois l'autorisation
 obtenue et une revalidation effectuée contre une source légitime,
@@ -58,7 +58,7 @@ orientant vers la bonne source.
 ## Le moteur `simulate_bounds` (spec 12 §2.3)
 
 ```python
-from ardlpy.critical_values import simulate_bounds
+from pyardl.critical_values import simulate_bounds
 
 sb = simulate_bounds(case=3, k=2, t_obs=45, n_sims=100_000, seed=42, i1=True)
 sb.f_cv(0.05), sb.t_cv(0.05)   # CV pour une configuration NON tabulée
@@ -79,7 +79,7 @@ arbitraire), base du futur backend Rust.
 ## Provenance et recoupement
 
 Chaque table encodée cite sa source exacte et son canal de transcription
-dans [`PROVENANCE.md`](../../src/ardlpy/critical_values/PROVENANCE.md),
+dans [`PROVENANCE.md`](../../src/pyardl/critical_values/PROVENANCE.md),
 et est recoupée soit par une seconde source (Kripfganz-Schneider,
 Dickey-Fuller/MacKinnon), soit par le moteur interne — y compris les
 cellules qui n'avaient AUCUNE seconde source avant la spec 12 (colonnes

@@ -4,16 +4,16 @@
 # À exécuter manuellement (R + package ARDL). NE JAMAIS inventer les
 # valeurs produites ici.
 #
-# Attendu côté ardlpy :
+# Attendu côté pyardl :
 # 1. ardl(LRM ~ LRY + IBO + IDE, order = c(2,2,2,2)) -> coefficients
-#    identiques à 1e-6 avec ARDL(y, x, order=(2, 2)) d'ardlpy sur les
-#    mêmes données (à intégrer dans src/ardlpy/datasets/, spec 04).
+#    identiques à 1e-6 avec ARDL(y, x, order=(2, 2)) d'pyardl sur les
+#    mêmes données (à intégrer dans src/pyardl/datasets/, spec 04).
 # 2. auto_ardl(..., max_order = 5, selection = "BIC") -> même ordre
 #    sélectionné que ARDL.select_order(..., max_p=5, max_q=5, ic="bic").
 #    ATTENTION : vérifier la politique d'échantillon commun d'auto_ardl
 #    (documentation du package) ; si auto_ardl compare sur échantillons
 #    maximaux propres, documenter l'écart éventuel de sélection dans
-#    tests/replication/expected/spec05.json plutôt que d'aligner ardlpy
+#    tests/replication/expected/spec05.json plutôt que d'aligner pyardl
 #    sur un comportement non comparable (la correction
 #    statistique prime).
 #

@@ -12,8 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ardlpy.critical_values.pss2001 import get_bounds
-from ardlpy.critical_values.simulate import simulate_bounds
+from pyardl.critical_values.pss2001 import get_bounds
+from pyardl.critical_values.simulate import simulate_bounds
 
 
 class TestEngineBasics:
@@ -126,7 +126,7 @@ def test_full_pss_crosscheck_slow() -> None:
 
     Version script (journal + CSV) : validation/spec12_montecarlo.py.
     """
-    from ardlpy.critical_values.pss2001 import LEVELS, MAX_K, T_BOUNDS
+    from pyardl.critical_values.pss2001 import LEVELS, MAX_K, T_BOUNDS
 
     n_sims = 100_000
     failures: list[str] = []

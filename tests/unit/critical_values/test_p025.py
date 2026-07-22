@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from ardlpy.critical_values.pss2001 import MAX_K, T_BOUNDS, get_bounds
+from pyardl.critical_values.pss2001 import MAX_K, T_BOUNDS, get_bounds
 
 
 @pytest.mark.needs_review

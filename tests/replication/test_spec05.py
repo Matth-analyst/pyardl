@@ -13,15 +13,15 @@ from pathlib import Path
 
 import pytest
 
-from ardlpy.core.ardl import ARDL
-from ardlpy.datasets import load_denmark
+from pyardl.core.ardl import ARDL
+from pyardl.datasets import load_denmark
 
 _EXPECTED = json.loads(
     (Path(__file__).parent / "expected" / "spec05.json").read_text(encoding="utf-8")
 )
 
-# mapping nom R -> nom ardlpy pour ARDL(2; 2,2,2) sur denmark
-_R_TO_ARDLPY = {
+# mapping nom R -> nom pyardl pour ARDL(2; 2,2,2) sur denmark
+_R_TO_PYARDL = {
     "(Intercept)": "const",
     "L(LRM, 1)": "LRM.L1",
     "L(LRM, 2)": "LRM.L2",
@@ -47,7 +47,7 @@ def test_ardl_2222_coefficients_match_r() -> None:
 
     assert len(res.params) == len(expected["coefficients"])
     for r_name, value in expected["coefficients"].items():
-        assert res.params[_R_TO_ARDLPY[r_name]] == pytest.approx(value, abs=tol), r_name
+        assert res.params[_R_TO_PYARDL[r_name]] == pytest.approx(value, abs=tol), r_name
     assert res.ssr == pytest.approx(expected["ssr"], rel=1e-8)
 
 
@@ -58,7 +58,7 @@ def test_auto_ardl_bic_order_matched_under_same_policy() -> None:
 
     R auto_ardl évalue chaque candidat via stats::BIC sur SON échantillon
     maximal propre (échantillons non communs — le piège que la spec 05
-    §3.2 interdit à ardlpy) et par recherche stepwise non exhaustive.
+    §3.2 interdit à pyardl) et par recherche stepwise non exhaustive.
     La comparaison directe avec ARDL.select_order (échantillon commun)
     n'est donc pas un test de concordance valide : l'écart de sélection
     est documenté dans docs/QUESTIONS.md (entrée spec 05 §6.5). Ici on

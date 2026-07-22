@@ -49,7 +49,7 @@ spec03 <- paste0(
   '  "lambda_se": ', j(lam1[["Std. Error"]]), ",\n",
   '  "theta": ', named_obj(theta1), "},\n",
   '"model_q_ide_0": {"order": [2, 2, 2, 0],\n',
-  '  "note": "cas q_j=0 : niveau IDE contemporain dans l ECM (convention ardlpy confirmée)",\n',
+  '  "note": "cas q_j=0 : niveau IDE contemporain dans l ECM (convention pyardl confirmée)",\n',
   '  "resid_gap_ardl_uecm": ', j(resid_gap_q0), ",\n",
   '  "ecm_coefficients": ', named_obj(ecm0), ",\n",
   '  "theta": ', named_obj(theta0), "}\n}\n"

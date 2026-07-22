@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from ardlpy.bounds import bounds_test
-from ardlpy.datasets import load_pss2001
+from pyardl.bounds import bounds_test
+from pyardl.datasets import load_pss2001
 
 _EXPECTED = json.loads(
     (Path(__file__).parent / "expected" / "spec10_pss2001.json").read_text(
@@ -28,7 +28,7 @@ _EXPECTED = json.loads(
 
 _ORDER = (6, {"Prod": 0, "UR": 5, "Wedge": 4, "Union": 5})
 
-# nom R -> nom ardlpy (q_Prod = 0 -> niveau contemporain "Prod" ✓)
+# nom R -> nom pyardl (q_Prod = 0 -> niveau contemporain "Prod" ✓)
 _LEVEL_MAP = {
     "(Intercept)": "const",
     "trend(w)": "trend",
@@ -87,8 +87,8 @@ def test_uecm_coefficients_and_ssr_match_r() -> None:
         expected = _EXPECTED["uecm_coefficients"][r_name]
         if our_name == "trend":
             # R ARDL::trend() sur un ts trimestriel construit t/4 (tendance
-            # en années) ; ardlpy utilise t (1..T). Reparamétrisation
-            # affine : coefficient R = 4 x coefficient ardlpy ; F, t, SSR
+            # en années) ; pyardl utilise t (1..T). Reparamétrisation
+            # affine : coefficient R = 4 x coefficient pyardl ; F, t, SSR
             # et tous les autres coefficients sont invariants.
             assert 4.0 * coefs[our_name] == pytest.approx(expected, abs=1e-6)
         else:

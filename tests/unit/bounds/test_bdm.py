@@ -13,9 +13,9 @@ import pandas as pd
 import pytest
 from statsmodels.tsa.ardl import UECM as SM_UECM
 
-from ardlpy.bounds import bounds_test
-from ardlpy.bounds.pss import _joint_decision
-from ardlpy.exceptions import ArdlpyMethodologyWarning, DegenerateCaseWarning
+from pyardl.bounds import bounds_test
+from pyardl.bounds.pss import _joint_decision
+from pyardl.exceptions import DegenerateCaseWarning, PyardlMethodologyWarning
 
 
 def _dgp_cointegrated(seed: int, n: int = 300) -> tuple[pd.Series, pd.DataFrame]:
@@ -154,7 +154,7 @@ class TestAdjustmentCIRule:
             warnings.simplefilter("ignore")
             res = bounds_test(y, x, case=3, order=(2, 1))
         assert res.decision_joint != "cointegration"
-        with pytest.warns(ArdlpyMethodologyWarning, match="cointégration"):
+        with pytest.warns(PyardlMethodologyWarning, match="cointégration"):
             adj = res.adjustment()
         assert np.isfinite(adj["lambda"])  # l'estimée reste consultable
         assert np.isnan(adj["ci_lower"]) and np.isnan(adj["ci_upper"])
@@ -166,7 +166,7 @@ class TestAdjustmentCIRule:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             res = bounds_test(y, x, case=4, order=(2, 1))
-        with pytest.warns(ArdlpyMethodologyWarning, match="cointégration"):
+        with pytest.warns(PyardlMethodologyWarning, match="cointégration"):
             adj = res.adjustment()
         assert np.isnan(adj["ci_lower"])
 

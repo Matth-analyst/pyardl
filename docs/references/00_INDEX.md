@@ -1,4 +1,4 @@
-# Index des spécifications d'implémentation — ardlpy
+# Index des spécifications d'implémentation — pyardl
 
 Chaque spec est autonome : modèle, algorithmes étape par étape, API,
 cas limites, plan de tests (unitaires + validation externe), liens.

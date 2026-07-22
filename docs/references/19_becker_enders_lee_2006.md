@@ -3,7 +3,7 @@
 ## Référence
 Becker, Enders & Lee (2006), *Journal of Time Series Analysis*, 27(3),
 381–409. DOI: 10.1111/j.1467-9892.2006.00478.x. Clé : `becker2006fourier`.
-Branche : **8** · Module : `ardlpy.fourier` (briques) · Priorité : v0.5.
+Branche : **8** · Module : `pyardl.fourier` (briques) · Priorité : v0.5.
 
 ## 1. Apport
 Idée fondatrice de toute la branche Fourier : plutôt que dater et compter

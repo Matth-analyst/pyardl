@@ -4,7 +4,7 @@
 Bertelli, Vacca & Zoia (2022), *Economic Modelling*, 116 (preprint
 arXiv:2204.04939) ; Vacca & Bertelli (2024), *The R Journal* (package
 bootCT). Clés : `bertelli2022bootstrap`, `vacca2024bootct`.
-Branche : **5** · Module : `ardlpy.bootstrap` + `ardlpy.simulate` ·
+Branche : **5** · Module : `pyardl.bootstrap` + `pyardl.simulate` ·
 Priorité : v0.3-v0.4.
 
 ## 1. Apport par rapport à McNown et al. (spec 14)
@@ -26,7 +26,7 @@ Priorité : v0.3-v0.4.
 
 ## 2. Implémentation
 
-### 2.1 `ardlpy.simulate.vecm_ardl(...)` (brique transversale)
+### 2.1 `pyardl.simulate.vecm_ardl(...)` (brique transversale)
 Paramètres : n_obs, burn_in, matrices du VECM (α, β → Π de rang choisi),
 Γ_i, cas déterministe, Σ des innovations, option dégénérescence type 1/2,
 seed. Retour : DataFrame + les paramètres « vrais » (pour les MC).
