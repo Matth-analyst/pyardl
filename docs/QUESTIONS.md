@@ -32,7 +32,7 @@ d'échantillon identique », testée dans
 `tests/replication/test_spec05.py`. Les coefficients à ordres fixes
 concordent à 1e-6 (contrat numérique intact).
 
-## Spec 12 §3.1 — recoupement PSS : 23 cellules hors tolérance ±0.05 (EN ATTENTE D'ARBITRAGE)
+## Spec 12 §3.1 — recoupement PSS : tolérance uniforme ±0.05 intenable (CLOS)
 
 **Constat (2026-07-07, `validation/spec12_montecarlo.py`, T=1000,
 n_sims=100 000, seeds journalisées)** : 505/528 cellules des tables PSS
@@ -55,7 +55,7 @@ maximale). Détail : `validation/results/spec12_pss_crosscheck.csv`.
 3. La cellule t fautive (cas I, k=10, 1 % I(1)) : écart +0.042 contre
    une tolérance de ±0.04 — marginal.
 
-**Statut : CLOS (arbitrage utilisateur du 2026-07-07, raffiné)** :
+**Statut : CLOS (décision du projet, 2026-07-07)** :
 critère retenu = tolérance PAR CELLULE de 3 erreurs types combinées,
 DÉRIVÉE du calcul d'erreur MC des quantiles (formule et dérivation :
 PROVENANCE.md, validation/spec12_mc_error.py) — pas de seuil ad hoc.
@@ -123,7 +123,7 @@ prévoir avec la spec 17 qui cible ce package).
 ## Spec 03 §2.2 — formule de ω_{j,0} et cas limite q_j = 0
 
 > **Statut : CLOS (2026-07-07)** : dérivation de ω et lecture 2 pour
-> q_j = 0 validées par revue humaine (formule corrigée reportée dans la
+> q_j = 0 validées en revue (formule corrigée reportée dans la
 > spec, note de révision 03_sargan_1964.md §2.2), puis **confirmées par
 > l'exécution du script R** (`spec03_ardl_uecm.R`, R 4.6.1, ARDL 0.2.5) :
 > pour l'ordre c(2,2,2,0), R ARDL::uecm place bien le niveau IDE

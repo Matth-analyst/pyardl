@@ -1,7 +1,7 @@
 # Registre des observations de validation
 
 Anomalies détectées dans des sources EXTERNES au cours des validations
-d'pyardl (tables publiées, packages de référence). Chaque entrée :
+de pyardl (tables publiées, packages de référence). Chaque entrée :
 source, position exacte, preuve, action. Les anomalies de nos propres
 implémentations ne vont pas ici (ce sont des bugs, traités par les
 tests) ; ce registre documente ce que nos protocoles de recoupement ont
@@ -32,7 +32,7 @@ et pour la section validation de l'article JOSS.
   3 erreurs types combinées (~0.15 pour cette cellule), alors que les
   autres cellules k = 0 des cas IV/V convergent exactement vers les
   valeurs publiées (15.73 retrouvé à ±0.003).
-- **Requalification (critère dérivé, arbitrage 2026-07-07)** : la
+- **Requalification (critère dérivé, 2026-07-07)** : la
   distribution F du cas I à k = 0 a une queue droite épaisse (t² de
   Dickey-Fuller sans constante) → densité faible au 99e percentile →
   SE du quantile publié (40 000 réplications) ≈ 0.11. Sous le critère
