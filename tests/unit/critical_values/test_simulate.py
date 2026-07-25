@@ -18,7 +18,7 @@ from pyardl.critical_values.simulate import simulate_bounds
 
 class TestEngineBasics:
     def test_parameters_are_logged(self) -> None:
-        """seed et paramètres journalisés."""
+        """Seed et paramètres journalisés."""
         sb = simulate_bounds(case=3, k=1, t_obs=100, n_sims=100, seed=123)
         assert sb.seed == 123
         assert sb.n_sims == 100

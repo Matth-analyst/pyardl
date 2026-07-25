@@ -136,7 +136,7 @@ class TestUnilaterality:
 
 
 class TestAdjustmentCIRule:
-    """Spec 11 §2.4 + piège connu : IC sur lambda affiché seulement
+    """IC sur lambda affiché seulement
     après cointégration établie (décision jointe)."""
 
     def test_ci_available_when_cointegrated(self) -> None:

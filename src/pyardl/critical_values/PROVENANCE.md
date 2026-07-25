@@ -1,6 +1,6 @@
 # Provenance des valeurs critiques encodées
 
-Règle : aucune valeur critique « de
+Règle du projet : aucune valeur critique « de
 mémoire » ; chaque table cite sa source exacte et est recoupée par une
 seconde source ou par le moteur de simulation interne (spec 12).
 
@@ -103,7 +103,7 @@ github.com/andyphilips/dynamac cloné le 2026-07-07). Le fichier
 programmatique élimine le risque d'erreur de recopie manuelle. Seules
 les données publiées sont reprises, aucun code.
 
-**Recoupement (moteur de simulation interne, règle du projet)** :
+**Recoupement (moteur de simulation interne)** :
 `tests/unit/critical_values/test_narayan.py` — cellules T = 40 et 60
 recoupées par `simulate_bounds` (Narayan a utilisé le même DGP que PSS
 2001 avec T fini, 40 000 réplications) : tolérance ±0.1 à n_sims élevé

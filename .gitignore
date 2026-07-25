@@ -17,8 +17,6 @@ venv/
 site/
 
 # --- Internal working files (kept locally, not part of the public repo) ---
-letter.txt
-docs/correspondence/
 docs/references/
 docs/QUESTIONS.md
 docs/DEVIATIONS.md

@@ -1,4 +1,5 @@
-"""Recoupement des tables PSS 2001 encodées.
+"""Recoupement des tables PSS 2001 encodées (détail
+des sources dans src/pyardl/critical_values/PROVENANCE.md).
 
 1. F (k=1..10) vs valeurs asymptotiques Kripfganz-Schneider 2020
    (statsmodels) — seconde source indépendante, tolérance ±0.15.
@@ -110,7 +111,7 @@ class TestStructuralMonotonicity:
 
 
 class TestCoverageExceptions:
-    """couverture manquante = exception explicite."""
+    """Couverture manquante = exception explicite."""
 
     def test_t_case_ii_iv_raises(self) -> None:
         for case in (2, 4):

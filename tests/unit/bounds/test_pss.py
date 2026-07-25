@@ -113,7 +113,7 @@ class TestCasesAndGuards:
             assert np.isfinite(res.t_stat)  # la stat est calculée quand même
 
     def test_positive_lambda_warns_and_no_cointegration_t(self) -> None:
-        """t unilatéral gauche exige lambda_hat < 0."""
+        """Le t unilatéral gauche exige lambda_hat < 0."""
         rng = np.random.default_rng(4)
         n = 150
         x = np.cumsum(rng.normal(size=n))

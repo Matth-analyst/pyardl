@@ -162,7 +162,7 @@ class TestPvalues:
 
 
 class TestCoverageExceptions:
-    """couverture manquante = exception explicite."""
+    """Couverture manquante = exception explicite."""
 
     def test_t_stat_raises(self) -> None:
         with pytest.raises(ValueError, match="does not cover the t statistic"):

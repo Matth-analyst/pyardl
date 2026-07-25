@@ -1,4 +1,4 @@
-"""Verrou n°1 (piège connu) : équivalence des régressions
+"""Verrou n°1 : équivalence des régressions
 ARDL <-> ECM. Ce test doit être écrit AVANT l'implémentation de
 ``pyardl.core.transforms`` et verrouille les formules de passage de la
 spec 03 §2.2 (source d'erreurs n°1 du projet).

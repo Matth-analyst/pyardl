@@ -1,7 +1,7 @@
 """Verrou spec 10 §7.2 (écrit AVANT l'implémentation) : le F du bounds
 test calculé par Wald sur la régression non contrainte — avec le
 déterministe restreint DANS le vecteur testé pour les cas II et IV
-(spec 10 §3.1, piège connu) — doit être identique à 1e-10 au F
+— doit être identique à 1e-10 au F
 calculé par SSR entre régression contrainte et non contrainte,
 construites À LA MAIN dans ce fichier (vérification croisée réelle).
 """

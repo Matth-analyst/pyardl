@@ -1,4 +1,4 @@
-"""Fixtures partagées (seed explicite, jamais l'état global numpy)."""
+"""Fixtures partagées : seed explicite, jamais l'état global numpy."""
 
 from __future__ import annotations
 
