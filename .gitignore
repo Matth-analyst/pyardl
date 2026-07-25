@@ -15,3 +15,7 @@ venv/
 .env
 *.log
 site/
+
+# --- Fichiers de travail internes (conservés en local, hors dépôt public) ---
+letter.txt
+docs/correspondence/
