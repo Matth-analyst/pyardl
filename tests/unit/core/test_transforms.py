@@ -183,9 +183,9 @@ def test_longrun_covariance_requires_cov_params() -> None:
 @pytest.mark.parametrize(
     ("kwargs", "match"),
     [
-        ({"p": 0}, "p doit"),
-        ({"phi": np.array([0.1, 0.2])}, "phi doit"),
-        ({"q": (1, 1)}, "même longueur"),
+        ({"p": 0}, "p must be"),
+        ({"phi": np.array([0.1, 0.2])}, "phi must have"),
+        ({"q": (1, 1)}, "same length"),
     ],
 )
 def test_ardlparams_validation(kwargs: dict, match: str) -> None:
@@ -201,7 +201,7 @@ def test_ardlparams_validation(kwargs: dict, match: str) -> None:
 
 
 def test_ardlparams_negative_q_rejected() -> None:
-    with pytest.raises(ValueError, match=r"q\[0\] doit"):
+    with pytest.raises(ValueError, match=r"q\[0\] must be"):
         ARDLParams(p=1, q=(-1,), phi=np.array([0.5]), beta=(np.array([0.3, 0.2]),))
 
 
@@ -219,9 +219,9 @@ def test_ardlparams_x_names_length_mismatch() -> None:
 @pytest.mark.parametrize(
     ("kwargs", "match"),
     [
-        ({"p": 0}, "p doit"),
-        ({"psi": np.array([1.0])}, "psi doit"),
-        ({"gamma": np.array([0.5, 0.5])}, "même longueur"),
+        ({"p": 0}, "p must be"),
+        ({"psi": np.array([1.0])}, "psi must have"),
+        ({"gamma": np.array([0.5, 0.5])}, "same length"),
     ],
 )
 def test_ecmparams_validation(kwargs: dict, match: str) -> None:

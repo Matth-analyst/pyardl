@@ -1,34 +1,37 @@
-r"""Estimateur ARDL(p, q_1, ..., q_k) général (spec 05 — Hendry, Pagan & Sargan 1984).
+r"""ARDL(p, q_1, ..., q_k) estimation by ordinary least squares.
 
-Modèle :
+The model is
 
     y_t = det_t + sum_{i=1}^{p} phi_i y_{t-i}
           + sum_j sum_{i=0}^{q_j} beta_{j,i} x_{j,t-i} + eps_t
 
-L'ARDL est la forme mère dont dérivent statique, différences, Koyck,
-FDL/Almon, ECM et autorégressif pur : un seul moteur d'estimation,
-plusieurs vues (``.to_ecm()``, ``.longrun``, ``.adjustment`` — spec 03).
+where ``det_t`` collects the deterministic terms (intercept, linear
+trend). The ARDL is the general form from which the static regression,
+the pure-differences model, finite distributed lags and the
+error-correction representation all follow: one estimator, several views
+(:meth:`ARDLResults.to_ecm`, :attr:`ARDLResults.longrun`,
+:attr:`ARDLResults.adjustment`).
 
-Conventions numériques (spec 05 §6.5, concordance statsmodels) :
+Two conventions are worth knowing:
 
-- ordre des colonnes du design : const, trend, y.L1..y.Lp,
-  x_j.L0..x_j.Lq_j, régresseurs fixes — identique à
-  ``statsmodels.tsa.ardl.ARDL`` (concordance des coefficients vérifiée
-  à 1e-10 en test) ;
-- ``nobs`` = taille de l'échantillon d'estimation réel (T - hold_back).
-  Attention : ``statsmodels.tsa.ardl.ARDL`` rapporte ``nobs = T - p``
-  et calcule llf/IC dessus, même quand max(q_j) > p ; pyardl utilise
-  l'échantillon d'estimation réel partout (llf, IC, sigma2), condition
-  de comparabilité des critères dans ``select_order``. Les deux
-  conventions coïncident dès que p >= max(q_j).
+- The design matrix columns are ordered ``const, trend, y.L1..y.Lp,
+  x_j.L0..x_j.Lq_j, fixed regressors``, matching
+  ``statsmodels.tsa.ardl.ARDL`` (coefficients agree to 1e-10).
+- ``nobs`` is the size of the actual estimation sample (``T -
+  hold_back``). ``statsmodels`` instead reports ``T - p`` and computes
+  the log-likelihood and information criteria on that, even when
+  ``max(q_j) > p``. pyardl uses the real estimation sample throughout,
+  which is what makes information criteria comparable across candidates
+  in :meth:`ARDL.select_order`. The two conventions coincide as soon as
+  ``p >= max(q_j)``.
 
-Références
+References
 ----------
 Hendry, D. F., Pagan, A. R. & Sargan, J. D. (1984). "Dynamic
 Specification", *Handbook of Econometrics*, vol. 2, ch. 18.
-Clé BibTeX : ``hendry1984dynamic``.
-Pesaran, M. H. & Shin, Y. (1998) — garde-fou d'autocorrélation (§2.2).
-Clé BibTeX : ``pesaran1998ardl``.
+Pesaran, M. H. & Shin, Y. (1998). "An Autoregressive Distributed Lag
+Modelling Approach to Cointegration Analysis", in *Econometrics and
+Economic Theory in the 20th Century*, Cambridge University Press.
 """
 
 from __future__ import annotations
@@ -67,12 +70,12 @@ def _parse_order(
     order: tuple[int, int | dict[str, int]] | int,
     x_names: tuple[str, ...],
 ) -> tuple[int, dict[str, int]]:
-    """Normalise ``order`` en (p, {nom: q_j})."""
+    """Normalise ``order`` into ``(p, {name: q_j})``."""
     if isinstance(order, int):
         if x_names:
             raise ValueError(
-                "order entier réservé au cas sans régresseurs (AR pur) ; "
-                "avec x, passer order=(p, q)."
+                "An integer order is only accepted for a pure AR model (no x "
+                "regressors); with x, pass order=(p, q)."
             )
         p, q_spec = order, {}
     else:
@@ -80,42 +83,44 @@ def _parse_order(
         if isinstance(q_raw, dict):
             unknown = set(q_raw) - set(x_names)
             if unknown:
-                raise ValueError(f"Noms inconnus dans order : {sorted(unknown)}")
+                raise ValueError(f"Unknown regressor names in order: {sorted(unknown)}")
             q_spec = {name: int(q_raw[name]) for name in x_names}
         else:
             q_spec = {name: int(q_raw) for name in x_names}
     if p < 0:
-        raise ValueError("p doit être >= 0.")
+        raise ValueError("p must be >= 0.")
     for name, qj in q_spec.items():
         if qj < 0:
-            raise ValueError(f"q[{name}] doit être >= 0.")
+            raise ValueError(f"q[{name}] must be >= 0.")
     return int(p), q_spec
 
 
 class ARDL:
-    """Modèle ARDL(p, q_1, ..., q_k) estimé par OLS (spec 05).
+    """ARDL(p, q_1, ..., q_k) model estimated by ordinary least squares.
 
     Parameters
     ----------
     y : array-like, shape (T,)
-        Variable dépendante.
+        Dependent variable.
     x : array-like, shape (T, k), optional
-        Régresseurs à retards distribués (DataFrame recommandé pour les
-        noms). ``None`` -> AR(p) pur.
+        Distributed-lag regressors; a DataFrame is recommended so that
+        column names carry through to the output. ``None`` fits a pure
+        AR(p) model.
     order : tuple (p, q)
-        p : nombre de retards de y (>= 0 ; p=0 -> FDL sans dynamique).
-        q : int (même ordre pour tous les x) ou dict {nom: q_j}.
+        ``p`` is the number of lags of y (``p=0`` gives a finite
+        distributed lag model with no dynamics). ``q`` is either an int,
+        applied to every regressor, or a dict ``{name: q_j}``.
     det : {"none", "const", "trend"}
-        Déterministes : rien, constante, ou constante + tendance
-        linéaire (« trend » inclut toujours la constante).
+        Deterministic terms: none, an intercept, or an intercept plus a
+        linear trend (``"trend"`` always includes the intercept).
     seasonal : bool
-        Non implémenté (conventions saisonnières : spec 04, phase 2).
+        Not implemented yet.
     fixed_regressors : array-like, shape (T, m), optional
-        Variables z_t incluses sans retards (ex. dummies).
+        Variables entered without lags, such as dummies.
     hold_back : int, optional
-        Nombre d'observations initiales exclues de l'estimation
-        (>= max(p, max q_j)). Sert à imposer un échantillon commun
-        entre candidats (spec 05 §3.2).
+        Number of initial observations excluded from estimation (at least
+        ``max(p, max q_j)``). Used to force a common sample across
+        candidate models during order selection.
 
     Examples
     --------
@@ -139,12 +144,9 @@ class ARDL:
         hold_back: int | None = None,
     ) -> None:
         if seasonal:
-            raise NotImplementedError(
-                "seasonal=True sera implémenté avec les conventions "
-                "saisonnières de la spec 04 (phase 2)."
-            )
+            raise NotImplementedError("Seasonal dummies are not implemented yet.")
         if det not in ("none", "const", "trend"):
-            raise ValueError('det doit être "none", "const" ou "trend".')
+            raise ValueError('det must be "none", "const" or "trend".')
 
         y_arr, x_arr, index, y_name, x_names = check_series(y, x)
         self._y = y_arr
@@ -164,7 +166,7 @@ class ARDL:
             if fixed.ndim == 1:
                 fixed = fixed[:, None]
             if fixed.shape[0] != y_arr.shape[0]:
-                raise ValueError("fixed_regressors : longueur incompatible avec y.")
+                raise ValueError("fixed_regressors has a different length from y.")
             if isinstance(fixed_regressors, pd.DataFrame):
                 self._fixed_names = tuple(str(c) for c in fixed_regressors.columns)
             else:
@@ -175,7 +177,9 @@ class ARDL:
         if hold_back is None:
             hold_back = start_required
         elif hold_back < start_required:
-            raise ValueError(f"hold_back={hold_back} < max(p, max q)={start_required}.")
+            raise ValueError(
+                f"hold_back={hold_back} is smaller than max(p, max q)={start_required}."
+            )
         self.hold_back = int(hold_back)
 
         n_est = y_arr.shape[0] - self.hold_back
@@ -188,11 +192,12 @@ class ARDL:
         )
         if n_est <= n_params:
             raise ValueError(
-                f"Pas assez d'observations : n_est={n_est} <= n_params={n_params}."
+                f"Not enough observations: the estimation sample has {n_est} "
+                f"points for {n_params} parameters."
             )
 
     # ------------------------------------------------------------------
-    # Construction du design (ordre des colonnes = statsmodels, cf. module)
+    # Design matrix (column order matches statsmodels, see module docstring)
     # ------------------------------------------------------------------
     def _build_design(self) -> tuple[FloatArray, FloatArray, list[str]]:
         y, x = self._y, self._x
@@ -235,16 +240,33 @@ class ARDL:
         cov_type: CovType = "nonrobust",
         cov_kwds: dict[str, int] | None = None,
     ) -> ARDLResults:
-        """Estime le modèle par OLS et exécute le garde-fou
-        d'autocorrélation de Pesaran-Shin 1998 (spec 09 §2.2)."""
+        """Fit the model by OLS and check the residuals for autocorrelation.
+
+        Valid long-run inference in an ARDL requires enough lags for the
+        errors to be white noise. A Ljung-Box test is therefore run
+        automatically after every fit, and a
+        :class:`~pyardl.exceptions.PyardlMethodologyWarning` is issued when
+        it rejects. This is a condition of validity, not an option.
+
+        Parameters
+        ----------
+        cov_type : {"nonrobust", "HC0", "HC1", "HC2", "HC3", "HAC"}
+            Covariance estimator. ``HAC`` accepts ``cov_kwds={"nlags": m}``
+            (Newey-West); a data-driven default is used otherwise.
+        cov_kwds : dict, optional
+            Extra arguments for the covariance estimator.
+
+        Returns
+        -------
+        ARDLResults
+        """
         results = self._fit(cov_type=cov_type, cov_kwds=cov_kwds)
         lb_p = results._ljungbox_pvalue()
         if lb_p < 0.05:
             warnings.warn(
-                f"Erreurs autocorrélées (Ljung-Box p={lb_p:.4f} < 0.05) : "
-                "l'inférence de long terme n'est pas fiable ; augmenter "
-                "p/q ou revoir la spécification (Pesaran-Shin 1998, "
-                "spec 09 §2.2).",
+                f"Autocorrelated residuals (Ljung-Box p={lb_p:.4f} < 0.05): "
+                "long-run inference is not reliable. Increase p/q or revisit "
+                "the specification.",
                 PyardlMethodologyWarning,
                 stacklevel=2,
             )
@@ -255,7 +277,7 @@ class ARDL:
         cov_type: CovType = "nonrobust",
         cov_kwds: dict[str, int] | None = None,
     ) -> ARDLResults:
-        """Estimation sans garde-fou (usage interne : select_order, gets)."""
+        """Fit without the autocorrelation check (used internally)."""
         design, y_dep, names = self._build_design()
         n_est, k = design.shape
 
@@ -270,7 +292,8 @@ class ARDL:
         resid = y_dep - design @ coefs
         ssr = float(resid @ resid)
 
-        # inv(X'X) via QR (jamais inv(X.T @ X) — règle du projet)
+        # inv(X'X) obtained from the QR factorisation, never by inverting
+        # X'X directly, which is numerically far less stable.
         q_mat, r_mat = np.linalg.qr(design)
         r_inv = scipy.linalg.solve_triangular(r_mat, np.eye(k))
         xtx_inv = r_inv @ r_inv.T
@@ -301,7 +324,7 @@ class ARDL:
                 meat += w * (gamma + gamma.T)
             cov = xtx_inv @ meat @ xtx_inv
         else:
-            raise ValueError(f"cov_type inconnu : {cov_type!r}")
+            raise ValueError(f"Unknown cov_type: {cov_type!r}")
 
         return ARDLResults(
             model=self,
@@ -314,7 +337,7 @@ class ARDL:
         )
 
     # ------------------------------------------------------------------
-    # Sélection d'ordre (spec 05 §3)
+    # Order selection
     # ------------------------------------------------------------------
     @staticmethod
     def select_order(
@@ -327,35 +350,47 @@ class ARDL:
         det: DetType = "const",
         min_p: int = 1,
     ) -> ARDLOrderSelection:
-        """Sélection d'ordre par critère d'information (spec 05 §3).
+        """Select the lag orders by information criterion.
 
-        Tous les candidats sont estimés sur l'échantillon COMMUN
-        t = max(max_p, max_q)+1..T (hold_back fixé — spec 05 §3.2,
-        piège de la spec 02 §4), sinon les critères ne sont pas
-        comparables. Le meilleur modèle est ensuite ré-estimé sur
-        l'échantillon maximal de son ordre (§3.4).
+        All candidates are estimated on the **same** sample,
+        ``t = max(max_p, max_q)+1 .. T``. This matters: comparing
+        information criteria computed on different numbers of
+        observations is meaningless, and it is an easy mistake to make
+        when each candidate is allowed to use its own maximal sample. The
+        selected model is then re-estimated on the largest sample its own
+        order allows.
 
         Parameters
         ----------
         y, x : array-like
-            Données (x obligatoire ici ; l'AR pur a d'autres outils).
+            Data. ``x`` is required here.
         max_p, max_q : int
-            Bornes de la grille : p ∈ min_p..max_p, q_j ∈ 0..max_q.
+            Grid bounds: ``p`` in ``min_p..max_p``, each ``q_j`` in
+            ``0..max_q``.
         ic : {"aic", "bic", "hq"}
-            Critère de sélection (le tableau rapporte les trois).
+            Criterion used to rank candidates. All three are reported in
+            the output table.
         search : {"grid", "per_variable"}
-            "grid" : produit cartésien complet. "per_variable" :
-            optimisation séquentielle de p puis de chaque q_j (à la
-            statsmodels/EViews), pour k > 3 où la grille explose.
-        det : déterministes (voir :class:`ARDL`).
+            ``"grid"`` explores the full cartesian product.
+            ``"per_variable"`` optimises ``p`` and then each ``q_j`` in
+            turn, which keeps the problem tractable when the number of
+            regressors makes the full grid explode.
+        det : {"none", "const", "trend"}
+            Deterministic terms, see :class:`ARDL`.
         min_p : int
-            Borne inférieure de p (défaut 1, cf. spec 05 §3.1).
+            Lower bound for ``p``.
+
+        Returns
+        -------
+        ARDLOrderSelection
+            Ranked table of candidates, best order, and the re-estimated
+            best model.
         """
         if ic not in ("aic", "bic", "hq"):
-            raise ValueError('ic doit être "aic", "bic" ou "hq".')
+            raise ValueError('ic must be "aic", "bic" or "hq".')
         _, x_arr, _, _, x_names = check_series(y, x)
         if x_arr is None:
-            raise ValueError("select_order requiert des régresseurs x.")
+            raise ValueError("select_order requires x regressors.")
         k = x_arr.shape[1]
         hold_back = max(max_p, max_q)
 
@@ -422,7 +457,7 @@ class ARDL:
         )
 
     # ------------------------------------------------------------------
-    # GETS (spec 05 §4)
+    # General-to-specific reduction
     # ------------------------------------------------------------------
     @staticmethod
     def gets(
@@ -433,22 +468,40 @@ class ARDL:
         alpha: float = 0.05,
         det: DetType = "const",
     ) -> GETSResults:
-        """Réduction general-to-specific (spec 05 §4).
+        """General-to-specific reduction of an over-parameterised model.
 
-        Part de (max_p, max_q) et réduit itérativement l'ordre du retard
-        terminal le moins significatif tant que : (a) sa p-value > alpha,
-        (b) les diagnostics restent propres (Ljung-Box,
-        Breusch-Pagan > 0.05), (c) le F des restrictions cumulées vs le
-        modèle général ne rejette pas (> alpha). Le chemin complet est
-        journalisé dans ``.reduction_path``.
+        Starts from ``(max_p, max_q)`` and repeatedly drops the least
+        significant *terminal* lag, as long as three conditions hold:
+        its p-value exceeds ``alpha``, the residual diagnostics stay
+        clean (Ljung-Box and Breusch-Pagan above 5%), and an F test of
+        the accumulated restrictions against the general model does not
+        reject. The full reduction path is recorded in
+        :attr:`GETSResults.reduction_path`, so the sequence of decisions
+        can be audited.
 
-        La réduction préserve la structure contiguë des retards (on ne
-        supprime que le retard TERMINAL de chaque variable) — cf.
-        docs/QUESTIONS.md, entrée spec 05 §4.
+        Only the terminal lag of each variable is a candidate for
+        removal, which keeps the lag structure contiguous and the result
+        a genuine ARDL(p, q) model.
+
+        Parameters
+        ----------
+        y, x : array-like
+            Data.
+        max_p, max_q : int
+            Starting orders of the general model.
+        alpha : float
+            Significance level used both for dropping a lag and for the
+            cumulated F test.
+        det : {"none", "const", "trend"}
+            Deterministic terms, see :class:`ARDL`.
+
+        Returns
+        -------
+        GETSResults
         """
         _, x_arr, _, y_name, x_names = check_series(y, x)
         if x_arr is None:
-            raise ValueError("gets requiert des régresseurs x.")
+            raise ValueError("gets requires x regressors.")
         hold_back = max(max_p, max_q)
 
         def fit_cand(p: int, q_list: list[int]) -> ARDLResults:
@@ -532,9 +585,9 @@ class ARDL:
 
 
 def _f_test_nested(general: ARDLResults, restricted: ARDLResults) -> float:
-    """p-value du F des restrictions cumulées (même échantillon requis)."""
+    """p-value of the F test of the accumulated restrictions."""
     if restricted.nobs != general.nobs:
-        raise ValueError("F imbriqué : échantillons différents.")
+        raise ValueError("Nested F test requires the same estimation sample.")
     n_restr = len(general.params) - len(restricted.params)
     if n_restr == 0:
         return 1.0
@@ -547,7 +600,20 @@ def _f_test_nested(general: ARDLResults, restricted: ARDLResults) -> float:
 
 @dataclass(frozen=True)
 class ARDLOrderSelection:
-    """Résultat de :meth:`ARDL.select_order` (spec 05 §3.3-3.4)."""
+    """Outcome of :meth:`ARDL.select_order`.
+
+    Attributes
+    ----------
+    table : pandas.DataFrame
+        All candidates, sorted by the selection criterion, with AIC, BIC,
+        HQ, log-likelihood and sample size for each.
+    ic : str
+        Criterion used for the ranking.
+    best_order : tuple
+        ``(p, {name: q_j})`` of the selected model.
+    best_model : ARDLResults
+        Selected model, re-estimated on its own maximal sample.
+    """
 
     table: pd.DataFrame
     ic: str
@@ -555,13 +621,32 @@ class ARDLOrderSelection:
     best_model: ARDLResults
 
     def top(self, n: int = 5) -> pd.DataFrame:
-        """Top-N des candidats (robustesse à la Pesaran, spec 05 §3.3)."""
+        """Return the ``n`` best candidates.
+
+        Inspecting a few near-optimal specifications, rather than trusting
+        the single best one, is good practice: information criteria often
+        separate the top candidates by very little.
+        """
         return self.table.head(n)
 
 
 @dataclass(frozen=True)
 class GETSResults:
-    """Résultat de :meth:`ARDL.gets` (spec 05 §4)."""
+    """Outcome of :meth:`ARDL.gets`.
+
+    Attributes
+    ----------
+    final_model : ARDLResults
+        Reduced model, re-estimated on its maximal sample.
+    final_order : tuple
+        ``(p, {name: q_j})`` reached at the end of the reduction.
+    reduction_path : pandas.DataFrame
+        One row per attempted removal, with the p-value of the dropped
+        lag, the residual diagnostics, the cumulated F test and whether
+        the step was accepted.
+    general_model : ARDLResults
+        The initial over-parameterised model.
+    """
 
     final_model: ARDLResults
     final_order: tuple[int, dict[str, int]]
@@ -571,11 +656,12 @@ class GETSResults:
 
 @dataclass
 class ARDLResults:
-    """Résultats d'estimation ARDL (immuable ; spec 05 §2.3).
+    """Results of an ARDL fit.
 
-    Toutes les vues de long terme (``to_ecm``, ``longrun``,
-    ``adjustment``) consomment l'algèbre de la spec 03 via
-    :attr:`ardl_params` — aucune conversion manuelle nécessaire.
+    Besides the usual regression output (``params``, ``bse``, ``tvalues``,
+    ``pvalues``, ``resid``, ``aic``/``bic``/``hqic``, ``rsquared``), this
+    object exposes the error-correction views of the same fit:
+    :meth:`to_ecm`, :attr:`longrun` and :attr:`adjustment`.
     """
 
     model: ARDL
@@ -587,7 +673,7 @@ class ARDLResults:
     cov_type: str
     _cache: dict[str, object] = field(default_factory=dict, repr=False)
 
-    # -------------------------- statistiques de base ------------------
+    # -------------------------- basic statistics ----------------------
     @property
     def params(self) -> pd.Series:
         return pd.Series(self._params, index=self._param_names, name="coef")
@@ -682,10 +768,10 @@ class ARDLResults:
         k = len(self._params)
         return 1.0 - (1.0 - self.rsquared) * (self.nobs - 1) / (self.nobs - k)
 
-    # -------------------------- stabilité dynamique -------------------
+    # -------------------------- dynamic stability ---------------------
     @property
     def ar_roots(self) -> npt.NDArray[np.complex128]:
-        """Racines du polynôme 1 - phi_1 L - ... - phi_p L^p (spec 05 §2.4)."""
+        """Roots of the autoregressive polynomial 1 - phi_1 L - ... - phi_p L^p."""
         phi = self._phi_values()
         if phi.shape[0] == 0:
             return np.array([], dtype=np.complex128)
@@ -693,22 +779,27 @@ class ARDLResults:
 
     @property
     def is_stable(self) -> bool:
-        """True si toutes les racines AR sont hors du cercle unité."""
+        """Whether all autoregressive roots lie outside the unit circle.
+
+        If they do not, the dynamics are explosive or contain a unit root,
+        the long-run quantities have no equilibrium interpretation, and a
+        :class:`~pyardl.exceptions.PyardlMethodologyWarning` is issued.
+        """
         roots = self.ar_roots
         if roots.shape[0] == 0:
             return True
         stable = bool(np.all(np.abs(roots) > 1.0))
         if not stable:
             warnings.warn(
-                "Dynamique instable : au moins une racine du polynôme AR "
-                "est sur ou dans le cercle unité ; les quantités de long "
-                "terme n'ont pas d'interprétation d'équilibre.",
+                "Unstable dynamics: at least one autoregressive root lies on "
+                "or inside the unit circle, so the long-run quantities have no "
+                "equilibrium interpretation.",
                 PyardlMethodologyWarning,
                 stacklevel=2,
             )
         return stable
 
-    # -------------------------- pont vers la spec 03 ------------------
+    # -------------------------- error-correction views ----------------
     def _phi_values(self) -> FloatArray:
         p = self.model.p
         y_name = self.model._y_name
@@ -718,17 +809,23 @@ class ARDLResults:
 
     @property
     def ardl_params(self) -> ARDLParams:
-        """Conteneur spec 03, directement consommable par ``ardl_to_ecm``
-        et par toutes les fonctions de long terme, ``cov_params`` inclus."""
+        """Parameters packaged for the error-correction algebra.
+
+        Can be passed directly to
+        :func:`~pyardl.core.transforms.ardl_to_ecm` and to the long-run
+        helpers; the covariance matrix is carried along.
+        """
         model = self.model
         if model.p == 0:
             raise ValueError(
-                "p=0 (pas de y retardé) : la forme ECM n'existe pas — modèle FDL pur."
+                "p=0: with no lagged y there is no error-correction form "
+                "(this is a pure distributed-lag model)."
             )
         if model._fixed is not None:
             raise NotImplementedError(
-                "ardl_params avec fixed_regressors : mapping non défini "
-                "par la spec 03 (les z_t ne sont ni des phi ni des beta)."
+                "The error-correction views are not defined when the model "
+                "has fixed regressors: they are neither phi nor beta "
+                "coefficients."
             )
         beta = []
         pos = (
@@ -755,13 +852,23 @@ class ARDLResults:
         )
 
     def to_ecm(self) -> ECMParams:
-        """Vue ECM (reparamétrisation exacte, spec 03) — mêmes données,
-        mêmes résidus."""
+        """Return the error-correction view of this fit.
+
+        An exact reparameterisation: same data, same residuals, same fit,
+        expressed in terms of the adjustment speed and the level
+        coefficients instead of the raw lag polynomials.
+        """
         return ardl_to_ecm(self.ardl_params)
 
     @property
     def longrun(self) -> pd.DataFrame:
-        """Coefficients de long terme theta_j avec se (delta, spec 03/09)."""
+        """Long-run coefficients with delta-method standard errors.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per regressor, with columns ``theta`` and ``se``.
+        """
         params = self.ardl_params
         theta = longrun_coefs(params)
         cov_theta = longrun_covariance(params)
@@ -771,10 +878,18 @@ class ARDLResults:
 
     @property
     def adjustment(self) -> pd.Series:
-        """Vitesse d'ajustement lambda, se et demi-vie (spec 03 §5)."""
+        """Adjustment speed, its standard error, and the half-life.
+
+        Returns
+        -------
+        pandas.Series
+            ``lambda`` (negative under error correction), ``se`` and
+            ``half_life``, the number of periods needed to absorb half of
+            a shock.
+        """
         params = self.ardl_params
         lam = speed_of_adjustment(params)
-        # var(lam) = 1' V_phi 1 (lam = -1 + somme des phi)
+        # var(lam) = 1' V_phi 1, since lam = -1 + sum(phi)
         p = self.model.p
         n_lead = (1 if self.model.det in ("const", "trend") else 0) + (
             1 if self.model.det == "trend" else 0
@@ -803,7 +918,14 @@ class ARDLResults:
         return float(het_breuschpagan(self._resid, design)[1])
 
     def diagnostics(self) -> pd.DataFrame:
-        """Ljung-Box, Jarque-Bera, Breusch-Pagan sur les résidus."""
+        """Residual diagnostics: Ljung-Box, Jarque-Bera and Breusch-Pagan.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Test statistic and p-value for autocorrelation, normality and
+            heteroskedasticity of the residuals.
+        """
         lb_lags = self._ljungbox_lags()
         lb = acorr_ljungbox(self._resid, lags=[lb_lags])
         jb_stat, jb_p, _, _ = jarque_bera(self._resid)
@@ -820,9 +942,9 @@ class ARDLResults:
             index=[f"Ljung-Box({lb_lags})", "Jarque-Bera", "Breusch-Pagan"],
         )
 
-    # -------------------------- présentation --------------------------
+    # -------------------------- presentation --------------------------
     def summary(self) -> str:
-        """Tableau de résultats type publication."""
+        """Return a publication-style summary of the fit as a string."""
         q_desc = ", ".join(
             f"{name}:{qj}"
             for name, qj in zip(self.model._x_names, self.model.q, strict=True)

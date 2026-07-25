@@ -64,7 +64,7 @@ class TestInternalConsistency:
 
     def test_seasonal_not_implemented(self) -> None:
         y, x = _dgp_clean(seed=4)
-        with pytest.raises(NotImplementedError, match="spec 04"):
+        with pytest.raises(NotImplementedError, match="not implemented"):
             ARDL(y, x, order=(1, 1), seasonal=True)
 
     def test_fixed_regressors_match_statsmodels(self) -> None:
@@ -143,7 +143,7 @@ class TestStability:
         for t in range(1, n):
             y[t] = 1.05 * y[t - 1] + 0.1 * xv[t] + rng.normal(scale=0.1)
         res = ARDL(pd.Series(y, name="y"), pd.DataFrame({"x": xv}), order=(1, 0))._fit()
-        with pytest.warns(PyardlMethodologyWarning, match="instable"):
+        with pytest.warns(PyardlMethodologyWarning, match="Unstable dynamics"):
             assert res.is_stable is False
 
     def test_stationary_dgp_is_stable_true(self) -> None:

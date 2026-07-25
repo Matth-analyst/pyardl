@@ -1,34 +1,34 @@
-r"""Algèbre exacte ARDL <-> ECM (spec 03 — Sargan 1964).
+r"""Exact algebra between the ARDL and error-correction representations.
 
-Réécriture exacte d'un modèle ARDL(p, q_1, ..., q_k) :
+An ARDL(p, q_1, ..., q_k) model
 
     y_t = alpha + delta*t + sum_i phi_i y_{t-i}
           + sum_j sum_i beta_{j,i} x_{j,t-i} + eps_t
 
-sous forme de mécanisme à correction d'erreur (ECM) :
+can be rewritten *exactly* — no approximation, identical residuals — as an
+error-correction model (ECM):
 
     Δy_t = alpha + delta*t + lam*y_{t-1} + sum_j gamma_j x_{j,t-1}
            + sum_i psi_i Δy_{t-i} + sum_j sum_i omega_{j,i} Δx_{j,t-i} + eps_t
 
-Formules de passage (spec 03 §2.2, dérivées par sommation par parties,
-voir ``docs/QUESTIONS.md`` pour le traitement du cas limite q_j = 0) :
+The two parameterisations are linked by:
 
     lam = -(1 - sum_i phi_i)
     gamma_j = sum_i beta_{j,i}
-    psi_i = -sum_{m=i+1}^{p} phi_m,            i = 1, ..., p-1
+    psi_i = -sum_{m=i+1}^{p} phi_m,             i = 1, ..., p-1
     omega_{j,0} = beta_{j,0}
     omega_{j,i} = -sum_{m=i+1}^{q_j} beta_{j,m}, i = 1, ..., q_j-1
-    theta_j = -gamma_j / lam = sum_i beta_{j,i} / (1 - sum_i phi_i)   (long terme)
+    theta_j = -gamma_j / lam                     (long-run coefficient)
 
-Les transformations sont vectorisées par sommes cumulées inversées
-(``np.cumsum``), sans boucle Python sur l'ordre des retards — seule une
-boucle sur les k régresseurs (peu nombreux) subsiste, chaque régresseur
-ayant son propre ordre q_j.
+``lam`` is the speed of adjustment: the fraction of last period's
+disequilibrium corrected each period. ``theta_j`` is the long-run
+elasticity of y with respect to x_j.
 
-Références
+References
 ----------
 Sargan, J. D. (1964). "Wages and Prices in the United Kingdom: A Study in
-Econometric Methodology". Clé BibTeX : ``sargan1964wages``.
+Econometric Methodology", in *Econometric Analysis for National Economic
+Planning*, Butterworths.
 """
 
 from __future__ import annotations
@@ -53,31 +53,32 @@ def _as_float_array(a: npt.ArrayLike) -> FloatArray:
 
 @dataclass(frozen=True)
 class ARDLParams:
-    """Paramètres d'un modèle ARDL(p, q_1, ..., q_k).
+    """Parameters of an ARDL(p, q_1, ..., q_k) model.
 
     Parameters
     ----------
     p : int
-        Ordre autorégressif (nombre de retards de y), p >= 1.
+        Autoregressive order, i.e. number of lags of y (at least 1).
     q : tuple of int
-        Ordre des retards de chaque régresseur x_j, q_j >= 0.
+        Lag order of each regressor x_j (may be 0).
     phi : ndarray, shape (p,)
-        Coefficients phi_1, ..., phi_p (retards de y).
+        Coefficients phi_1, ..., phi_p on the lags of y.
     beta : tuple of ndarray
-        beta[j] a la forme (q_j + 1,) : coefficients beta_{j,0}, ..., beta_{j,q_j}.
+        ``beta[j]`` has shape ``(q_j + 1,)`` and holds
+        beta_{j,0}, ..., beta_{j,q_j}.
     const : float
-        Constante (0.0 si absente).
+        Intercept (0.0 if the model has none).
     trend : float
-        Coefficient de tendance linéaire (0.0 si absente).
+        Linear trend coefficient (0.0 if the model has none).
     has_const, has_trend : bool
-        Présence effective de la constante / tendance dans le modèle estimé
-        (contrôle l'ordre du vecteur de paramètres pour ``cov_params``).
+        Whether the intercept and trend are actually part of the estimated
+        model. They determine the layout of the parameter vector used by
+        ``cov_params``.
     x_names : tuple of str, optional
-        Noms des régresseurs x (longueur k), pour l'affichage.
+        Names of the regressors, used for display.
     cov_params : ndarray, optional
-        Matrice de covariance du vecteur de paramètres complet, dans
-        l'ordre défini par :func:`param_vector` (const?, trend?, phi,
-        beta[0], beta[1], ...).
+        Covariance matrix of the full parameter vector, ordered as
+        :meth:`param_vector` (const?, trend?, phi, beta[0], beta[1], ...).
     """
 
     p: int
@@ -95,29 +96,29 @@ class ARDLParams:
         object.__setattr__(self, "phi", _as_float_array(self.phi))
         object.__setattr__(self, "beta", tuple(_as_float_array(b) for b in self.beta))
         if self.p < 1:
-            raise ValueError("p doit être >= 1 (au moins y_{t-1}).")
+            raise ValueError("p must be >= 1 (the model needs at least y_{t-1}).")
         if self.phi.shape != (self.p,):
-            raise ValueError(f"phi doit avoir la forme ({self.p},).")
+            raise ValueError(f"phi must have shape ({self.p},).")
         if len(self.q) != len(self.beta):
-            raise ValueError("q et beta doivent avoir la même longueur (k).")
+            raise ValueError("q and beta must have the same length (k).")
         for j, (qj, bj) in enumerate(zip(self.q, self.beta, strict=True)):
             if qj < 0:
-                raise ValueError(f"q[{j}] doit être >= 0.")
+                raise ValueError(f"q[{j}] must be >= 0.")
             if bj.shape != (qj + 1,):
-                raise ValueError(f"beta[{j}] doit avoir la forme ({qj + 1},).")
+                raise ValueError(f"beta[{j}] must have shape ({qj + 1},).")
         if self.x_names is not None and len(self.x_names) != len(self.q):
-            raise ValueError("x_names doit avoir la même longueur que q.")
+            raise ValueError("x_names must have the same length as q.")
 
     @property
     def k(self) -> int:
-        """Nombre de régresseurs x."""
+        """Number of x regressors."""
         return len(self.q)
 
     def param_vector(self) -> FloatArray:
-        """Vecteur de paramètres empilé, ordre : const?, trend?, phi, beta[0], ...
+        """Stack the parameters as const?, trend?, phi, beta[0], beta[1], ...
 
-        Cet ordre est le contrat utilisé par ``cov_params`` et par
-        :func:`longrun_covariance` (spec 03 §3.2).
+        This ordering is the contract used by ``cov_params`` and by
+        :func:`longrun_covariance`.
         """
         parts: list[FloatArray] = []
         if self.has_const:
@@ -131,32 +132,30 @@ class ARDLParams:
 
 @dataclass(frozen=True)
 class ECMParams:
-    """Paramètres de la forme ECM équivalente (spec 03 §2.2).
+    """Parameters of the equivalent error-correction representation.
 
     Parameters
     ----------
-    p, q : voir :class:`ARDLParams`.
+    p, q
+        See :class:`ARDLParams`.
     lam : float
-        Vitesse d'ajustement lambda = -(1 - sum phi_i).
+        Speed of adjustment, ``lam = -(1 - sum phi_i)``.
     gamma : ndarray, shape (k,)
-        Coefficients de niveau x_{j,t-1}.
+        Level coefficients on x_{j,t-1}.
     psi : ndarray, shape (p-1,)
-        Coefficients des Δy_{t-i}, i = 1, ..., p-1.
+        Coefficients on Δy_{t-i}, i = 1, ..., p-1.
     omega : tuple of ndarray
-        omega[j] a la forme (q_j,) : coefficients des Δx_{j,t-i},
-        i = 0, ..., q_j - 1. Si q_j = 0, omega[j] est vide : le régresseur
-        x_j n'a pas de dynamique de court terme propre et gamma_j
-        multiplie alors x_{j,t} (contemporain) et non x_{j,t-1} dans la
-        régression ECM — cf. docs/QUESTIONS.md pour la justification
-        (dimension du sous-espace engendré) et spec 05 pour la
-        construction de la matrice de dessin correspondante.
+        ``omega[j]`` has shape ``(q_j,)`` and holds the coefficients on
+        Δx_{j,t-i}, i = 0, ..., q_j - 1.
 
-        Cette convention q_j = 0 est celle de Stata ``ardl`` (qui
-        accepte q_j = 0 et fait entrer x_{j,t} contemporain dans la
-        partie de niveau de l'EC) ; ``statsmodels.tsa.ardl.UECM``, en
-        revanche, refuse q_j = 0 à la construction (``ValueError: All
-        included exog variables must have a lag length >= 1``) — pyardl
-        le supporte.
+        When ``q_j = 0`` the array is empty: regressor x_j has no
+        short-run dynamics of its own, and ``gamma_j`` then multiplies the
+        *contemporaneous* level x_{j,t} rather than x_{j,t-1}. Giving it a
+        lagged level instead would add a degree of freedom the original
+        ARDL does not have, and the two representations would no longer
+        share the same residuals. This matches the behaviour of Stata's
+        ``ardl``; ``statsmodels.tsa.ardl.UECM`` rejects ``q_j = 0``
+        altogether, whereas pyardl supports it.
     """
 
     p: int
@@ -177,25 +176,26 @@ class ECMParams:
         object.__setattr__(self, "psi", _as_float_array(self.psi))
         object.__setattr__(self, "omega", tuple(_as_float_array(o) for o in self.omega))
         if self.p < 1:
-            raise ValueError("p doit être >= 1.")
+            raise ValueError("p must be >= 1.")
         if self.psi.shape != (max(self.p - 1, 0),):
-            raise ValueError(f"psi doit avoir la forme ({max(self.p - 1, 0)},).")
+            raise ValueError(f"psi must have shape ({max(self.p - 1, 0)},).")
         if len(self.q) != len(self.omega) or len(self.q) != self.gamma.shape[0]:
-            raise ValueError("q, gamma et omega doivent avoir la même longueur (k).")
+            raise ValueError("q, gamma and omega must have the same length (k).")
         for j, (qj, oj) in enumerate(zip(self.q, self.omega, strict=True)):
             if oj.shape != (qj,):
-                raise ValueError(f"omega[{j}] doit avoir la forme ({qj},).")
+                raise ValueError(f"omega[{j}] must have shape ({qj},).")
 
     @property
     def k(self) -> int:
+        """Number of x regressors."""
         return len(self.q)
 
 
 def ardl_to_ecm(params: ARDLParams) -> ECMParams:
-    """Transforme des paramètres ARDL en paramètres ECM (reparamétrisation exacte).
+    """Convert ARDL parameters to their error-correction counterpart.
 
-    Voir le module docstring pour les formules ; vectorisé via
-    ``np.cumsum`` (spec 03 §3, point 1).
+    The reparameterisation is exact: fitting either representation on the
+    same data yields identical residuals and sum of squared residuals.
 
     Examples
     --------
@@ -209,7 +209,7 @@ def ardl_to_ecm(params: ARDLParams) -> ECMParams:
     """
     lam = -(1.0 - float(np.sum(params.phi)))
 
-    # psi_i = -sum_{m=i+1}^{p} phi_m, i = 1..p-1  (S[i] = sum(phi[i:]), 0-indexed)
+    # psi_i = -sum_{m=i+1}^{p} phi_m, i = 1..p-1  (s[i] = sum(phi[i:]), 0-indexed)
     s = np.cumsum(params.phi[::-1])[::-1]
     psi = -s[1:] if params.p > 1 else np.array([], dtype=np.float64)
 
@@ -218,18 +218,17 @@ def ardl_to_ecm(params: ARDLParams) -> ECMParams:
     for j, (qj, bj) in enumerate(zip(params.q, params.beta, strict=True)):
         gamma[j] = float(np.sum(bj))
         if qj == 0:
-            # Pas de dynamique de court terme propre : gamma_j multipliera
-            # x_{j,t} (contemporain) dans la régression, pas x_{j,t-1}
-            # (sinon sur-paramétrisation, cf. docs/QUESTIONS.md).
+            # No short-run dynamics of its own: gamma_j will multiply the
+            # contemporaneous x_{j,t}, not x_{j,t-1} (see ECMParams.omega).
             omega.append(np.array([], dtype=np.float64))
             continue
-        # C_i = sum_{m=i}^{qj} beta_{j,m}, 0-indexed, longueur qj+1
+        # c_i = sum_{m=i}^{qj} beta_{j,m}, 0-indexed, length qj+1
         c = np.cumsum(bj[::-1])[::-1]
         c1 = c[1]
         if qj >= 2:
             omega_j = np.concatenate(([c[0] - c1], -c[2:]))
         else:
-            # qj == 1 : un seul terme omega_{j,0} = C_0 - C_1
+            # qj == 1: a single term, omega_{j,0} = c_0 - c_1
             omega_j = np.array([c[0] - c1])
         omega.append(omega_j)
 
@@ -249,9 +248,10 @@ def ardl_to_ecm(params: ARDLParams) -> ECMParams:
 
 
 def ecm_to_ardl(params: ECMParams) -> ARDLParams:
-    """Transforme des paramètres ECM en paramètres ARDL (inversion séquentielle).
+    """Convert error-correction parameters back to the ARDL form.
 
-    Système triangulaire résolu par sommes cumulées (spec 03 §2.3).
+    Exact inverse of :func:`ardl_to_ecm`; the mapping is triangular and is
+    solved by cumulative sums.
 
     Examples
     --------
@@ -265,16 +265,16 @@ def ecm_to_ardl(params: ECMParams) -> ARDLParams:
     0.5
     """
     p = params.p
-    # D_1 = 1 + lam ; D_i = -psi_{i-1} pour i = 2..p ; D_{p+1} = 0
+    # d_1 = 1 + lam; d_i = -psi_{i-1} for i = 2..p; d_{p+1} = 0
     d = np.concatenate(([1.0 + params.lam], -params.psi, [0.0]))
-    phi = -np.diff(d)  # longueur p
+    phi = -np.diff(d)  # length p
 
     beta: list[FloatArray] = []
     for qj, gamma_j, omega_j in zip(params.q, params.gamma, params.omega, strict=True):
         if qj == 0:
             beta.append(np.array([gamma_j]))
             continue
-        # C_0 = gamma_j ; C_1 = gamma_j - omega_{j,0} ; C_i = -omega_{j,i-1}, i=2..qj
+        # c_0 = gamma_j; c_1 = gamma_j - omega_{j,0}; c_i = -omega_{j,i-1}
         c1 = gamma_j - omega_j[0]
         if qj >= 2:
             c = np.concatenate(([gamma_j, c1], -omega_j[1:], [0.0]))
@@ -296,22 +296,32 @@ def ecm_to_ardl(params: ECMParams) -> ARDLParams:
 
 
 def speed_of_adjustment(params: ARDLParams) -> float:
-    """Vitesse d'ajustement lambda = -(1 - sum phi_i)."""
+    """Return the speed of adjustment ``lam = -(1 - sum phi_i)``.
+
+    A value in ``]-1, 0[`` means the system converges back to its long-run
+    equilibrium; the closer to -1, the faster the correction.
+    """
     return -(1.0 - float(np.sum(params.phi)))
 
 
 def longrun_coefs(params: ARDLParams, *, tol: float = _LAMBDA_TOL) -> pd.Series:
-    """Coefficients de long terme theta_j = sum_i beta_{j,i} / (1 - sum_i phi_i).
+    """Long-run coefficients ``theta_j = sum_i beta_{j,i} / (1 - sum_i phi_i)``.
 
-    Émet :class:`~pyardl.exceptions.DegenerateCaseWarning` et renvoie des
-    NaN si |lambda| < tol (absence de force de rappel, spec 03 §3.4).
+    If there is no error-correction force (``|lam| < tol``) the long-run
+    coefficients are not defined: the function returns NaNs and issues a
+    :class:`~pyardl.exceptions.DegenerateCaseWarning`.
+
+    Returns
+    -------
+    pandas.Series
+        One long-run coefficient per regressor, indexed by regressor name.
     """
     lam = speed_of_adjustment(params)
     names = params.x_names or tuple(f"x{j}" for j in range(params.k))
     if abs(lam) < tol:
         warnings.warn(
-            "lambda ~ 0 : pas de force de rappel, les coefficients de long "
-            "terme ne sont pas définis (cf. specs 14-15, dégénérescences).",
+            "lambda is ~0: there is no error-correction force, so long-run "
+            "coefficients are not defined.",
             DegenerateCaseWarning,
             stacklevel=2,
         )
@@ -322,29 +332,34 @@ def longrun_coefs(params: ARDLParams, *, tol: float = _LAMBDA_TOL) -> pd.Series:
 
 
 def longrun_covariance(params: ARDLParams, v: FloatArray | None = None) -> FloatArray:
-    """Covariance des coefficients de long terme theta_j par méthode delta.
+    """Covariance matrix of the long-run coefficients, by the delta method.
 
-    Gradient analytique (spec 03 §3, point 2) :
-    d(theta_j)/d(beta_{j,i}) = 1 / (1 - sum phi) ;
-    d(theta_j)/d(phi_i) = theta_j / (1 - sum phi) ;
-    0 pour les paramètres des autres régresseurs et pour const/trend.
+    Uses the analytical gradient
+
+        d(theta_j)/d(beta_{j,i}) = 1 / (1 - sum phi)
+        d(theta_j)/d(phi_i)      = theta_j / (1 - sum phi)
+
+    with zero entries for the parameters of the other regressors and for
+    the deterministic terms.
 
     Parameters
     ----------
     params : ARDLParams
-        Doit porter ``cov_params`` (matrice de covariance du vecteur
-        ``params.param_vector()``) si ``v`` n'est pas fourni.
+        Must carry ``cov_params`` (the covariance matrix of
+        ``params.param_vector()``) unless ``v`` is given.
     v : ndarray, optional
-        Matrice de covariance à utiliser à la place de ``params.cov_params``.
+        Covariance matrix to use instead of ``params.cov_params``.
 
     Returns
     -------
     ndarray, shape (k, k)
-        Matrice de covariance de theta = (theta_0, ..., theta_{k-1}).
+        Covariance matrix of ``(theta_0, ..., theta_{k-1})``.
     """
     v_hat = v if v is not None else params.cov_params
     if v_hat is None:
-        raise ValueError("cov_params requis (sur params ou en argument v).")
+        raise ValueError(
+            "cov_params is required, either on params or through the v argument."
+        )
 
     denom = 1.0 - float(np.sum(params.phi))
     theta = np.array([float(np.sum(b)) for b in params.beta]) / denom
@@ -370,16 +385,17 @@ def longrun_covariance(params: ARDLParams, v: FloatArray | None = None) -> Float
 
 
 def half_life(params: ARDLParams) -> float:
-    """Demi-vie du retour à l'équilibre : ln(0.5) / ln(1 + lambda).
+    """Half-life of the return to equilibrium: ``ln(0.5) / ln(1 + lam)``.
 
-    Valide uniquement si -1 < lambda < 0 (spec 03 §3, point 3) ; NaN +
-    :class:`~pyardl.exceptions.DegenerateCaseWarning` sinon.
+    This is the number of periods needed to absorb half of a shock. It is
+    only meaningful when ``-1 < lam < 0``; otherwise the function returns
+    NaN and issues a :class:`~pyardl.exceptions.DegenerateCaseWarning`.
     """
     lam = speed_of_adjustment(params)
     if not (-1.0 < lam < 0.0):
         warnings.warn(
-            "half_life non défini : lambda hors de (-1, 0), pas de "
-            "convergence géométrique vers l'équilibre de long terme.",
+            "half_life is undefined: lambda lies outside (-1, 0), so there is "
+            "no geometric convergence to a long-run equilibrium.",
             DegenerateCaseWarning,
             stacklevel=2,
         )

@@ -1,25 +1,31 @@
-"""Classes d'avertissement méthodologique dédiées.
+"""Dedicated warning classes for methodological limitations.
 
-Toute limitation méthodologique (cas dégénéré, échantillon trop petit,
-instrument faible, non-convergence...) doit être signalée via une sous-classe
-de :class:`PyardlMethodologyWarning`, jamais via ``UserWarning`` nu, afin que
-l'utilisateur puisse filtrer ces avertissements spécifiquement
-(``warnings.filterwarnings``) et que les tests puissent les cibler
-(``pytest.warns``).
+Any methodological caveat (degenerate case, very small sample, failure to
+converge, ...) is signalled through a subclass of
+:class:`PyardlMethodologyWarning` rather than a bare ``UserWarning``, so
+that these warnings can be filtered specifically::
+
+    import warnings
+    from pyardl.exceptions import PyardlMethodologyWarning
+
+    warnings.filterwarnings("error", category=PyardlMethodologyWarning)
+
+Raising them to errors is a good habit in scripted analyses: it prevents a
+silently unreliable result from going unnoticed.
 """
 
 from __future__ import annotations
 
 
 class PyardlMethodologyWarning(UserWarning):
-    """Classe de base pour tout avertissement méthodologique émis par pyardl."""
+    """Base class for every methodological warning issued by pyardl."""
 
 
 class DegenerateCaseWarning(PyardlMethodologyWarning):
-    """Cas dégénéré : absence de force de rappel (lambda proche de 0) ou de
-    convergence vers l'équilibre de long terme (lambda hors de ]-1, 0[).
+    """No error-correction force, or no convergence to a long-run equilibrium.
 
-    Les quantités de long terme (theta, half-life) ne sont alors pas
-    définies statistiquement ; cf. specs 14-15 (dégénérescences) pour la
-    classification complète.
+    Emitted when the adjustment speed ``lambda`` is close to zero (no pull
+    back towards equilibrium) or falls outside ``]-1, 0[`` (no convergence).
+    Long-run quantities such as ``theta`` and the half-life are then not
+    statistically defined and are reported as ``NaN``.
     """

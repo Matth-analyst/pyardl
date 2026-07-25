@@ -1,7 +1,8 @@
-"""Briques transversales réutilisées par tous les modules (spec 01 §3, 00_INDEX.md).
+"""Shared building blocks used across the library.
 
-Ne pas dupliquer : toute fonction ici doit être importée, jamais réécrite
-localement dans un module de modèle.
+These helpers are imported by the model modules rather than reimplemented
+locally, so that input validation and lag construction behave identically
+everywhere.
 """
 
 from __future__ import annotations
@@ -23,34 +24,30 @@ def _delta_method(
     *,
     step: float = 1e-6,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """Méthode delta générique : g(theta_hat), Var(g) = grad(g)' V_hat grad(g).
+    """Generic delta method: ``g(theta_hat)`` and ``grad(g)' V grad(g)``.
 
-    Le gradient de ``g`` est calculé par différences finies centrées
-    (pas de forme analytique requise), ce qui en fait un helper générique
-    réutilisable dans toute la bibliothèque (spec 01 §3). Les modules qui
-    disposent d'un gradient analytique (ex. spec 03 §3.2) doivent
-    l'utiliser en priorité et ne recourir à ce helper que pour la
-    vérification croisée en test.
+    The gradient of ``g`` is obtained by central finite differences, so no
+    closed form is required. Modules that do have an analytical gradient use
+    it instead; this helper serves as a generic fallback and as a
+    cross-check in tests.
 
     Parameters
     ----------
-    g : Callable[[ndarray], ndarray | float]
-        Fonction (vectorisée ou scalaire) des paramètres, ``g(theta_hat)``
-        donne la quantité dérivée dont on veut la variance.
+    g : callable
+        Function of the parameter vector whose variance is wanted.
     theta_hat : ndarray, shape (n_params,)
-        Estimation ponctuelle du vecteur de paramètres.
+        Point estimate of the parameter vector.
     v_hat : ndarray, shape (n_params, n_params)
-        Matrice de covariance estimée de ``theta_hat``.
+        Estimated covariance matrix of ``theta_hat``.
     step : float
-        Pas des différences finies centrées.
+        Relative step size of the central finite differences.
 
     Returns
     -------
     g_hat : ndarray
-        Valeur de ``g`` évaluée en ``theta_hat`` (aplatie en 1D).
+        ``g`` evaluated at ``theta_hat``, flattened to 1-D.
     cov_g : ndarray, shape (m, m)
-        Matrice de covariance de ``g(theta_hat)`` (m = dimension de sortie
-        de ``g``).
+        Covariance matrix of ``g(theta_hat)``.
 
     Examples
     --------
@@ -85,24 +82,25 @@ def _delta_method(
 def lag_matrix(
     x: npt.ArrayLike, lags: int, *, first_lag: int = 0
 ) -> npt.NDArray[np.float64]:
-    """Matrice des retards de x (spec 02 §2, building block du cœur ARDL).
+    """Build the matrix of lagged values of a series.
 
     Parameters
     ----------
     x : array-like, shape (T,)
-        Série d'entrée.
+        Input series.
     lags : int
-        Retard maximal (>= first_lag).
+        Highest lag to include (must be at least ``first_lag``).
     first_lag : int
-        Premier retard inclus : 0 (défaut, colonnes x_t, ..., x_{t-lags})
-        ou 1 (colonnes x_{t-1}, ..., x_{t-lags} — cas des retards de y
-        dans un ARDL).
+        Lowest lag to include: ``0`` gives columns
+        ``x_t, ..., x_{t-lags}``; ``1`` gives ``x_{t-1}, ..., x_{t-lags}``,
+        which is what an ARDL model needs for the lags of the dependent
+        variable.
 
     Returns
     -------
     ndarray, shape (T - lags, lags - first_lag + 1)
-        Colonne i = x_{t - (first_lag + i)}, alignée sur t = lags..T-1
-        (0-indexé) : les ``lags`` premières observations sont perdues.
+        Column ``i`` holds ``x_{t - (first_lag + i)}``. The first ``lags``
+        observations are dropped so that all columns are aligned.
 
     Examples
     --------
@@ -113,12 +111,12 @@ def lag_matrix(
     """
     arr = np.asarray(x, dtype=np.float64)
     if arr.ndim != 1:
-        raise ValueError("x doit être 1D.")
+        raise ValueError("x must be 1-D.")
     if lags < first_lag or first_lag < 0:
-        raise ValueError("lags >= first_lag >= 0 requis.")
+        raise ValueError("lags >= first_lag >= 0 is required.")
     t_len = arr.shape[0]
     if t_len <= lags:
-        raise ValueError(f"Série trop courte : T={t_len} <= lags={lags}.")
+        raise ValueError(f"Series is too short: T={t_len} <= lags={lags}.")
     cols = [arr[lags - i : t_len - i] for i in range(first_lag, lags + 1)]
     return np.column_stack(cols)
 
@@ -135,42 +133,44 @@ def check_series(
     str,
     tuple[str, ...],
 ]:
-    """Validation d'entrées commune à toute la bibliothèque (spec 01 §6).
+    """Validate and normalise the input series shared by all estimators.
 
-    Vérifie : longueurs égales, pas de NaN interne (NaN de bord -> trim
-    avec warning), n >= ``min_obs`` sinon warning petit échantillon,
-    variance non nulle. Préserve l'index temporel pandas si fourni.
+    Checks that ``y`` and ``x`` have the same length and non-zero variance,
+    trims leading and trailing NaNs (with a warning) while rejecting
+    internal NaNs, and warns when the sample is too small for asymptotic
+    inference to be trustworthy. A pandas index is preserved when supplied.
 
     Parameters
     ----------
     y : array-like, shape (T,)
-        Variable dépendante.
-    x : array-like, shape (T,) ou (T, k), optional
-        Régresseurs (Series, DataFrame ou ndarray).
+        Dependent variable.
+    x : array-like, shape (T,) or (T, k), optional
+        Regressors, as a Series, DataFrame or ndarray. Column names are
+        taken from a DataFrame when available.
     min_obs : int
-        Seuil du warning petit échantillon.
+        Sample size below which a small-sample warning is issued.
 
     Returns
     -------
     y_arr : ndarray, shape (T',)
-    x_arr : ndarray, shape (T', k) ou None
-    index : pd.Index ou None
-        Index pandas aligné sur l'échantillon conservé (None si les
-        entrées sont des ndarrays nus).
+    x_arr : ndarray, shape (T', k) or None
+    index : pandas.Index or None
+        Index aligned on the retained sample, or ``None`` for plain arrays.
     y_name : str
     x_names : tuple of str
 
     Raises
     ------
     ValueError
-        Longueurs différentes, NaN interne, ou variance nulle.
+        If lengths differ, an internal NaN is found, or a series is
+        constant.
     """
     y_name = getattr(y, "name", None) or "y"
     index = y.index if isinstance(y, pd.Series) else None
 
     y_arr = np.asarray(y, dtype=np.float64)
     if y_arr.ndim != 1:
-        raise ValueError("y doit être 1D.")
+        raise ValueError("y must be 1-D.")
 
     x_names: tuple[str, ...] = ()
     x_arr: npt.NDArray[np.float64] | None = None
@@ -187,16 +187,17 @@ def check_series(
         if x_arr.ndim == 1:
             x_arr = x_arr[:, None]
         if x_arr.ndim != 2:
-            raise ValueError("x doit être 1D ou 2D.")
+            raise ValueError("x must be 1-D or 2-D.")
         if not x_names:
             x_names = tuple(f"x{j}" for j in range(x_arr.shape[1]))
         if x_arr.shape[0] != y_arr.shape[0]:
             raise ValueError(
-                f"Longueurs incompatibles : y a {y_arr.shape[0]} "
-                f"observations, x en a {x_arr.shape[0]}."
+                f"Incompatible lengths: y has {y_arr.shape[0]} observations, "
+                f"x has {x_arr.shape[0]}."
             )
 
-    # NaN de bord -> trim avec warning ; NaN interne -> erreur.
+    # Leading/trailing NaNs are trimmed with a warning; internal NaNs are an
+    # error, since silently dropping them would break the time ordering.
     stacked = y_arr[:, None] if x_arr is None else np.column_stack([y_arr, x_arr])
     valid = np.asarray(~np.isnan(stacked).any(axis=1), dtype=np.bool_)
     if not valid.all():
@@ -205,9 +206,13 @@ def check_series(
             int(len(valid) - 1 - np.argmax(valid[::-1])),
         )
         if not valid[first : last + 1].all():
-            raise ValueError("NaN interne détecté (seuls les NaN de bord sont trimés).")
+            raise ValueError(
+                "Internal NaN detected; only leading and trailing NaNs can be "
+                "trimmed automatically."
+            )
         warnings.warn(
-            f"NaN de bord : {int((~valid).sum())} observation(s) retirée(s).",
+            f"Trimmed {int((~valid).sum())} leading/trailing observation(s) "
+            "containing NaN.",
             PyardlMethodologyWarning,
             stacklevel=2,
         )
@@ -219,14 +224,14 @@ def check_series(
 
     if y_arr.shape[0] < min_obs:
         warnings.warn(
-            f"Échantillon très petit (n={y_arr.shape[0]} < {min_obs}) : "
-            "l'inférence asymptotique n'est pas fiable.",
+            f"Very small sample (n={y_arr.shape[0]} < {min_obs}): asymptotic "
+            "inference is not reliable.",
             PyardlMethodologyWarning,
             stacklevel=2,
         )
     if np.var(y_arr) == 0.0:
-        raise ValueError("y a une variance nulle.")
+        raise ValueError("y has zero variance.")
     if x_arr is not None and (np.var(x_arr, axis=0) == 0.0).any():
-        raise ValueError("Au moins une colonne de x a une variance nulle.")
+        raise ValueError("At least one column of x has zero variance.")
 
     return y_arr, x_arr, index, str(y_name), x_names

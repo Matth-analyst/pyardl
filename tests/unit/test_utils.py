@@ -31,11 +31,11 @@ class TestLagMatrix:
         np.testing.assert_array_equal(out, x[:, None])
 
     def test_errors(self) -> None:
-        with pytest.raises(ValueError, match="1D"):
+        with pytest.raises(ValueError, match="1-D"):
             lag_matrix(np.ones((3, 2)), 1)
         with pytest.raises(ValueError, match="first_lag"):
             lag_matrix(np.arange(5.0), 1, first_lag=2)
-        with pytest.raises(ValueError, match="trop courte"):
+        with pytest.raises(ValueError, match="too short"):
             lag_matrix(np.arange(3.0), 3)
 
 
@@ -50,13 +50,13 @@ class TestCheckSeries:
         assert index is not None and len(index) == 20
 
     def test_length_mismatch(self) -> None:
-        with pytest.raises(ValueError, match="Longueurs incompatibles"):
+        with pytest.raises(ValueError, match="Incompatible lengths"):
             check_series(np.arange(10.0), np.arange(9.0))
 
     def test_edge_nan_trimmed_with_warning(self) -> None:
         """Spec 01 §6 : NaN de bord -> trim avec warning."""
         y = np.array([np.nan, 1.0, 2.0, 3.0] + list(np.linspace(4, 20, 17)))
-        with pytest.warns(PyardlMethodologyWarning, match="NaN de bord"):
+        with pytest.warns(PyardlMethodologyWarning, match="Trimmed"):
             y_arr, *_ = check_series(y)
         assert y_arr.shape[0] == 20
         assert not np.isnan(y_arr).any()
@@ -64,15 +64,15 @@ class TestCheckSeries:
     def test_internal_nan_raises(self) -> None:
         y = np.linspace(0, 19, 20)
         y[10] = np.nan
-        with pytest.raises(ValueError, match="NaN interne"):
+        with pytest.raises(ValueError, match="Internal NaN"):
             check_series(y)
 
     def test_small_sample_warning(self) -> None:
-        with pytest.warns(PyardlMethodologyWarning, match="petit"):
+        with pytest.warns(PyardlMethodologyWarning, match="Very small sample"):
             check_series(np.arange(10.0))
 
     def test_zero_variance_raises(self) -> None:
-        with pytest.raises(ValueError, match="variance nulle"):
+        with pytest.raises(ValueError, match="zero variance"):
             check_series(np.ones(20))
-        with pytest.raises(ValueError, match="variance nulle"):
+        with pytest.raises(ValueError, match="zero variance"):
             check_series(np.arange(20.0), np.ones(20))
