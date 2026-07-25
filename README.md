@@ -1,91 +1,175 @@
 # pyardl
 
-Bibliothèque Python d'économétrie des séries temporelles couvrant la
-généalogie complète des modèles ARDL : estimation ARDL/UECM, bounds
-tests de cointégration, valeurs critiques modernes (surfaces de
-réponse, p-values), et — sur la feuille de route — inférence bootstrap,
-NARDL, QARDL, Fourier ARDL et panels hétérogènes (MG/PMG/CS-ARDL).
+ARDL models and bounds tests for cointegration in Python.
 
-**Rigueur méthodologique d'abord** : chaque table de valeurs critiques
-cite sa source exacte et est recoupée par une seconde source publiée ou
-par le moteur de simulation interne
-([PROVENANCE.md](src/pyardl/critical_values/PROVENANCE.md)) ; chaque
-estimateur est validé contre statsmodels, le package R `ARDL` et les
-résultats publiés (réplication de l'application salaires UK de Pesaran,
-Shin & Smith 2001 incluse en test de non-régression) ; les anomalies
-détectées dans les sources de référence elles-mêmes sont consignées
-dans un [registre public](docs/VALIDATION_OBSERVATIONS.md).
+`pyardl` estimates autoregressive distributed lag models, converts them
+to their error-correction form, and runs the Pesaran-Shin-Smith bounds
+test for the existence of a long-run relationship — the test you reach
+for when you do not know in advance whether your series are I(0) or
+I(1).
 
-## Installation
-
-```bash
-pip install -e ".[dev]"        # depuis un clone (pas encore sur PyPI)
-```
-
-Dépendances : numpy, scipy, pandas, statsmodels (Python ≥ 3.11).
-
-## Exemple : bounds test avec p-values
+It fills a gap: the bounds test is standard in applied econometrics and
+available in Stata and R, but Python support has been partial. `pyardl`
+covers all five deterministic cases, gives you three critical-value
+sources including modern response surfaces with p-values, and never
+reduces an inconclusive result to a yes/no answer.
 
 ```python
-import pandas as pd
 from pyardl.bounds import bounds_test
 from pyardl.datasets import load_denmark
 
-data = load_denmark()          # données danoises (Johansen & Juselius 1990)
+data = load_denmark()
 res = bounds_test(
-    data["LRM"], data[["LRY", "IBO", "IDE"]],
-    case=3,                     # constante non restreinte (PSS 2001)
+    data["LRM"],                       # log real money demand
+    data[["LRY", "IBO", "IDE"]],       # income, bond rate, deposit rate
+    case=3,                            # unrestricted intercept, no trend
     order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}),
 )
 print(res.summary())
 ```
 
 ```text
-Bounds test PSS 2001 — cas 3, k=3, UECM(3; LRY:1, IBO:3, IDE:2), cv_source=kripfganz
+Bounds test (Pesaran, Shin & Smith 2001) - case 3, k=3, ECM(3; LRY:1, IBO:3, IDE:2), critical values: kripfganz
 
-F_overall = 6.2059   décision (5%) : cointegration
-p-values F (K&S 2020) : p_I0 = 0.0005, p_I1 = 0.0039
-t_BDM     = -4.5479   décision (5%) : cointegration
-décision jointe F+t (spec 11) : cointegration
-...
+F_overall = 6.2059   decision (5%): cointegration
+F p-values: p_I0 = 0.0005, p_I1 = 0.0039
+t_BDM     = -4.5479   decision (5%): cointegration
+joint decision (F and t): cointegration
+
+        F_I0   F_I1   t_I0   t_I1
+alpha
+0.10   2.730  3.747 -2.570 -3.460
+0.05   3.229  4.322 -2.860 -3.780
+0.01   4.311  5.543 -3.430 -4.370
 ```
 
-- `decision_f` / `decision_t` / `decision_joint` sont à états explicites
-  (`cointegration` / `no_cointegration` / `inconclusive` /
-  `degenerate_suspicion`) — jamais un booléen ; la zone non concluante
-  est lue en continu : « inconclusive, p ∈ [p_I1, p_I0] ».
-- `cv_source` : `"kripfganz"` (défaut — surfaces de réponse, p-values),
-  `"pss"` (valeurs publiées PSS 2001, reproduction de la littérature),
-  `"narayan"` (petits échantillons 30 ≤ T ≤ 80).
-- L'estimateur sous-jacent est accessible directement :
-  `pyardl.core.ardl.ARDL` (sélection d'ordre sur échantillon commun,
-  GETS, vues ECM/long terme exactes).
-
-## État des phases (feuille de route : [00_INDEX](docs/references/00_INDEX.md))
-
-| Phase | Contenu | État |
-|---|---|---|
-| 1 (v0.1.0) | Algèbre ARDL↔ECM (spec 03), estimateur ARDL/UECM + sélection + GETS (05), bounds test 5 cas (10), t-test BDM + décision jointe (11), garde-fous PS98 (09) | ✅ close — jalon : réplication PSS 2001 (F/t à 1e-4 vs R ARDL) |
-| 2 (en cours) | Moteur de simulation de CV + Narayan 2005 (12) ✅ ; surfaces de réponse K&S, p-values (13) ✅ voie A1 ; CUSUM (26), racines unitaires (27), datasets/saisonnalité (04), Engle-Granger (06) à venir | 🚧 |
-| 3 | Bootstrap (14), cadre à 3 tests et dégénérescences (15), Johansen (07) ; premier module Rust | ⬜ |
-| 4-8 | NARDL (17), Fourier (19-21), simulations dynamiques (25), QARDL (18), panels (22-24), docs (28) | ⬜ |
-
-La source de vérité du projet est le dossier
-[`docs/references/`](docs/references/00_INDEX.md) (28 spécifications
-d'implémentation) ; le cycle de travail et les règles numériques non
-négociables sont documentées dans le dépôt.
-
-## Tests
+## Installation
 
 ```bash
-pytest -m "not slow and not external"   # suite CI (~1 min)
-pytest -m external                       # réplications R (valeurs pré-générées)
-pytest -m slow                           # Monte Carlo complets (nightly)
+pip install -e .
 ```
+
+Requires Python 3.11+ and numpy, scipy, pandas, statsmodels. Not yet on
+PyPI; install from a clone for now.
+
+## What it does
+
+**Estimation** — `pyardl.core.ardl.ARDL` fits ARDL(p, q) models by OLS
+with robust covariance options (HC0-HC3, Newey-West), reports the usual
+regression output, and checks the residuals for autocorrelation
+automatically, because long-run inference is not valid without it.
+
+```python
+from pyardl.core.ardl import ARDL
+
+res = ARDL(y, x, order=(2, {"income": 1, "price": 2})).fit()
+res.longrun        # long-run coefficients with delta-method std. errors
+res.adjustment     # speed of adjustment and half-life
+res.to_ecm()       # exact error-correction reparameterisation
+res.is_stable      # are all AR roots outside the unit circle?
+res.diagnostics()  # Ljung-Box, Jarque-Bera, Breusch-Pagan
+```
+
+**Order selection** — a grid or per-variable search over AIC, BIC and
+HQ. All candidates are estimated on the same sample, so the criteria are
+actually comparable; the selected model is then re-estimated on its own
+maximal sample.
+
+```python
+sel = ARDL.select_order(y, x, max_p=4, max_q=4, ic="bic")
+sel.best_order
+sel.top(5)         # inspect near-optimal specifications too
+```
+
+**General-to-specific reduction** — `ARDL.gets` reduces an
+over-parameterised model while keeping the residual diagnostics clean,
+and records every step in `reduction_path` so the sequence can be
+audited.
+
+**Bounds testing** — all five deterministic cases, the F and t
+statistics, and a three-state verdict (`cointegration`,
+`no_cointegration`, `inconclusive`) that is never collapsed into a
+boolean. When the F and t tests disagree in the specific way that
+signals a degenerate relationship, that is reported too rather than
+hidden.
+
+**Critical values** — three sources, selected with `cv_source`:
+
+| Source | Use it for | Coverage |
+|---|---|---|
+| `"kripfganz"` (default) | everyday work; precise values at any level, with p-values | cases 1-5, k = 1-10, F |
+| `"pss"` | reproducing published results exactly | cases 1-5, k = 0-10, F and t |
+| `"narayan"` | small samples, 30 ≤ T ≤ 80 | cases 2, 3, 5, k ≤ 7, F |
+
+Every shipped table documents its exact source and how it was
+cross-checked in
+[`PROVENANCE.md`](src/pyardl/critical_values/PROVENANCE.md). A Monte
+Carlo engine (`simulate_bounds`) is also available for configurations
+no published table covers.
+
+## Design choices
+
+A few decisions that shape how the library behaves:
+
+- **Inconclusive means inconclusive.** The bounds test genuinely has a
+  region where no conclusion follows. `pyardl` reports it as such, and
+  shows the p-value interval so the result can be read on a continuous
+  scale.
+- **Methodological warnings are real warnings.** Autocorrelated
+  residuals, an adjustment speed with the wrong sign, unstable dynamics:
+  each raises a `PyardlMethodologyWarning` you can turn into an error
+  with `warnings.filterwarnings("error", category=...)`.
+- **Confidence intervals are withheld when they would be invalid.** The
+  interval for the adjustment speed only appears once cointegration is
+  established, since its distribution is non-standard under the null.
+- **Nothing is silently substituted.** Asking for a critical value
+  outside a source's coverage raises an error naming a source that does
+  cover it, rather than quietly returning a neighbouring cell.
+
+## Validation
+
+Estimation results agree with `statsmodels.tsa.ardl` to 1e-10, and with
+the R `ARDL` package to 1e-6 on the Danish dataset. The bounds test
+reproduces the UK real-wage application of Pesaran, Shin & Smith (2001)
+to 1e-4 on both statistics. The shipped critical value tables were
+cross-checked cell by cell against independent sources and an internal
+Monte Carlo engine.
+
+```bash
+pytest -m "not slow"     # full suite
+pytest -m slow           # long Monte Carlo runs
+```
+
+## Status
+
+Version 0.1.0. The estimation core, the error-correction algebra, the
+bounds test and the critical-value machinery are implemented, tested
+and validated. Work continues on parameter-stability tests, unit-root
+pre-tests, bootstrap inference, and the non-linear and panel
+extensions.
+
+## References
+
+Pesaran, M. H., Shin, Y. & Smith, R. J. (2001). "Bounds Testing
+Approaches to the Analysis of Level Relationships", *Journal of Applied
+Econometrics*, 16(3), 289-326.
+
+Kripfganz, S. & Schneider, D. C. (2020). "Response Surface Regressions
+for Critical Value Bounds and Approximate p-values in Equilibrium
+Correction Models", *Oxford Bulletin of Economics and Statistics*,
+82(6), 1456-1481.
+
+Narayan, P. K. (2005). "The saving and investment nexus for China:
+evidence from cointegration tests", *Applied Economics*, 37(17),
+1979-1990.
+
+Banerjee, A., Dolado, J. & Mestre, R. (1998). "Error-correction
+Mechanism Tests for Cointegration in a Single-equation Framework",
+*Journal of Time Series Analysis*, 19(3), 267-283.
 
 ## Licence
 
-MIT — voir [LICENSE](LICENSE). Les valeurs critiques encodées
-proviennent de tables publiées (provenance et licences documentées dans
-[PROVENANCE.md](src/pyardl/critical_values/PROVENANCE.md)) ; aucun
-matériel tiers non licencié n'est redistribué.
+MIT — see [LICENSE](LICENSE). The encoded critical values come from
+published tables; their provenance and licensing are documented in
+[`PROVENANCE.md`](src/pyardl/critical_values/PROVENANCE.md). No
+third-party material is redistributed without a clear licence.

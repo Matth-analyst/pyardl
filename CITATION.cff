@@ -1,11 +1,11 @@
 cff-version: 1.2.0
 message: >-
-  Si vous utilisez pyardl dans vos travaux, merci de citer le logiciel
-  comme ci-dessous, ainsi que les articles méthodologiques sous-jacents
-  (Pesaran, Shin & Smith 2001 pour le bounds test ; Kripfganz &
-  Schneider 2020 pour les surfaces de réponse et p-values ; Narayan
-  2005 pour les bornes petits échantillons), référencés dans
-  docs/ardl_references.pdf et src/pyardl/critical_values/PROVENANCE.md.
+  If you use pyardl in your work, please cite the software as below, as
+  well as the underlying methodological articles: Pesaran, Shin & Smith
+  (2001) for the bounds test, Kripfganz & Schneider (2020) for the
+  response surfaces and p-values, and Narayan (2005) for the
+  small-sample bounds. Sources for every shipped critical value are
+  documented in src/pyardl/critical_values/PROVENANCE.md.
 type: software
 title: "pyardl: ARDL models and bounds-test cointegration in Python"
 authors:
@@ -13,8 +13,9 @@ authors:
     given-names: Komlan Matthania
     email: komlanadjohmatthania@gmail.com
 version: 0.1.0
-date-released: "2026-07-07"
+date-released: "2026-07-25"
 license: MIT
+repository-code: "https://github.com/Matth-analyst/pyardl"
 keywords:
   - econometrics
   - time series
@@ -23,9 +24,10 @@ keywords:
   - bounds test
   - error correction model
 abstract: >-
-  Bibliothèque Python d'économétrie des séries temporelles pour les
-  modèles ARDL : estimation ARDL/UECM, bounds tests de cointégration de
-  Pesaran-Shin-Smith (5 cas déterministes, décision jointe F+t),
-  valeurs critiques multi-sources avec provenance documentée (tables
-  PSS 2001, Narayan 2005, surfaces de réponse Kripfganz-Schneider avec
-  p-values) et moteur de simulation Monte Carlo reproductible.
+  A Python time-series econometrics library for ARDL models: ARDL and
+  UECM estimation, Pesaran-Shin-Smith bounds tests for cointegration
+  (five deterministic cases, joint F and t decision), multi-source
+  critical values with documented provenance (Pesaran, Shin & Smith
+  2001 tables, Narayan 2005 small-sample bounds, Kripfganz-Schneider
+  response surfaces with p-values), and a reproducible Monte Carlo
+  simulation engine.

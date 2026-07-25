@@ -1,13 +1,15 @@
 site_name: pyardl
 site_description: ARDL models, bounds tests for cointegration, and modern critical values in Python.
+repo_url: https://github.com/Matth-analyst/pyardl
 docs_dir: docs
 nav:
-  - Home: ../README.md
-  - Modules:
-      - core.transforms: modules/core_transforms.md
-      - core.ardl: modules/core_ardl.md
-      - bounds (PSS 2001): modules/bounds_pss.md
-      - critical_values: modules/critical_values.md
+  - Home: index.md
+  - Getting started: getting-started.md
+  - API reference:
+      - ARDL estimation: api/ardl.md
+      - Bounds test: api/bounds.md
+      - Critical values: api/critical-values.md
+      - ARDL/ECM algebra: api/transforms.md
 theme:
   name: material
 markdown_extensions:
