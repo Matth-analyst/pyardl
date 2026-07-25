@@ -91,7 +91,7 @@ class TestJointDecisionIntegration:
             res = bounds_test(y, x, case=2, order=(2, 1))
         assert res.decision_joint is None
 
-    def test_degenerate_suspicion_emits_warning_pointing_to_spec15(self) -> None:
+    def test_degenerate_suspicion_emits_warning(self) -> None:
         """DGP dégénéré de type 1 : relation en niveaux portée par x seul
         (lambda = 0, gamma != 0) -> F peut rejeter, t ne doit pas."""
         rng = np.random.default_rng(2)
@@ -108,13 +108,13 @@ class TestJointDecisionIntegration:
             )
         if res.decision_joint == "degenerate_suspicion":
             messages = [str(w.message) for w in caught]
-            assert any("spec 15" in m for m in messages)
-            assert any("dégénérescence" in m for m in messages)
+            assert any("degenerate" in m for m in messages)
+            assert any("F rejects but t does not" in m for m in messages)
 
     def test_summary_reports_joint_decision(self) -> None:
         y, x = _dgp_cointegrated(seed=3)
         res = bounds_test(y, x, case=3, order=(2, 1))
-        assert "décision jointe" in res.summary()
+        assert "joint decision" in res.summary()
 
 
 class TestUnilaterality:
@@ -131,7 +131,7 @@ class TestUnilaterality:
 
     def test_explosive_warns_degenerate_case(self) -> None:
         y, x = _dgp_explosive(seed=200)
-        with pytest.warns(DegenerateCaseWarning, match="lambda_hat"):
+        with pytest.warns(DegenerateCaseWarning, match="Estimated lambda"):
             bounds_test(y, x, case=3, order=(1, 1))
 
 
@@ -154,7 +154,7 @@ class TestAdjustmentCIRule:
             warnings.simplefilter("ignore")
             res = bounds_test(y, x, case=3, order=(2, 1))
         assert res.decision_joint != "cointegration"
-        with pytest.warns(PyardlMethodologyWarning, match="cointégration"):
+        with pytest.warns(PyardlMethodologyWarning, match="cointegration is not"):
             adj = res.adjustment()
         assert np.isfinite(adj["lambda"])  # l'estimée reste consultable
         assert np.isnan(adj["ci_lower"]) and np.isnan(adj["ci_upper"])
@@ -166,7 +166,7 @@ class TestAdjustmentCIRule:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             res = bounds_test(y, x, case=4, order=(2, 1))
-        with pytest.warns(PyardlMethodologyWarning, match="cointégration"):
+        with pytest.warns(PyardlMethodologyWarning, match="cointegration is not"):
             adj = res.adjustment()
         assert np.isnan(adj["ci_lower"])
 

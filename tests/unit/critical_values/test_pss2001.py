@@ -114,7 +114,7 @@ class TestCoverageExceptions:
 
     def test_t_case_ii_iv_raises(self) -> None:
         for case in (2, 4):
-            with pytest.raises(ValueError, match="ne publie pas de bornes t"):
+            with pytest.raises(ValueError, match="No t bounds are published"):
                 get_bounds("t", case=case, k=1, alpha=0.05)
 
     def test_alpha_025_served_by_internal_simulation(self) -> None:
@@ -123,11 +123,11 @@ class TestCoverageExceptions:
         toujours une exception explicite."""
         lo, up = get_bounds("F", case=3, k=1, alpha=0.025)
         assert 4.94 < lo < 6.84  # encadré par les 5 % et 1 % publiés
-        with pytest.raises(ValueError, match="non couvert"):
+        with pytest.raises(ValueError, match="is not covered"):
             get_bounds("F", case=3, k=1, alpha=0.20)
 
     def test_k_too_large_raises(self) -> None:
-        with pytest.raises(ValueError, match="hors des tables"):
+        with pytest.raises(ValueError, match="outside the published tables"):
             get_bounds("F", case=3, k=11, alpha=0.05)
 
     def test_bad_case_raises(self) -> None:

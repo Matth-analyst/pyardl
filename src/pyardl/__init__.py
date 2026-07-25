@@ -1,3 +1,3 @@
-"""pyardl — économétrie des modèles ARDL (estimation, bounds tests, bootstrap)."""
+"""pyardl: ARDL models and bounds tests for cointegration."""
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0"

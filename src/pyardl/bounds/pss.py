@@ -1,36 +1,44 @@
-r"""Bounds test PSS 2001 (spec 10) — le cœur de la bibliothèque.
+r"""Bounds test for the existence of a level relationship (PSS 2001).
 
-UECM (forme conditionnelle) :
+The test is run on the unrestricted error-correction form
 
     Δy_t = det_t + lam*y_{t-1} + sum_j gamma_j x_{j,t-1}
            + sum_i psi_i Δy_{t-i} + sum_j sum_i omega_{j,i} Δx_{j,t-i} + eps_t
 
-Tests (spec 10 §2) :
+and answers a question that ordinary cointegration tests cannot: is there
+a long-run relationship between y and the x's, *without* having to know
+first whether the regressors are I(0) or I(1)?
 
-1. ``F_overall`` : H0 : lam = gamma_1 = ... = gamma_k = 0 — pour les
-   cas II et IV, le déterministe restreint (c0, resp. c1) fait PARTIE du
-   vecteur testé (k+2 restrictions au lieu de k+1 — spec 10 §3.1,
-   vérifié par le test d'équivalence Wald/régression contrainte).
-2. ``t_BDM`` : H0 : lam = 0, test UNILATÉRAL GAUCHE exigeant
-   lam_hat < 0.
+Two statistics are computed:
 
-Décision à trois états :
-``"cointegration"`` / ``"no_cointegration"`` / ``"inconclusive"`` —
-jamais un booléen ; la zone non concluante est celle que les specs 13-16
-viennent résorber.
+1. ``F_overall`` tests ``lam = gamma_1 = ... = gamma_k = 0``, i.e. no
+   level relationship at all. Under cases II and IV the restricted
+   deterministic term is part of the tested vector, which gives ``k+2``
+   restrictions instead of ``k+1``.
+2. ``t_BDM`` tests ``lam = 0`` alone. It is a **left-tailed** test:
+   rejection requires an estimated ``lam`` that is negative, i.e. an
+   actual pull back towards equilibrium.
 
-Cas limite q_j = 0 (note spec 03, docs/QUESTIONS.md) : le régresseur
-entre dans le vecteur testé via son niveau CONTEMPORAIN x_{j,t} (pas de
-terme Δx_{j,t} distinct). x_{j,t} reste I(1) sous H0 — l'identité exacte
-x_{j,t} = x_{j,t-1} + Δx_{j,t} (écart stationnaire) laisse
-l'asymptotique du test inchangée ; seule la datation diffère d'une
-période.
+Because the limiting distributions depend on the unknown integration
+order of the regressors, critical values come in pairs: a lower bound
+(all regressors I(0)) and an upper bound (all regressors I(1)). The
+outcome therefore has **three** states rather than two —
+``"cointegration"``, ``"no_cointegration"`` and ``"inconclusive"`` when
+the statistic falls between the bounds.
 
-Références
+Note on ``q_j = 0``: a regressor with no lags of its own enters the
+tested vector through its contemporaneous level ``x_{j,t}``. This does
+not change the asymptotics, since ``x_{j,t} = x_{j,t-1} + Δx_{j,t}`` and
+the difference is stationary; only the dating shifts by one period.
+
+References
 ----------
 Pesaran, M. H., Shin, Y. & Smith, R. J. (2001). "Bounds Testing
-Approaches to the Analysis of Level Relationships", *J. Applied
-Econometrics*, 16(3), 289-326. Clé BibTeX : ``pesaran2001bounds``.
+Approaches to the Analysis of Level Relationships", *Journal of Applied
+Econometrics*, 16(3), 289-326.
+Banerjee, A., Dolado, J. & Mestre, R. (1998). "Error-correction
+Mechanism Tests for Cointegration in a Single-equation Framework",
+*Journal of Time Series Analysis*, 19(3), 267-283.
 """
 
 from __future__ import annotations
@@ -61,7 +69,7 @@ _CASE_RESTRICTED_DET = {2: "const", 4: "trend"}
 
 @dataclass
 class _UECMFit:
-    """Estimation OLS de l'UECM d'un cas donné (interne)."""
+    """OLS fit of the unrestricted error-correction model (internal)."""
 
     params: pd.Series
     cov: FloatArray
@@ -69,7 +77,7 @@ class _UECMFit:
     ssr: float
     design: FloatArray
     names: list[str]
-    tested: list[str]  # colonnes du vecteur testé par le F
+    tested: list[str]  # columns entering the F test
     lam_name: str
 
     @property
@@ -92,11 +100,13 @@ def _estimate_uecm(
     fixed: FloatArray | None = None,
     fixed_names: tuple[str, ...] = (),
 ) -> _UECMFit:
-    """Construit et estime l'UECM du cas demandé (design direct)."""
+    """Build and fit the error-correction model for the requested case."""
     n, k = x.shape
     start = max([p, *q]) if q else p
     if start < 1:
-        raise ValueError("p >= 1 requis pour l'UECM (Δy_t et y_{t-1}).")
+        raise ValueError(
+            "p >= 1 is required: the error-correction model needs y_{t-1}."
+        )
     dy = np.diff(y)
     dx = np.diff(x, axis=0)
 
@@ -121,8 +131,8 @@ def _estimate_uecm(
 
     for j, name in enumerate(x_names):
         if q[j] == 0:
-            # Niveau contemporain (convention q_j=0, docs/QUESTIONS.md) —
-            # reste I(1) sous H0, cf. module docstring.
+            # Contemporaneous level (q_j = 0 convention, see the module
+            # docstring): still I(1) under the null.
             cols.append(x[start:n, j])
             names.append(f"{name}.L0")
             tested.append(f"{name}.L0")
@@ -140,7 +150,7 @@ def _estimate_uecm(
             names.append(f"D.{name}.L{i}")
 
     if fixed is not None:
-        # z_t sans retards (ex. dummies) : hors du vecteur testé.
+        # Unlagged z_t (dummies and the like): never part of the tested vector.
         cols.extend(fixed[start:].T)
         names.extend(fixed_names)
 
@@ -150,7 +160,7 @@ def _estimate_uecm(
     coefs, _, rank, _ = np.linalg.lstsq(design, y_dep, rcond=None)
     if rank < design.shape[1]:
         warnings.warn(
-            "Design UECM singulier : covariance non fiable.",
+            "Singular design matrix: the covariance estimates are unreliable.",
             PyardlMethodologyWarning,
             stacklevel=3,
         )
@@ -176,8 +186,11 @@ def _estimate_uecm(
 
 
 def _wald_f(fit: _UECMFit) -> float:
-    """F de Wald sur les colonnes ``fit.tested`` (variance nonrobuste —
-    algébriquement identique au F par SSR restreint/non restreint)."""
+    """Wald F statistic on the tested columns.
+
+    Algebraically identical to the F computed from restricted and
+    unrestricted sums of squared residuals.
+    """
     idx = [fit.names.index(name) for name in fit.tested]
     r_vec = fit.params.to_numpy()[idx]
     v_sub = fit.cov[np.ix_(idx, idx)]
@@ -193,18 +206,18 @@ JointDecision = Literal[
 def _joint_decision(
     decision_f: Decision, decision_t: Decision | None
 ) -> JointDecision | None:
-    """Décision jointe F + t (spec 11 §2.3, préparation du cadre SMG).
+    """Combine the F and t decisions into a single verdict.
 
-    La cointégration exige la concordance des DEUX tests (Banerjee-
-    Dolado-Mestre 1998 ; Sam-McNown-Goh 2019, spec 15) :
+    Establishing a level relationship requires **both** tests to agree:
 
-    - F et t rejettent -> ``"cointegration"`` ;
-    - F rejette mais pas t -> ``"degenerate_suspicion"`` (dégénérescence
-      de type 1 : les gamma seuls portent la relation, pas de force de
-      rappel — classification complète : spec 15) ;
-    - aucun ne rejette -> ``"no_cointegration"`` ;
-    - toute autre discordance -> ``"inconclusive"`` ;
-    - t non tabulé (cas II/IV) -> ``None`` (logique jointe indisponible).
+    - both reject -> ``"cointegration"``;
+    - F rejects but t does not -> ``"degenerate_suspicion"``. The level
+      terms are jointly significant, yet y shows no pull back towards
+      equilibrium; the apparent relationship is likely carried by the
+      regressors alone;
+    - neither rejects -> ``"no_cointegration"``;
+    - any other disagreement -> ``"inconclusive"``;
+    - t unavailable (cases II and IV) -> ``None``.
     """
     if decision_t is None:
         return None
@@ -218,8 +231,8 @@ def _joint_decision(
 
 
 def _classify(stat: float, lower: float, upper: float, *, left_tail: bool) -> Decision:
-    """Décision à trois états."""
-    if left_tail:  # t_BDM : rejet si t < borne I(1) (plus négative)
+    """Classify a statistic against its bounds, in three states."""
+    if left_tail:  # t_BDM: reject when t is below the (more negative) I(1) bound
         if stat < upper:
             return "cointegration"
         if stat > lower:
@@ -234,7 +247,30 @@ def _classify(stat: float, lower: float, upper: float, *, left_tail: bool) -> De
 
 @dataclass
 class BoundsTestResults:
-    """Résultat du bounds test PSS 2001 (spec 10 §5)."""
+    """Outcome of a bounds test.
+
+    Attributes
+    ----------
+    f_stat, t_stat : float
+        The two test statistics.
+    decision_f, decision_t : str or None
+        Three-state verdicts, ``"cointegration"`` / ``"no_cointegration"``
+        / ``"inconclusive"``. ``decision_t`` is ``None`` when no t bounds
+        are available for the chosen case and critical-value source.
+    decision_joint : str or None
+        Combined verdict, see the module documentation. May also be
+        ``"degenerate_suspicion"``.
+    bounds : pandas.DataFrame
+        Lower and upper bounds for F and t at the 10%, 5% and 1% levels.
+    p_values : pandas.Series or None
+        Approximate p-values at both bounds, when the critical-value
+        source provides them.
+    uecm : pandas.DataFrame
+        Coefficients, standard errors and t-ratios of the fitted
+        error-correction model.
+    case, k, order, alpha, cv_source
+        Settings the test was run with.
+    """
 
     case: int
     k: int
@@ -252,15 +288,25 @@ class BoundsTestResults:
     _fit: _UECMFit = field(repr=False)
 
     def adjustment(self, alpha: float = 0.05) -> pd.Series:
-        """Vitesse d'ajustement lambda avec IC conditionnel (spec 11 §2.4).
+        """Adjustment speed with a confidence interval, when it is valid.
 
-        L'IC standard sur lambda n'est valide que SOUS cointégration
-        établie (distribution non standard sous H0) : si la décision
-        jointe n'est pas ``"cointegration"``, les bornes d'IC sont NaN
-        et un warning méthodologique est émis (piège connu —
-        « ne jamais afficher d'IC sur la vitesse d'ajustement avant
-        cointégration établie »). L'estimée ponctuelle et son se restent
-        consultables.
+        The usual normal confidence interval for ``lambda`` is only valid
+        **once cointegration has been established**: under the null the
+        distribution is non-standard, so an interval computed anyway would
+        be misleading. If the joint decision is not ``"cointegration"``,
+        the bounds are returned as NaN together with a
+        :class:`~pyardl.exceptions.PyardlMethodologyWarning`; the point
+        estimate and its standard error remain available.
+
+        Parameters
+        ----------
+        alpha : float
+            Significance level of the interval.
+
+        Returns
+        -------
+        pandas.Series
+            ``lambda``, ``se``, ``ci_lower`` and ``ci_upper``.
         """
         from scipy.stats import norm
 
@@ -272,10 +318,10 @@ class BoundsTestResults:
             ci_lower, ci_upper = lam - z * se, lam + z * se
         else:
             warnings.warn(
-                "IC sur lambda masqué : la cointégration n'est pas établie "
-                f"(décision jointe : {self.decision_joint}) — l'IC standard "
-                "sur la vitesse d'ajustement n'est valide que sous "
-                "cointégration (spec 11 §2.4).",
+                "Confidence interval withheld: cointegration is not "
+                f"established (joint decision: {self.decision_joint}). The "
+                "standard interval for the adjustment speed is only valid "
+                "under cointegration.",
                 PyardlMethodologyWarning,
                 stacklevel=2,
             )
@@ -286,8 +332,14 @@ class BoundsTestResults:
         )
 
     def diagnostics(self) -> pd.DataFrame:
-        """Ljung-Box, Jarque-Bera, Breusch-Pagan sur les résidus UECM
-        (CUSUM/CUSUMSQ arrivent avec la spec 26)."""
+        """Residual diagnostics of the fitted error-correction model.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Ljung-Box (autocorrelation), Jarque-Bera (normality) and
+            Breusch-Pagan (heteroskedasticity), with p-values.
+        """
         resid = self._fit.resid
         lb_lags = max(1, min(10, len(resid) // 5))
         lb = acorr_ljungbox(resid, lags=[lb_lags])
@@ -309,50 +361,53 @@ class BoundsTestResults:
         )
 
     def summary(self) -> str:
-        """Présentation type publication : stats, p-values aux deux
-        bornes (spec 13), bornes aux 3 seuils, décisions (avec lecture
-        continue de la zone non concluante)."""
+        """Return a readable report of the test as a string.
+
+        Shows both statistics, their p-values at each bound when
+        available, the decisions, and the critical value bounds at the
+        10%, 5% and 1% levels. When the F decision is inconclusive, the
+        p-value interval is displayed so that the result can be read on a
+        continuous scale rather than as a bare verdict.
+        """
         p, q = self.order
         q_desc = ", ".join(f"{n}:{v}" for n, v in q.items())
 
         decision_f_txt: str = self.decision_f
         if self.decision_f == "inconclusive" and self.p_values is not None:
-            # lecture continue de la zone non concluante (spec 13 §2.1.4)
             decision_f_txt = (
-                f"inconclusive, p ∈ [{self.p_values['p_I1']:.4f}, "
+                f"inconclusive, p in [{self.p_values['p_I1']:.4f}, "
                 f"{self.p_values['p_I0']:.4f}]"
             )
         p_line = (
-            f"p-values F (K&S 2020) : p_I0 = {self.p_values['p_I0']:.4f}, "
+            f"F p-values: p_I0 = {self.p_values['p_I0']:.4f}, "
             f"p_I1 = {self.p_values['p_I1']:.4f}"
             if self.p_values is not None
-            else "p-values F : indisponibles (k hors couverture des surfaces)"
+            else "F p-values: unavailable for this number of regressors"
         )
         if self.p_values is not None and "t_p_I0" in self.p_values.index:
             p_line += (
-                f"\np-values t (K&S 2020) : p_I0 = "
-                f"{self.p_values['t_p_I0']:.4f}, "
+                f"\nt p-values: p_I0 = {self.p_values['t_p_I0']:.4f}, "
                 f"p_I1 = {self.p_values['t_p_I1']:.4f}"
             )
 
         lines = [
-            f"Bounds test PSS 2001 — cas {self.case}, k={self.k}, "
-            f"UECM({p}; {q_desc}), cv_source={self.cv_source}",
+            f"Bounds test (Pesaran, Shin & Smith 2001) - case {self.case}, "
+            f"k={self.k}, ECM({p}; {q_desc}), critical values: {self.cv_source}",
             "",
-            f"F_overall = {self.f_stat:.4f}   décision ({self.alpha:.0%}) : "
+            f"F_overall = {self.f_stat:.4f}   decision ({self.alpha:.0%}): "
             f"{decision_f_txt}",
             p_line,
-            f"t_BDM     = {self.t_stat:.4f}   décision ({self.alpha:.0%}) : "
+            f"t_BDM     = {self.t_stat:.4f}   decision ({self.alpha:.0%}): "
             + (
                 self.decision_t
                 if self.decision_t is not None
-                else f"non tabulé (cas {self.case})"
+                else f"not tabulated for case {self.case}"
             ),
-            "décision jointe F+t (spec 11) : "
+            "joint decision (F and t): "
             + (
                 self.decision_joint
                 if self.decision_joint is not None
-                else f"indisponible (cas {self.case}, t non tabulé)"
+                else f"unavailable (case {self.case}, no t bounds)"
             ),
             "",
             self.bounds.to_string(float_format=lambda v: f"{v: .3f}"),
@@ -376,14 +431,13 @@ def _finalize_results(
     p_values: pd.Series | None,
     fit: _UECMFit,
 ) -> BoundsTestResults:
-    """Garde-fou d'autocorrélation (spec 09 §2.2) + assemblage du résultat."""
+    """Run the autocorrelation check and assemble the result object."""
     lb_lags = max(1, min(10, fit.nobs // 5))
     lb_p = float(acorr_ljungbox(fit.resid, lags=[lb_lags])["lb_pvalue"].iloc[0])
     if lb_p < 0.05:
         warnings.warn(
-            f"Erreurs autocorrélées (Ljung-Box p={lb_p:.4f} < 0.05) : le "
-            "bounds test n'est pas fiable ; augmenter p/q (Pesaran-Shin "
-            "1998, spec 09 §2.2).",
+            f"Autocorrelated residuals (Ljung-Box p={lb_p:.4f} < 0.05): the "
+            "bounds test is not reliable. Increase p/q.",
             PyardlMethodologyWarning,
             stacklevel=3,
         )
@@ -420,88 +474,105 @@ def bounds_test(
     finite_t: bool = False,
     fixed_regressors: npt.ArrayLike | None = None,
 ) -> BoundsTestResults:
-    """Bounds test de cointégration PSS 2001 (spec 10 §5 — fonction phare).
+    """Test whether a long-run level relationship exists between y and x.
+
+    Fits the unrestricted error-correction model and confronts the F and
+    t statistics with the appropriate pair of critical value bounds. See
+    the module documentation for the interpretation of the three-state
+    outcome.
 
     Parameters
     ----------
     y, x : array-like
-        Variable dépendante et régresseurs de niveau.
+        Dependent variable and level regressors.
     case : int
-        Cas déterministe PSS (1 à 5, spec 10 §3). Cas III le plus commun.
+        Deterministic case, 1 to 5, following Pesaran, Shin & Smith:
+
+        =====  ===============  ===============
+        case   intercept        trend
+        =====  ===============  ===============
+        1      none             none
+        2      restricted       none
+        3      unrestricted     none
+        4      unrestricted     restricted
+        5      unrestricted     unrestricted
+        =====  ===============  ===============
+
+        Case 3 is the most common choice in applied work.
     order : tuple (p, q), optional
-        Ordres de l'UECM. Si None, sélection automatique par
-        :meth:`ARDL.select_order` (critère ``ic``, bornes ``max_p``,
-        ``max_q``) sur la forme ARDL puis transformation.
+        Lag orders. If omitted, they are selected automatically with
+        :meth:`~pyardl.core.ardl.ARDL.select_order` using ``ic``,
+        ``max_p`` and ``max_q``.
+    ic : {"aic", "bic", "hq"}
+        Criterion used when ``order`` is not given.
+    max_p, max_q : int
+        Search bounds used when ``order`` is not given.
     alpha : float
-        Seuil des bornes utilisé pour la décision (le tableau
-        ``bounds`` rapporte tous les seuils disponibles).
+        Significance level driving the reported decisions. The ``bounds``
+        table always reports the 10%, 5% and 1% levels.
     cv_source : {"kripfganz", "pss", "narayan"}
-        Source des valeurs critiques (politique : spec 12 §2.4 ;
-        hiérarchie : pyardl.critical_values). "kripfganz" (DÉFAUT
-        depuis la spec 13) : surfaces de réponse via statsmodels — CV F
-        asymptotiques précis à tout seuil + p-values aux deux bornes ;
-        les bornes t restent celles de PSS 2001 (composition
-        documentée : le matériel voie A1 ne couvre pas le t ; k=0 non
-        couvert). "pss" : valeurs publiées à l'identique (reproduction
-        de la littérature). "narayan" : petits échantillons (T = nobs
-        de l'UECM, interpolation ; cas II/III/V, F seulement),
-        recommandé si 30 <= T <= 80.
+        Where the critical values come from.
+
+        - ``"kripfganz"`` (default): response surfaces, giving precise
+          asymptotic F bounds at any level plus p-values at both bounds.
+          The t bounds fall back to the published PSS tables.
+        - ``"pss"``: the values published in PSS (2001), served
+          unchanged. Use this to reproduce published results exactly.
+        - ``"narayan"``: small-sample bounds (Narayan 2005), recommended
+          when ``30 <= T <= 80``, where asymptotic bounds over-reject.
+          Covers cases 2, 3 and 5, and the F statistic only.
     finite_t : bool
-        **EXPÉRIMENTAL, NON VALIDÉ (bloqué par une demande de
-        permission en cours auprès des auteurs — voie A3, cf.
-        ``docs/correspondence/2026-07-10_ks_license_draft.md`` et
-        ``docs/DEVIATIONS.md``).** Si True (avec
-        ``cv_source="kripfganz"``) : bornes F ET t et p-values
-        ajustées à la taille d'échantillon par les surfaces de réponse
-        complètes de K&S (voie A2) — nécessite le téléchargement
-        préalable des coefficients depuis le site des auteurs
-        (``pyardl.critical_values.ks2020_finite.
-        download_surface_coefs()``, NE PAS APPELER avant réception de
-        l'autorisation ; non redistribués par pyardl). Le mapping des
-        cas 2/4 vers les surfaces 3/5 pour le t est lu dans le source
-        des auteurs mais n'est pas revalidé empiriquement. Ne pas
-        utiliser en production.
+        Experimental and not validated; see
+        :mod:`pyardl.critical_values.ks2020_finite`. Requires
+        ``cv_source="kripfganz"``.
     fixed_regressors : array-like, shape (T, m), optional
-        Variables z_t sans retards (ex. dummies), hors du vecteur testé
-        (non prises en compte par la sélection d'ordre automatique).
+        Variables entered without lags, such as dummies. They are never
+        part of the tested vector, and are ignored by automatic order
+        selection.
 
     Returns
     -------
     BoundsTestResults
-        Statistiques, bornes, décisions à trois états, UECM estimé,
-        diagnostics.
 
     Notes
     -----
-    Hypothèses de validité à vérifier par l'utilisateur (spec 10 §1) :
-    x faiblement exogènes, pas de cointégration entre les x (spec 07),
-    aucune variable I(2) (spec 27), erreurs non autocorrélées (un
-    warning est émis automatiquement si Ljung-Box < 5 %).
+    The test is valid under assumptions you should check separately: the
+    regressors are weakly exogenous, they are not themselves
+    cointegrated, no variable is I(2), and the residuals are not
+    autocorrelated. The last one is checked automatically and a warning
+    is issued if the Ljung-Box test rejects.
+
+    Examples
+    --------
+    >>> from pyardl.bounds import bounds_test
+    >>> from pyardl.datasets import load_denmark
+    >>> data = load_denmark()
+    >>> res = bounds_test(
+    ...     data["LRM"], data[["LRY", "IBO", "IDE"]],
+    ...     case=3, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}),
+    ... )
+    >>> res.decision_f
+    'cointegration'
     """
     if case not in (1, 2, 3, 4, 5):
-        raise ValueError(f"case doit être dans 1..5, reçu {case}.")
+        raise ValueError(f"case must be between 1 and 5, got {case}.")
     if cv_source not in ("kripfganz", "pss", "narayan"):
-        raise ValueError(f"cv_source inconnu : {cv_source!r}.")
+        raise ValueError(f"Unknown cv_source: {cv_source!r}.")
     if finite_t and cv_source != "kripfganz":
-        raise ValueError(
-            'finite_t=True requiert cv_source="kripfganz" (surfaces de '
-            "réponse complètes, voie A2)."
-        )
+        raise ValueError('finite_t=True requires cv_source="kripfganz".')
     if finite_t:
         warnings.warn(
-            "finite_t=True (voie A2, surfaces K&S complètes) est "
-            "EXPÉRIMENTAL et NON VALIDÉ : la demande de permission "
-            "d'usage auprès des auteurs est en cours (voie A3, cf. "
-            "docs/DEVIATIONS.md) et aucune comparaison recevable à une "
-            "sortie Stata de référence n'a été effectuée. Ne pas "
-            "utiliser en production.",
+            "finite_t=True is experimental and not validated: permission to "
+            "use the underlying coefficient file is still pending with its "
+            "authors, and no admissible comparison against a reference "
+            "implementation has been carried out. Do not use in production.",
             PyardlMethodologyWarning,
             stacklevel=2,
         )
 
     y_arr, x_arr, _, y_name, x_names = check_series(y, x)
     if x_arr is None:
-        raise ValueError("bounds_test requiert des régresseurs x.")
+        raise ValueError("bounds_test requires x regressors.")
     k = x_arr.shape[1]
 
     if order is None:
@@ -543,16 +614,15 @@ def bounds_test(
 
     decision_t: Decision | None
 
-    # bornes à tous les seuils disponibles (F : source choisie ; t : tables
-    # PSS, sauf finite_t=True où les surfaces K&S couvrent aussi le t)
+    # Bounds at every available level. The F bounds come from the chosen
+    # source; the t bounds come from the PSS tables unless finite_t is set.
     if finite_t:
         from pyardl.critical_values.ks2020_finite import (
             crit_value_bounds_finite,
             pvalue_bounds_finite,
         )
 
-        # sr = coefficients de court terme, régresseurs fixes inclus
-        # (convention Stata ardl, validée contre la sortie SJ 2023)
+        # sr = number of short-run coefficients, fixed regressors included
         sr = (p - 1) + sum(q) + len(fixed_names)
         rows = []
         for a in (0.10, 0.05, 0.01):
@@ -569,9 +639,9 @@ def bounds_test(
         decision_t = _classify(t_stat, t_lo, t_up, left_tail=True)
         if lam_hat >= 0:
             warnings.warn(
-                f"lambda_hat = {lam_hat:.4f} >= 0 : pas de force de rappel "
-                "vers l'équilibre ; le t_BDM (unilatéral GAUCHE) n'a pas "
-                "d'interprétation de cointégration.",
+                f"Estimated lambda = {lam_hat:.4f} >= 0: there is no pull "
+                "back towards equilibrium, so the left-tailed t test has no "
+                "cointegration interpretation here.",
                 DegenerateCaseWarning,
                 stacklevel=2,
             )
@@ -580,8 +650,8 @@ def bounds_test(
         decision_joint = _joint_decision(decision_f, decision_t)
         if decision_joint == "degenerate_suspicion":
             warnings.warn(
-                "F rejette mais pas t : suspicion de dégénérescence de "
-                "type 1 (spec 15).",
+                "F rejects but t does not: the level relationship may be "
+                "degenerate (see the joint decision).",
                 PyardlMethodologyWarning,
                 stacklevel=2,
             )
@@ -632,11 +702,10 @@ def bounds_test(
     if cv_source == "narayan" and case in (3, 5):
         decision_t = None
         warnings.warn(
-            "Narayan 2005 ne publie pas de bornes t : décision t "
-            'indisponible avec cv_source="narayan" — le t_stat est '
-            'rapporté ; utiliser cv_source="pss" pour une décision t '
-            "asymptotique (en petit échantillon elle serait trop "
-            "libérale, spec 12 §1).",
+            "Narayan (2005) publishes no t bounds, so no t decision is "
+            'available with cv_source="narayan". The statistic is still '
+            'reported; use cv_source="pss" for an asymptotic t decision, '
+            "bearing in mind it over-rejects in small samples.",
             PyardlMethodologyWarning,
             stacklevel=2,
         )
@@ -645,9 +714,9 @@ def bounds_test(
         decision_t = _classify(t_stat, t_lo, t_up, left_tail=True)
         if lam_hat >= 0:
             warnings.warn(
-                f"lambda_hat = {lam_hat:.4f} >= 0 : pas de force de rappel "
-                "vers l'équilibre ; le t_BDM (unilatéral GAUCHE) n'a pas "
-                "d'interprétation de cointégration.",
+                f"Estimated lambda = {lam_hat:.4f} >= 0: there is no pull "
+                "back towards equilibrium, so the left-tailed t test has no "
+                "cointegration interpretation here.",
                 DegenerateCaseWarning,
                 stacklevel=2,
             )
@@ -655,9 +724,9 @@ def bounds_test(
     else:
         decision_t = None
         warnings.warn(
-            f"Cas {case} : PSS 2001 ne tabule pas le t_BDM pour les cas à "
-            "déterministes restreints — décision t indisponible, utiliser "
-            "le F_overall.",
+            f"Case {case}: PSS (2001) does not tabulate the t statistic for "
+            "cases with restricted deterministics, so no t decision is "
+            "available. Use the F statistic.",
             PyardlMethodologyWarning,
             stacklevel=2,
         )
@@ -665,16 +734,15 @@ def bounds_test(
     decision_joint = _joint_decision(decision_f, decision_t)
     if decision_joint == "degenerate_suspicion":
         warnings.warn(
-            "F rejette mais pas t : suspicion de dégénérescence de type 1 "
-            "(les gamma seuls portent la relation de niveaux, pas de force "
-            "de rappel en y) — la cointégration n'est PAS établie ; le "
-            "cadre à 3 tests de Sam-McNown-Goh 2019 (spec 15) classifie "
-            "formellement ce cas.",
+            "F rejects but t does not: the level terms are jointly "
+            "significant, yet y shows no pull back towards equilibrium. The "
+            "relationship may be degenerate; cointegration is NOT "
+            "established.",
             PyardlMethodologyWarning,
             stacklevel=2,
         )
 
-    # p-values approchées du F aux deux bornes (spec 13, surfaces K&S)
+    # Approximate p-values at both bounds, when the source provides them
     p_values: pd.Series | None
     if 1 <= k <= 10:
         from pyardl.critical_values import pvalue_bounds

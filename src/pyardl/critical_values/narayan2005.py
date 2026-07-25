@@ -1,15 +1,16 @@
-"""Tables de Narayan (2005) — bornes F petits échantillons (spec 12 §2.1).
+"""Small-sample F bounds from Narayan (2005).
 
-Source primaire : Narayan, P. K. (2005), 'The saving and investment
-nexus for China: evidence from cointegration tests', *Applied
-Economics*, 37(17), 1979-1990 — tables « Case II / III / V »,
-T = 30..80 (pas de 5), k = 0..7, seuils 10/5/1 %, statistique F
-uniquement (Narayan ne publie pas de bornes t).
+Critical value bounds for the F statistic at sample sizes between 30 and
+80 observations, where the asymptotic bounds are noticeably too liberal.
+Covers cases 2, 3 and 5, ``k = 0..7``, at the 10%, 5% and 1% levels; the
+article publishes no t bounds.
 
-Canal de transcription et recoupement : voir PROVENANCE.md (même
-protocole que les tables PSS 2001). Fichier GÉNÉRÉ par
-validation/external/extract_narayan_tables.py — ne pas éditer à la
-main."""
+Source: Narayan, P. K. (2005), "The saving and investment nexus for
+China: evidence from cointegration tests", *Applied Economics*, 37(17),
+1979-1990. Provenance and cross-checks: see PROVENANCE.md.
+
+This file is generated; do not edit it by hand.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ import numpy.typing as npt
 T_GRID: tuple[int, ...] = (30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80)
 MAX_K_NARAYAN = 7
 
-# {T: {case: array (8, 3, 2)}} — (k, seuil 10/5/1 %, borne I0/I1)
+# {T: {case: array (8, 3, 2)}}: (k, level 10/5/1%, bound I0/I1)
 _RAW = {
     30: {
         2: [

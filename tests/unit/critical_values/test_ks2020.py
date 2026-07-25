@@ -165,7 +165,7 @@ class TestCoverageExceptions:
     """couverture manquante = exception explicite."""
 
     def test_t_stat_raises(self) -> None:
-        with pytest.raises(ValueError, match="ne couvre pas le t_BDM"):
+        with pytest.raises(ValueError, match="does not cover the t statistic"):
             get_bounds("t", case=3, k=1, alpha=0.05, cv_source="kripfganz")
 
     def test_k0_raises(self) -> None:
@@ -173,11 +173,11 @@ class TestCoverageExceptions:
             crit_value_bounds(case=3, k=0, alpha=0.05)
 
     def test_k_too_large_raises(self) -> None:
-        with pytest.raises(ValueError, match="hors couverture"):
+        with pytest.raises(ValueError, match="outside the covered range"):
             crit_value_bounds(case=3, k=11, alpha=0.05)
 
     def test_alpha_out_of_domain_raises(self) -> None:
-        with pytest.raises(ValueError, match="domaine"):
+        with pytest.raises(ValueError, match="outside the reliable range"):
             crit_value_bounds(case=3, k=1, alpha=0.5)
 
     def test_bad_case_raises(self) -> None:

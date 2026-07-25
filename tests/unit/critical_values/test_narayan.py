@@ -125,7 +125,7 @@ class TestInterpolationAndCoverage:
 
     def test_out_of_range_falls_back_to_pss_with_warning(self) -> None:
         """Spec 12 §3.2 : hors plage -> warning + asymptotique."""
-        with pytest.warns(PyardlMethodologyWarning, match="hors de la plage"):
+        with pytest.warns(PyardlMethodologyWarning, match="outside the range"):
             got = get_bounds(
                 "F", case=3, k=1, alpha=0.05, cv_source="narayan", t_obs=200
             )
@@ -140,11 +140,11 @@ class TestInterpolationAndCoverage:
                 )
 
     def test_t_stat_raises(self) -> None:
-        with pytest.raises(ValueError, match="bornes F"):
+        with pytest.raises(ValueError, match="only publishes F bounds"):
             get_bounds("t", case=3, k=1, alpha=0.05, cv_source="narayan", t_obs=40)
 
     def test_k_too_large_raises(self) -> None:
-        with pytest.raises(ValueError, match="k <= 7"):
+        with pytest.raises(ValueError, match="exceeds the Narayan tables"):
             get_bounds("F", case=3, k=8, alpha=0.05, cv_source="narayan", t_obs=40)
 
     def test_missing_t_obs_raises(self) -> None:

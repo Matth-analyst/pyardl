@@ -1,19 +1,19 @@
-"""Bornes asymptotiques du bounds test PSS 2001 (spec 10 §4).
+"""Asymptotic critical value bounds published by Pesaran, Shin & Smith.
 
-Tables CI(i)-(v) (statistique F) et CII(i)/(iii)/(v) (statistique t) de
-Pesaran, Shin & Smith (2001), pp. 300-303. Provenance détaillée, seconde
-source de recoupement et limitations de couverture : voir PROVENANCE.md
-dans ce dossier — NE PAS modifier ces nombres sans mettre PROVENANCE.md
-à jour.
+Tables CI(i)-(v) for the F statistic and CII(i)/(iii)/(v) for the t
+statistic, from Pesaran, Shin & Smith (2001), pp. 300-303.
 
-Couverture : cas I-V, k = 0..10, seuils 10 %, 5 %, 2.5 %, 1 %. Les
-seuils 10/5/1 % sont les valeurs PUBLIÉES par PSS 2001 (servies à
-l'identique — fonction : reproduction de la littérature) ; le seuil
-2.5 % provient du moteur de simulation interne (spec 12,
-``pss2001_p025.py``, provenance distincte — marqué needs_review jusqu'à
-vérification contre l'article original). Toute combinaison non couverte
-lève une exception explicite — jamais de
-substitution silencieuse.
+Coverage: cases 1 to 5, ``k = 0..10``, at the 10%, 5%, 2.5% and 1%
+levels. The 10/5/1% values are the ones printed in the article, served
+unchanged so that published results can be reproduced exactly. The 2.5%
+level is not part of the transcribed tables and is supplied by internal
+simulation instead (see ``pss2001_p025``), which is why its provenance
+is documented separately.
+
+Any combination outside this coverage raises an explicit error rather
+than silently substituting a neighbouring value. Provenance and
+cross-checks: see ``PROVENANCE.md`` next to this module; do not edit
+these numbers without updating it.
 """
 
 from __future__ import annotations
@@ -28,11 +28,11 @@ __all__ = ["get_bounds", "LEVELS", "MAX_K"]
 LEVELS: tuple[float, ...] = (0.10, 0.05, 0.01)
 MAX_K = 10
 
-# Chaque table : shape (11, 3, 2) = (k = 0..10, seuil ∈ {10%, 5%, 1%},
-# borne ∈ {I(0), I(1)}). Source : PSS 2001, tables CI/CII (PROVENANCE.md).
+# Each table has shape (11, 3, 2): k = 0..10, level in {10%, 5%, 1%},
+# bound in {I(0), I(1)}. Source: PSS (2001), tables CI and CII.
 
 _F = {
-    # Table CI(i) — cas I : ni constante ni tendance
+    # Table CI(i) - case 1: no intercept, no trend
     1: [
         [(3.00, 3.00), (4.20, 4.20), (7.17, 7.17)],
         [(2.44, 3.28), (3.15, 4.11), (4.81, 6.02)],
@@ -46,7 +46,7 @@ _F = {
         [(1.63, 2.75), (1.86, 3.05), (2.34, 3.68)],
         [(1.60, 2.72), (1.82, 2.99), (2.26, 3.60)],
     ],
-    # Table CI(ii) — cas II : constante restreinte, pas de tendance
+    # Table CI(ii) - case 2: restricted intercept, no trend
     2: [
         [(3.80, 3.80), (4.60, 4.60), (6.44, 6.44)],
         [(3.02, 3.51), (3.62, 4.16), (4.94, 5.58)],
@@ -60,7 +60,7 @@ _F = {
         [(1.80, 2.80), (2.04, 3.08), (2.50, 3.68)],
         [(1.76, 2.77), (1.98, 3.04), (2.41, 3.61)],
     ],
-    # Table CI(iii) — cas III : constante non restreinte, pas de tendance
+    # Table CI(iii) - case 3: unrestricted intercept, no trend
     3: [
         [(6.58, 6.58), (8.21, 8.21), (11.79, 11.79)],
         [(4.04, 4.78), (4.94, 5.73), (6.84, 7.84)],
@@ -74,7 +74,7 @@ _F = {
         [(1.88, 2.99), (2.14, 3.30), (2.65, 3.97)],
         [(1.83, 2.94), (2.06, 3.24), (2.54, 3.86)],
     ],
-    # Table CI(iv) — cas IV : constante non restreinte, tendance restreinte
+    # Table CI(iv) - case 4: unrestricted intercept, restricted trend
     4: [
         [(5.37, 5.37), (6.29, 6.29), (8.26, 8.26)],
         [(4.05, 4.49), (4.68, 5.15), (6.10, 6.73)],
@@ -88,7 +88,7 @@ _F = {
         [(2.05, 3.02), (2.30, 3.33), (2.79, 3.93)],
         [(1.98, 2.97), (2.21, 3.25), (2.68, 3.84)],
     ],
-    # Table CI(v) — cas V : constante et tendance non restreintes
+    # Table CI(v) - case 5: unrestricted intercept and trend
     5: [
         [(9.81, 9.81), (11.64, 11.64), (15.73, 15.73)],
         [(5.59, 6.26), (6.56, 7.30), (8.74, 9.63)],
@@ -105,7 +105,7 @@ _F = {
 }
 
 _T = {
-    # Table CII(i) — cas I
+    # Table CII(i) - case 1
     1: [
         [(-1.62, -1.62), (-1.95, -1.95), (-2.58, -2.58)],
         [(-1.62, -2.28), (-1.95, -2.60), (-2.58, -3.22)],
@@ -119,7 +119,7 @@ _T = {
         [(-1.62, -4.26), (-1.95, -4.61), (-2.58, -5.25)],
         [(-1.62, -4.42), (-1.95, -4.76), (-2.58, -5.44)],
     ],
-    # Table CII(iii) — cas III
+    # Table CII(iii) - case 3
     3: [
         [(-2.57, -2.57), (-2.86, -2.86), (-3.43, -3.43)],
         [(-2.57, -2.91), (-2.86, -3.22), (-3.43, -3.82)],
@@ -133,7 +133,7 @@ _T = {
         [(-2.57, -4.56), (-2.86, -4.88), (-3.43, -5.54)],
         [(-2.57, -4.69), (-2.86, -5.03), (-3.43, -5.68)],
     ],
-    # Table CII(v) — cas V
+    # Table CII(v) - case 5
     5: [
         [(-3.13, -3.13), (-3.41, -3.41), (-3.96, -3.97)],
         [(-3.13, -3.40), (-3.41, -3.69), (-3.96, -4.26)],
@@ -163,34 +163,33 @@ def get_bounds(
     k: int,
     alpha: float,
 ) -> tuple[float, float]:
-    """Bornes asymptotiques PSS 2001 pour le bounds test (spec 10 §4.2).
+    """Return the published asymptotic bounds for the requested cell.
 
     Parameters
     ----------
     stat : {"F", "t"}
-        Statistique testée : F_overall ou t_BDM.
+        Which statistic the bounds are for.
     case : int
-        Cas déterministe PSS (1 à 5). Le t n'est tabulé que pour les cas
-        I, III et V (PSS 2001 ne publie pas de bornes t pour les cas à
-        déterministes restreints).
+        Deterministic case, 1 to 5. The t statistic is only tabulated for
+        cases 1, 3 and 5; the article publishes no t bounds for the cases
+        with restricted deterministics.
     k : int
-        Nombre de régresseurs de niveau (0 à 10).
+        Number of level regressors, 0 to 10.
     alpha : float
-        Seuil : 0.10, 0.05 ou 0.01. Le seuil 2.5 % de l'article n'est
-        pas encore couvert (dette spec 12, cf. PROVENANCE.md).
+        Significance level: 0.10, 0.05, 0.025 or 0.01.
 
     Returns
     -------
-    (lower, upper) : tuple of float
-        Borne I(0) (inférieure) et borne I(1) (supérieure). Pour le t,
-        « inférieure/supérieure » s'entend en valeur absolue : la borne
-        I(1) est la plus négative (test unilatéral gauche).
+    tuple of float
+        Lower bound (all regressors I(0)) and upper bound (all I(1)).
+        For the t statistic the test is left-tailed, so the "upper" bound
+        is the more negative of the two.
 
     Raises
     ------
     ValueError
-        Combinaison non couverte par les tables (jamais de substitution
-        silencieuse — règle du projet).
+        If the combination is not covered by the tables. Nothing is ever
+        silently substituted.
 
     Examples
     --------
@@ -200,26 +199,23 @@ def get_bounds(
     (-2.86, -3.22)
     """
     if case not in (1, 2, 3, 4, 5):
-        raise ValueError(f"case doit être dans 1..5, reçu {case}.")
+        raise ValueError(f"case must be between 1 and 5, got {case}.")
     if not 0 <= k <= MAX_K:
         raise ValueError(
-            f"k={k} hors des tables PSS 2001 (k = 0..{MAX_K}) ; pour k plus "
-            "grand, utiliser le moteur de simulation (spec 12) ou les "
-            "surfaces de réponse (spec 13)."
+            f"k={k} is outside the published tables (k = 0..{MAX_K}); for "
+            "larger k use cv_source='kripfganz' or the simulation engine."
         )
     if stat not in ("F", "t"):
-        raise ValueError(f'stat doit être "F" ou "t", reçu {stat!r}.')
+        raise ValueError(f"stat must be 'F' or 't', got {stat!r}.")
     if stat == "t" and case not in T_BOUNDS:
         raise ValueError(
-            f"PSS 2001 ne publie pas de bornes t pour le cas {case} "
-            "(déterministes restreints) : la statistique t_BDM n'y est "
-            "pas applicable — utiliser le F_overall (tables CI) ou les "
-            "cas III/V."
+            f"No t bounds are published for case {case} (restricted "
+            "deterministics); use the F statistic, or cases 3 or 5."
         )
 
     if alpha == 0.025:
-        # Seuil non transcrit des tables publiées : simulation interne
-        # (spec 12, provenance et statut needs_review : PROVENANCE.md).
+        # Not part of the transcribed tables: supplied by internal
+        # simulation, with its own provenance entry.
         from pyardl.critical_values.pss2001_p025 import F_P025, T_P025
 
         cell = (F_P025 if stat == "F" else T_P025)[case][k]
@@ -229,8 +225,7 @@ def get_bounds(
         level_idx = LEVELS.index(alpha)
     except ValueError:
         raise ValueError(
-            f"alpha={alpha} non couvert : seuils disponibles "
-            f"{(*LEVELS, 0.025)} (cf. PROVENANCE.md)."
+            f"alpha={alpha} is not covered; available levels are {(*LEVELS, 0.025)}."
         ) from None
 
     table = F_BOUNDS[case] if stat == "F" else T_BOUNDS[case]

@@ -1,58 +1,31 @@
-r"""Surfaces de réponse K&S finies-T — voie A2 (spec 13 §2.1).
+r"""Finite-sample response surfaces (experimental, not validated).
 
-STATUT (2026-07-19) : **EXPÉRIMENTAL, NON VALIDÉ, BLOQUÉ PAR A3.**
-Le code de ce module implémente la forme fonctionnelle publiée, mais
-sa concordance avec les valeurs Stata n'a PAS été confirmée par une
-comparaison recevable : une comparaison antérieure s'appuyait sur un
-exemplaire téléchargé sans autorisation confirmée, et sur un
-"preprint" trouvé sur un site tiers dont la légitimité n'a pas été
-établie — les deux ont été retirés (voir docs/DEVIATIONS.md,
-CHANGELOG). N'UTILISER CE MODULE EN PRODUCTION QU'APRÈS :
-(1) autorisation des auteurs (voie A3,
-docs/correspondence/2026-07-10_ks_license_draft.md) et
-(2) revalidation contre une source de référence légitime.
+.. warning::
 
-Valeurs critiques ajustées à la taille d'échantillon et p-values
-approchées pour les statistiques F ET t du bounds test, en évaluant les
-COEFFICIENTS PUBLIÉS de Kripfganz & Schneider (fichier
-``ardl_surfreg_coefs.dta`` distribué avec leur package Stata ardl).
+   This module is **experimental and unvalidated**. Permission to use
+   the underlying coefficient file is still pending with its authors,
+   and no admissible comparison against a reference implementation has
+   been carried out. Do not rely on it in production.
 
-Licence / distribution (voie A2, arbitrage utilisateur) : les
-coefficients ne portent pas de licence explicite -> pyardl ne les
-REDISTRIBUE PAS. ``download_surface_coefs()`` NE DOIT PAS être appelé
-tant que la réponse des auteurs n'est pas reçue (voie A3 en attente).
-Une fois l'autorisation obtenue, le téléchargement se fait au premier
-usage (appel explicite), mis en cache localement avec empreinte
-SHA-256 et provenance journalisée.
+Would provide critical values and p-values for both the F and t
+statistics, adjusted for the sample size and the number of short-run
+coefficients, by evaluating the coefficients published by Kripfganz &
+Schneider alongside their Stata package.
 
-Forme fonctionnelle (algorithme publié — Kripfganz & Schneider 2020
-§3.2 et Supplementary Appendix ; réimplémentation indépendante, aucun
-code Stata copié — règle du projet) : pour chaque quantile tabulé p
-(grille de 221 niveaux, en 1/10000e),
+Those coefficients carry no explicit licence, so pyardl does not
+redistribute them: they would be downloaded from the authors' site on
+first use, cached locally with a checksum. That download must not be
+performed until permission has been granted.
 
-    cv(p) = sum_{j=0..4} theta_{j,0,0} / (k+1)^j
-          + (1/n)  * sum_{j=0..4} [theta_{j,1,0} + theta_{j,1,1}*sr] / (k+1)^j
-          + (1/n^2) * [theta_{0,2,0} + theta_{0,2,1}*sr]
-          + (1/n^3) * [theta_{0,3,0} + theta_{0,3,1}*sr]
-
-avec n la taille d'échantillon de l'UECM, k le nombre de régresseurs de
-long terme et sr le nombre de coefficients de COURT TERME de l'UECM
-(hors déterministes et hors termes de niveau) — pour un UECM(p; q) :
-sr = (p - 1) + somme des q_j. Le cas asymptotique s'obtient en
-supprimant les termes en 1/n.
-
-p-values : approximation locale de MacKinnon (1996, eq. 12) — les 9
-quantiles tabulés les plus proches de la statistique observée sont
-projetés sur l'échelle d'une distribution de référence
-(F(df1, df2) en fini, chi2/df1 ... cf. code), régression quadratique,
-puis probabilité de queue de la valeur ajustée.
-
-Références
+References
 ----------
-Kripfganz & Schneider (2020), *OBES* 82(6) ; Kripfganz & Schneider
-(2023), "ardl: Estimating autoregressive distributed lag and
-equilibrium correction models", *Stata Journal* 23(4), 983-1019 ;
-MacKinnon (1996), *J. Applied Econometrics* 11(6), 601-618.
+Kripfganz, S. & Schneider, D. C. (2020). "Response Surface Regressions
+for Critical Value Bounds and Approximate p-values in Equilibrium
+Correction Models", *Oxford Bulletin of Economics and Statistics*,
+82(6), 1456-1481.
+MacKinnon, J. G. (1996). "Numerical Distribution Functions for Unit
+Root and Cointegration Tests", *Journal of Applied Econometrics*,
+11(6), 601-618.
 """
 
 from __future__ import annotations
@@ -92,12 +65,16 @@ def _coefs_path() -> Path:
 
 
 def download_surface_coefs(force: bool = False, url: str = _URL) -> Path:
-    """Télécharge les coefficients K&S depuis le site des auteurs
-    (premier usage ; aucun matériel redistribué par pyardl).
+    """Download the coefficient file from the authors' site.
 
-    Écrit le fichier dans :func:`cache_dir` avec un journal de
-    provenance (URL, date, SHA-256). Les usages suivants lisent le
-    cache ; ``force=True`` re-télécharge.
+    Writes it to :func:`cache_dir` together with a provenance record
+    (URL, date, SHA-256). Later calls read the cache; ``force=True``
+    downloads again.
+
+    .. warning::
+
+       Do not call this until permission to use the file has been
+       granted; see the module warning.
     """
     path = _coefs_path()
     if path.exists() and not force:
@@ -107,9 +84,8 @@ def download_surface_coefs(force: bool = False, url: str = _URL) -> Path:
         payload = resp.read()
     if not payload[:20].count(b"<") == 0 or len(payload) < 10_000:
         raise RuntimeError(
-            f"Téléchargement invalide depuis {url} ({len(payload)} octets) — "
-            "vérifier l'URL ou télécharger manuellement dans "
-            f"{path}."
+            f"Invalid download from {url} ({len(payload)} bytes); check the "
+            f"URL or place the file manually at {path}."
         )
     path.write_bytes(payload)
     meta = {
@@ -118,7 +94,7 @@ def download_surface_coefs(force: bool = False, url: str = _URL) -> Path:
         "bytes": len(payload),
         "downloaded": datetime.date.today().isoformat(),
         "source": "Kripfganz & Schneider, package Stata ardl "
-        "(kripfganz.de) — non redistribué par pyardl, cf. PROVENANCE.md",
+        "(kripfganz.de); not redistributed by pyardl.",
     }
     (path.parent / "provenance.json").write_text(
         json.dumps(meta, indent=2), encoding="utf-8"
@@ -130,20 +106,20 @@ _TABLES: dict[tuple[str, int, int], pd.DataFrame] | None = None
 
 
 def _load_tables() -> dict[tuple[str, int, int], pd.DataFrame]:
-    """Charge (et met en cache mémoire) les tables de coefficients."""
+    """Load the coefficient tables, caching them in memory."""
     global _TABLES
     if _TABLES is not None:
         return _TABLES
     path = _coefs_path()
     if not path.exists():
         raise FileNotFoundError(
-            "Coefficients K&S finis-T absents du cache local "
-            f"({path}). Ils ne sont pas distribués avec pyardl (licence, "
-            "cf. PROVENANCE.md) : exécuter une fois\n"
+            "The finite-sample coefficient tables are not in the local "
+            f"cache ({path}). They are not distributed with pyardl for "
+            "licensing reasons; run once:\n"
             "    from pyardl.critical_values.ks2020_finite import "
             "download_surface_coefs\n"
             "    download_surface_coefs()\n"
-            "pour les télécharger depuis le site des auteurs."
+            "to fetch them from the authors' site."
         )
     df = pd.read_stata(path)
     _TABLES = {
@@ -154,26 +130,23 @@ def _load_tables() -> dict[tuple[str, int, int], pd.DataFrame]:
 
 
 def _check(stat: str, case: int, k: int, t_obs: int, sr: int) -> int:
-    """Valide les entrées et renvoie le cas EFFECTIF pour la table.
+    """Validate the inputs and return the effective case for the tables.
 
-    Pour la statistique t, les cas à déterministe restreint sont servis
-    par les surfaces du cas non restreint correspondant (2 -> 3,
-    4 -> 5) : la distribution du t n'est pas affectée par la
-    restriction des déterministes (elle ne modifie que le vecteur testé
-    par le F) — convention lue dans le source ``ardlbounds.ado`` des
-    auteurs. NON REVALIDÉE contre une sortie Stata de référence
-    légitime (bloqué par A3, cf. docstring du module).
+    For the t statistic, the restricted-deterministic cases are served by
+    the surfaces of the corresponding unrestricted case (2 -> 3, 4 -> 5),
+    since restricting a deterministic term changes the vector tested by
+    F but not the distribution of t. Not independently revalidated.
     """
     if stat not in ("F", "t"):
-        raise ValueError(f'stat doit être "F" ou "t", reçu {stat!r}.')
+        raise ValueError(f"stat must be 'F' or 't', got {stat!r}.")
     if case not in (1, 2, 3, 4, 5):
-        raise ValueError(f"case doit être dans 1..5, reçu {case}.")
+        raise ValueError(f"case must be between 1 and 5, got {case}.")
     if k < 0:
-        raise ValueError("k >= 0 requis.")
+        raise ValueError("k must be >= 0.")
     if t_obs < 5:
-        raise ValueError("t_obs >= 5 requis.")
+        raise ValueError("t_obs must be >= 5.")
     if sr < 0:
-        raise ValueError("sr >= 0 requis (nombre de coefficients de court terme).")
+        raise ValueError("sr must be >= 0 (number of short-run coefficients).")
     if stat == "t" and case in (2, 4):
         return case + 1
     return case
@@ -182,7 +155,7 @@ def _check(stat: str, case: int, k: int, t_obs: int, sr: int) -> int:
 def _cv_grid(
     stat: str, case: int, i1: bool, k: int, t_obs: int | None, sr: int
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """(quantiles p en [0,1], CV prédits) pour une borne donnée."""
+    """Return the tabulated levels and predicted bounds for one side."""
     tab = _load_tables()[(stat, case, int(i1))]
     kp1 = float(k + 1)
     cv = np.zeros(len(tab))
@@ -210,33 +183,31 @@ def crit_value_bounds_finite(
     alpha: float,
     stat: Literal["F", "t"] = "F",
 ) -> tuple[float, float]:
-    """CV finis-T (I0, I1) par les surfaces publiées K&S (voie A2).
+    """Finite-sample bounds from the published response surfaces.
 
     Parameters
     ----------
     case, k : int
-        Cas déterministe PSS et nombre de régresseurs de long terme.
+        Deterministic case and number of level regressors.
     t_obs : int
-        Taille de l'échantillon d'estimation de l'UECM.
+        Estimation sample size of the error-correction model.
     sr : int
-        Nombre de coefficients de court terme de l'UECM (hors
-        déterministes et niveaux) : ``(p - 1) + somme(q_j)``.
+        Number of short-run coefficients, ``(p - 1) + sum(q_j)``,
+        excluding deterministics and level terms.
     alpha : float
-        Seuil ; si alpha*10000 n'est pas un quantile tabulé,
-        interpolation linéaire entre les deux quantiles adjacents.
+        Significance level; interpolated between adjacent tabulated
+        levels when needed.
     stat : {"F", "t"}
-        Statistique (t : cas I/III/V ; quantile GAUCHE alpha).
+        Which statistic the bounds are for.
     """
     case_eff = _check(stat, case, k, t_obs, sr)
     out = []
     for i1 in (False, True):
         p_grid, cv = _cv_grid(stat, case_eff, i1, k, t_obs, sr)
-        # la colonne p du fichier K&S est le NIVEAU DE SIGNIFICATION
-        # (probabilité de queue : droite pour F, gauche pour t) — pour
-        # les deux statistiques, le CV au seuil alpha est interpolé en
-        # p = alpha (vérifié contre les ancres PSS/A1/Narayan).
+        # The p column holds the significance level (right tail for F,
+        # left tail for t), so both are interpolated at p = alpha.
         if not p_grid[0] <= alpha <= p_grid[-1]:
-            raise ValueError(f"alpha={alpha} hors de la grille des quantiles tabulés.")
+            raise ValueError(f"alpha={alpha} is outside the tabulated grid.")
         out.append(float(np.interp(alpha, p_grid, cv)))
     return out[0], out[1]
 
@@ -250,26 +221,23 @@ def pvalue_bounds_finite(
     df_resid: int,
     stat: Literal["F", "t"] = "F",
 ) -> tuple[float, float]:
-    """p-values finies-T aux deux bornes (MacKinnon 1996, eq. 12).
+    """Finite-sample p-values at both bounds (MacKinnon 1996, eq. 12).
 
-    Les 9 quantiles tabulés dont le CV prédit est le plus proche de la
-    statistique observée sont projetés sur l'échelle de la distribution
-    de référence (F(df1, df_resid) pour F, Student(df_resid) pour t) ;
-    une régression quadratique locale y = a + b*cv + c*cv^2 est ajustée
-    et la p-value est la probabilité de queue de la valeur prédite en
-    ``stat_value``. Hors de la grille : p-value bornée à 0 ou 1 (côté
-    approprié).
+    The nine tabulated levels whose predicted bound is closest to the
+    observed statistic are mapped onto the scale of a reference
+    distribution, a local quadratic is fitted, and the p-value is the
+    tail probability of the fitted value. Outside the grid the p-value
+    is clipped to 0 or 1 on the appropriate side.
 
-    ``df_resid`` : degrés de liberté résiduels de l'UECM.
+    ``df_resid`` is the residual degrees of freedom of the fitted model.
     """
     case_eff = _check(stat, case, k, t_obs, sr)
     df1 = k + 1 + (1 if case in (2, 4) else 0)
     out = []
     for i1 in (False, True):
         p_grid, cv = _cv_grid(stat, case_eff, i1, k, t_obs, sr)
-        # p = probabilité de queue : F -> cv DÉCROÎT en p (cv[0] est le
-        # quantile extrême droit) ; t -> cv CROÎT en p (cv[0] est le
-        # quantile extrême gauche).
+        # p is a tail probability: for F the bound decreases with p
+        # (cv[0] is the far right quantile); for t it increases.
         if stat == "F":
             if stat_value >= cv[0]:
                 out.append(0.0)

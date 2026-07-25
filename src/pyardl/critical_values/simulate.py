@@ -1,27 +1,22 @@
-r"""Moteur de simulation des valeurs critiques du bounds test (spec 12 §2.3).
+r"""Monte Carlo engine for bounds-test critical values.
 
-Simule la distribution sous H0 des statistiques F_overall et t_BDM de
-l'UECM (spec 10) pour un cas déterministe, un nombre de régresseurs k et
-une taille T donnés :
+Simulates the null distribution of the F and t statistics for a given
+deterministic case, number of regressors and sample size, following the
+design of Pesaran, Shin & Smith (2001):
 
-- H0 : Δy_t = eps_t (lam = 0, gamma = 0) — y est une marche aléatoire ;
-- borne inférieure (« tout I(0) ») : x_j iid N(0,1) ;
-- borne supérieure (« tout I(1) ») : x_j marches aléatoires
-  indépendantes (DGP de PSS 2001, annexe des tables CI/CII).
+- under the null, ``y`` is a random walk (``lam = 0``, ``gamma = 0``);
+- for the lower bound, the regressors are i.i.d. draws (all I(0));
+- for the upper bound, they are independent random walks (all I(1)).
 
-La régression simulée est Δy_t sur [det, y_{t-1}, x_{1,t-1}, ...,
-x_{k,t-1}] — pas de dynamique de court terme, conformément au DGP (les
-distributions asymptotiques n'en dépendent pas ; PSS 2001, §5).
+Useful when a configuration is not tabulated anywhere: an unusual
+significance level, more regressors than the published tables cover, or
+an arbitrary sample size. It is also how the shipped tables were
+independently cross-checked.
 
-Usages (spec 12 §2.3) : (a) reproduire les tables publiées (validation,
-solde de la dette QUESTIONS.md spec 10 §4) ; (b) fournir des CV pour des
-configurations non tabulées (ex. seuil 2.5 %, k > 10) ; (c) base du
-futur backend Rust.
-
-Conventions numériques : moindres carrés par QR batchée (jamais
-d'inversion de X'X — règle du projet) ; générateur
-``numpy.random.Generator`` à seed explicite, journalisée avec tous les
-paramètres dans l'objet résultat.
+Least squares is done through a batched QR factorisation, never by
+inverting X'X. The random generator takes an explicit seed, and every
+simulation parameter is recorded on the result object so that a set of
+critical values can always be traced back to how it was produced.
 """
 
 from __future__ import annotations
@@ -39,9 +34,11 @@ _CASE_RESTRICTED = {2: "const", 4: "trend"}
 
 @dataclass(frozen=True)
 class SimulatedBounds:
-    """Quantiles simulés des statistiques du bounds test.
+    """Simulated quantiles of the bounds-test statistics.
 
-    Tous les paramètres de simulation sont journalisés : l'objet suffit à reproduire exactement le calcul.
+    Every simulation parameter is recorded on the object, so a set of
+    critical values always carries enough information to be reproduced
+    exactly.
     """
 
     case: int
@@ -49,9 +46,9 @@ class SimulatedBounds:
     t_obs: int
     n_sims: int
     seed: int
-    i1: bool  # True = borne « tout I(1) », False = « tout I(0) »
-    chunk: int  # fait partie de la reproductibilité : le flux aléatoire
-    # est tiré par lots, donc dépend du découpage (journalisé, règle 2)
+    i1: bool  # True for the all-I(1) bound, False for the all-I(0) bound
+    chunk: int  # draws are generated in batches, so the batch size is part
+    # of what makes a run reproducible
     alphas: tuple[float, ...]
     f_quantiles: dict[float, float]
     t_quantiles: dict[float, float]
@@ -59,12 +56,14 @@ class SimulatedBounds:
     t_stats: FloatArray = field(repr=False)
 
     def f_cv(self, alpha: float) -> float:
-        """Valeur critique F au seuil ``alpha`` (quantile 1 - alpha)."""
+        """Critical value of the F statistic at level ``alpha``."""
         return self.f_quantiles[alpha]
 
     def t_cv(self, alpha: float) -> float:
-        """Valeur critique t au seuil ``alpha`` (quantile alpha, test
-        unilatéral gauche)."""
+        """Critical value of the t statistic at level ``alpha``.
+
+        The t test is left-tailed, so this is the ``alpha`` quantile.
+        """
         return self.t_quantiles[alpha]
 
 
@@ -78,37 +77,38 @@ def simulate_bounds(
     alphas: tuple[float, ...] = (0.10, 0.05, 0.025, 0.01),
     chunk: int = 2_000,
 ) -> SimulatedBounds:
-    """Simule les CV du bounds test sous H0 (spec 12 §2.3).
+    """Simulate critical values for the bounds test under the null.
 
     Parameters
     ----------
     case : int
-        Cas déterministe PSS (1 à 5) ; pour les cas II/IV, le
-        déterministe restreint entre dans le vecteur testé (spec 10 §3).
+        Deterministic case, 1 to 5. In cases 2 and 4 the restricted
+        deterministic term is part of the tested vector.
     k : int
-        Nombre de régresseurs (k = 0 : test sur y_{t-1} seul).
+        Number of regressors; ``k = 0`` tests ``y_{t-1}`` alone.
     t_obs : int
-        Taille de l'échantillon simulé (1000 = convention asymptotique
-        de PSS 2001 ; 30-80 pour les tables petits échantillons).
+        Length of each simulated series. 1000 reproduces the asymptotic
+        convention; use 30 to 80 for small-sample bounds.
     n_sims : int
-        Nombre de réplications (40 000 = convention PSS 2001).
+        Number of replications. More replications means tighter
+        quantiles: the Monte Carlo error falls with the square root.
     seed : int
-        Graine du ``numpy.random.Generator`` (journalisée).
+        Seed of the random generator; recorded on the result.
     i1 : bool
-        True : x_j marches aléatoires (borne I(1)) ; False : x_j iid
-        (borne I(0)).
+        ``True`` generates I(1) regressors (upper bound), ``False``
+        i.i.d. ones (lower bound).
     alphas : tuple of float
-        Seuils des quantiles retournés.
+        Significance levels at which quantiles are returned.
     chunk : int
-        Taille des lots de la QR batchée (mémoire ~ chunk × T × (k+3)).
-        Les tirages étant faits par lots, ``chunk`` fait partie des
-        paramètres de reproductibilité (journalisé dans le résultat) :
-        même (seed, n_sims, chunk) -> mêmes statistiques exactes.
+        Batch size of the vectorised least squares; memory use is
+        roughly ``chunk * t_obs * (k + 3)``. Since draws are generated in
+        batches, the same ``(seed, n_sims, chunk)`` always yields exactly
+        the same statistics.
 
     Returns
     -------
     SimulatedBounds
-        Quantiles F (droite) et t (gauche) + tirages complets.
+        Quantiles for both statistics, plus the full set of draws.
 
     Examples
     --------
@@ -119,11 +119,11 @@ def simulate_bounds(
     True
     """
     if case not in (1, 2, 3, 4, 5):
-        raise ValueError(f"case doit être dans 1..5, reçu {case}.")
+        raise ValueError(f"case must be between 1 and 5, got {case}.")
     if k < 0:
-        raise ValueError("k >= 0 requis.")
+        raise ValueError("k must be >= 0.")
     if t_obs < 20:
-        raise ValueError("t_obs >= 20 requis.")
+        raise ValueError("t_obs must be >= 20.")
 
     rng = np.random.default_rng(seed)
     det = _CASE_DET[case]
@@ -133,17 +133,17 @@ def simulate_bounds(
     n_eff = t_obs - 1  # Δy_t, t = 2..T
     lam_pos = n_det  # position de y_{t-1} dans le design
 
-    # colonnes déterministes (identiques pour toutes les réplications)
+    # Deterministic columns, identical across replications
     det_cols = np.empty((n_eff, n_det))
     if n_det >= 1:
         det_cols[:, 0] = 1.0
     if n_det == 2:
         det_cols[:, 1] = np.arange(2, t_obs + 1, dtype=np.float64)
 
-    # colonnes du design restreint (H0 imposée) : déterministes NON testés
+    # Restricted design: only the deterministics that are not tested
     restr_idx = list(range(n_det))
     if case in _CASE_RESTRICTED:
-        restr_idx = restr_idx[:-1]  # le dernier déterministe est testé
+        restr_idx = restr_idx[:-1]  # the last deterministic term is tested
 
     f_stats = np.empty(n_sims)
     t_stats = np.empty(n_sims)
@@ -152,7 +152,7 @@ def simulate_bounds(
     while done < n_sims:
         m = min(chunk, n_sims - done)
         eps = rng.standard_normal((m, t_obs))
-        y = np.cumsum(eps, axis=1)  # marche aléatoire sous H0
+        y = np.cumsum(eps, axis=1)  # random walk under the null
         dy = np.diff(y, axis=1)  # = eps[:, 1:]
         y_lag = y[:, :-1]
 
@@ -164,13 +164,13 @@ def simulate_bounds(
             x = np.cumsum(x_innov, axis=1) if i1 else x_innov
             design[:, :, lam_pos + 1 :] = x[:, :-1, :]
 
-        # --- régression non contrainte (QR batchée, règle du projet) ---
+        # --- unrestricted regression (batched QR) ---
         q_u, r_u = np.linalg.qr(design)
         qty = np.einsum("stk,st->sk", q_u, dy)
         coefs = np.linalg.solve(r_u, qty[:, :, None])[:, :, 0]
         ssr_u = np.einsum("st,st->s", dy, dy) - np.einsum("sk,sk->s", qty, qty)
 
-        # --- régression contrainte (H0) ---
+        # --- restricted regression (null imposed) ---
         if restr_idx:
             q_r, _ = np.linalg.qr(design[:, :, restr_idx])
             qty_r = np.einsum("stk,st->sk", q_r, dy)
@@ -181,7 +181,7 @@ def simulate_bounds(
         df = n_eff - k_par
         f_stats[done : done + m] = ((ssr_r - ssr_u) / n_restr) / (ssr_u / df)
 
-        # --- t sur y_{t-1} : se via R^{-1} (diag de (X'X)^{-1}) ---
+        # --- t statistic on y_{t-1}: standard error from R^{-1} ---
         r_inv = np.linalg.solve(r_u, np.broadcast_to(np.eye(k_par), r_u.shape))
         xtx_inv_lam = np.einsum("sj,sj->s", r_inv[:, lam_pos, :], r_inv[:, lam_pos, :])
         se_lam = np.sqrt(ssr_u / df * xtx_inv_lam)

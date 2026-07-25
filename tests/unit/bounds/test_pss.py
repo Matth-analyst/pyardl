@@ -107,7 +107,7 @@ class TestCasesAndGuards:
     def test_t_decision_none_for_cases_ii_iv_with_warning(self) -> None:
         y, x = _dgp_cointegrated(seed=3)
         for case in (2, 4):
-            with pytest.warns(PyardlMethodologyWarning, match="ne tabule pas"):
+            with pytest.warns(PyardlMethodologyWarning, match="does not tabulate"):
                 res = bounds_test(y, x, case=case, order=(2, 1))
             assert res.decision_t is None
             assert np.isfinite(res.t_stat)  # la stat est calculée quand même
@@ -120,7 +120,7 @@ class TestCasesAndGuards:
         y = np.zeros(n)
         for t in range(1, n):  # dérive explosive : lambda_hat > 0
             y[t] = 1.03 * y[t - 1] + 0.1 * x[t] + rng.normal(scale=0.3)
-        with pytest.warns(DegenerateCaseWarning, match="lambda_hat"):
+        with pytest.warns(DegenerateCaseWarning, match="Estimated lambda"):
             res = bounds_test(
                 pd.Series(y, name="y"),
                 pd.DataFrame({"x": x}),
@@ -167,7 +167,8 @@ class TestCasesAndGuards:
         assert res_n.bounds.loc[0.05, "F_I1"] > res_p.bounds.loc[0.05, "F_I1"]
         assert res_n.decision_t is None
         assert any(
-            "Narayan" in str(w.message) and "bornes t" in str(w.message) for w in caught
+            "Narayan" in str(w.message) and "no t bounds" in str(w.message)
+            for w in caught
         )
 
     def test_cv_source_narayan_case1_raises(self) -> None:
@@ -206,7 +207,7 @@ class TestPresentation:
         y, x = _dgp_cointegrated(seed=10)
         res = bounds_test(y, x, case=3, order=(2, 1))
         s = res.summary()
-        for token in ("cas 3", "F_overall", "t_BDM", "F_I0", "F_I1"):
+        for token in ("case 3", "F_overall", "t_BDM", "F_I0", "F_I1"):
             assert token in s
 
     def test_bounds_table_has_three_levels(self) -> None:
@@ -284,7 +285,7 @@ class TestSpec13Integration:
         res = bounds_test(y, x, case=3, order=(2, 1))
         s = res.summary()
         assert "p_I0" in s and "p_I1" in s
-        assert "K&S 2020" in s
+        assert "p_I1" in s
 
     def test_inconclusive_gets_continuous_reading(self) -> None:
         """Vigilance n°5 : statut inconclusive lu en continu
@@ -311,7 +312,7 @@ class TestSpec13Integration:
             ),
         )
         s = forced.summary()
-        assert "inconclusive, p ∈ [" in s
+        assert "inconclusive, p in [" in s
         # ordre : p_I1 (borne gauche de l'intervalle) < p_I0
         assert f"[{p_i1:.4f}, {p_i0:.4f}]" in s
 

@@ -1,13 +1,11 @@
-"""Seuil 2.5 % des tables PSS — SIMULATION INTERNE (spec 12).
+"""Bounds at the 2.5% level, obtained by internal simulation.
 
-Provenance : moteur simulate_bounds (QR batchée), t_obs=1000,
-n_sims=100 000, seeds=910000 (I0) / 920000 (I1) + case*100 + k,
-chunk=2000 — générées par validation/spec12_montecarlo.py le
-2026-07-07 ; précision MC ~±0.02-0.1 selon la cellule (PROVENANCE.md).
-Ces valeurs ne sont PAS la transcription des tables publiées de PSS
-2001 (seuil non transcrit) — statut needs_review jusqu'à vérification
-contre l'article original. Format : {case: [(I0, I1) pour k=0..10]}.
-Fichier GÉNÉRÉ — ne pas éditer à la main.
+The 2.5% level is not part of the transcribed PSS tables, so these
+values come from the Monte Carlo engine (T=1000, 100 000 replications)
+rather than from the article. Provenance and cross-checks: see
+PROVENANCE.md.
+
+This file is generated; do not edit it by hand.
 """
 
 F_P025 = {

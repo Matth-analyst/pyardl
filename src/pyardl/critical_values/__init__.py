@@ -1,26 +1,25 @@
-"""Valeurs critiques des bounds tests (specs 10, 12, 13).
+"""Critical values for the bounds test.
 
-Toute table encodée cite sa source exacte dans PROVENANCE.md et est recoupée par une seconde source ou par le
-moteur de simulation interne (spec 12).
+Three sources are available, selected with ``cv_source``:
 
-Politique et hiérarchie des sources (spec 12 §2.4, arbitrage
-2026-07-07) :
+- ``"kripfganz"`` (recommended, and the default used by
+  :func:`~pyardl.bounds.bounds_test`): response-surface based. More
+  precise than the published tables, available at any significance
+  level, and it also yields approximate p-values at both bounds through
+  :func:`pvalue_bounds`. Currently asymptotic, covers the F statistic
+  and ``k = 1..10``.
+- ``"pss"``: the bounds published in Pesaran, Shin & Smith (2001),
+  served exactly as printed. Use this to reproduce published results.
+  They carry the Monte Carlo error of the original article (40 000
+  replications), roughly +/-0.05 at the usual levels and up to +/-0.15
+  in the 1% tail.
+- ``"narayan"``: small-sample bounds from Narayan (2005), for
+  ``30 <= T <= 80``. Asymptotic bounds over-reject at these sample
+  sizes, which is exactly the situation annual data often falls into.
+  Covers cases 2, 3 and 5, the F statistic only.
 
-- ``"pss"`` : bornes asymptotiques PSS 2001, servies À L'IDENTIQUE des
-  valeurs publiées — leur fonction est la REPRODUCTION DE LA
-  LITTÉRATURE. Elles portent l'erreur MC d'origine de l'article
-  (40 000 réplications ; ~±0.05 aux seuils usuels, jusqu'à ~±0.15 dans
-  la queue à 1 % — quantification : PROVENANCE.md). Exception : le
-  seuil 2.5 % provient du moteur interne (non transcrit).
-- ``"narayan"`` : bornes petits échantillons de Narayan 2005
-  (30 <= T <= 80, cas II/III/V, k <= 7, F seulement), valeurs publiées
-  à l'identique — recommandé sur données annuelles courtes.
-- ``"kripfganz"`` : surfaces de réponse (spec 13, voie A1 via
-  statsmodels) — source PAR DÉFAUT et RECOMMANDÉE : plus précise que
-  les tables publiées (32M de réplications par configuration contre
-  40k), tout seuil alpha, p-values aux deux bornes
-  (:func:`pvalue_bounds`). Limites voie A1 : asymptotique (ajustement
-  fini-T -> voie A2/B), F seulement, k = 1..10.
+Every encoded table documents its exact source and how it was
+cross-checked in ``PROVENANCE.md``, alongside this module.
 """
 
 from __future__ import annotations
@@ -49,38 +48,35 @@ _NARAYAN_LEVELS = {0.10: 0, 0.05: 1, 0.01: 2}
 def _narayan_bounds(
     stat: str, case: int, k: int, alpha: float, t_obs: int
 ) -> tuple[float, float]:
-    """Bornes de Narayan 2005 avec interpolation linéaire en T
-    (spec 12 §2.1)."""
+    """Narayan (2005) bounds, linearly interpolated in the sample size."""
     if stat != "F":
         raise ValueError(
-            "Narayan 2005 ne publie que des bornes F (pas de t_BDM) : "
-            'utiliser cv_source="pss" pour le t, ou les surfaces de '
-            "réponse (spec 13)."
+            "Narayan (2005) only publishes F bounds; use cv_source='pss' or "
+            "cv_source='kripfganz' for the t statistic."
         )
     if case in (1, 4):
         raise ValueError(
-            f"Narayan 2005 ne couvre pas le cas {case} (cas II, III et V "
-            'seulement) : utiliser cv_source="kripfganz" (spec 13) ou '
-            '"pss" (asymptotique).'
+            f"Narayan (2005) does not cover case {case} (only cases 2, 3 "
+            "and 5); use cv_source='kripfganz' or cv_source='pss'."
         )
     if case not in (2, 3, 5):
-        raise ValueError(f"case doit être dans 1..5, reçu {case}.")
+        raise ValueError(f"case must be between 1 and 5, got {case}.")
     if k > MAX_K_NARAYAN:
         raise ValueError(
-            f"k={k} hors des tables de Narayan (k <= {MAX_K_NARAYAN}) : "
-            'utiliser cv_source="kripfganz" (spec 13) ou "pss".'
+            f"k={k} exceeds the Narayan tables (k <= {MAX_K_NARAYAN}); use "
+            "cv_source='kripfganz' or cv_source='pss'."
         )
     if alpha not in _NARAYAN_LEVELS:
         raise ValueError(
-            f"alpha={alpha} non couvert par Narayan 2005 "
-            f"(seuils {tuple(_NARAYAN_LEVELS)})."
+            f"alpha={alpha} is not covered by Narayan (2005); available "
+            f"levels are {tuple(_NARAYAN_LEVELS)}."
         )
 
     if t_obs < T_GRID[0] or t_obs > T_GRID[-1]:
         warnings.warn(
-            f"T={t_obs} hors de la plage des tables de Narayan "
-            f"({T_GRID[0]}-{T_GRID[-1]}) : repli sur les bornes "
-            "asymptotiques PSS 2001 (spec 12 §2.1).",
+            f"T={t_obs} lies outside the range of the Narayan tables "
+            f"({T_GRID[0]}-{T_GRID[-1]}); falling back to the asymptotic PSS "
+            "bounds.",
             PyardlMethodologyWarning,
             stacklevel=3,
         )
@@ -110,18 +106,35 @@ def get_bounds(
     cv_source: Literal["pss", "narayan", "kripfganz"] = "pss",
     t_obs: int | None = None,
 ) -> tuple[float, float]:
-    """Bornes du bounds test — interface commune (specs 10 §4.2, 12 §2.1).
+    """Return the (lower, upper) critical value bounds.
 
     Parameters
     ----------
-    stat, case, k, alpha
-        Voir :func:`pyardl.critical_values.pss2001.get_bounds`.
+    stat : {"F", "t"}
+        Which statistic the bounds are for.
+    case : int
+        Deterministic case, 1 to 5.
+    k : int
+        Number of level regressors.
+    alpha : float
+        Significance level.
     cv_source : {"pss", "narayan", "kripfganz"}
-        Source des valeurs critiques (voir la politique du module).
+        Source of the critical values; see the module documentation.
     t_obs : int, optional
-        Taille d'échantillon — requis pour ``"narayan"`` (interpolation
-        linéaire entre les tailles tabulées 30..80 ; hors plage ->
-        repli asymptotique + warning).
+        Sample size. Required for ``"narayan"``, which interpolates
+        between the tabulated sizes 30 to 80 and falls back to the
+        asymptotic bounds (with a warning) outside that range.
+
+    Returns
+    -------
+    tuple of float
+        Lower bound (all regressors I(0)) and upper bound (all I(1)).
+
+    Raises
+    ------
+    ValueError
+        If the requested combination is not covered by the chosen source.
+        The message then points to a source that does cover it.
 
     Examples
     --------
@@ -134,19 +147,16 @@ def get_bounds(
         return _pss_bounds(stat, case, k, alpha)
     if cv_source == "narayan":
         if t_obs is None:
-            raise ValueError('cv_source="narayan" requiert t_obs.')
+            raise ValueError("cv_source='narayan' requires t_obs.")
         return _narayan_bounds(stat, case, k, alpha, t_obs)
     if cv_source == "kripfganz":
-        # Voie A1 : asymptotique, F seulement (t -> exception explicite
-        # de ks2020 pointant vers "pss") ; t_obs ignoré à ce stade
-        # (ajustement fini-T : voie A2/B, cf. PROVENANCE.md).
+        # Asymptotic, F only; t_obs is not used here.
         return _ks_bounds(case, k, alpha) if stat == "F" else _ks_t_error()
-    raise ValueError(f"cv_source inconnu : {cv_source!r}.")
+    raise ValueError(f"Unknown cv_source: {cv_source!r}.")
 
 
 def _ks_t_error() -> tuple[float, float]:
     raise ValueError(
-        'cv_source="kripfganz" (voie A1) ne couvre pas le t_BDM : '
-        'utiliser cv_source="pss" pour les bornes t (surfaces t : voie '
-        "A2/B, cf. PROVENANCE.md)."
+        "cv_source='kripfganz' does not cover the t statistic; use "
+        "cv_source='pss' for t bounds."
     )

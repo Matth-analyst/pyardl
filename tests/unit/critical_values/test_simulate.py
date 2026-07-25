@@ -54,7 +54,7 @@ class TestEngineBasics:
     def test_input_validation(self) -> None:
         with pytest.raises(ValueError, match="case"):
             simulate_bounds(case=0, k=1)
-        with pytest.raises(ValueError, match="k >= 0"):
+        with pytest.raises(ValueError, match="k must be >= 0"):
             simulate_bounds(case=3, k=-1)
         with pytest.raises(ValueError, match="t_obs"):
             simulate_bounds(case=3, k=1, t_obs=10)

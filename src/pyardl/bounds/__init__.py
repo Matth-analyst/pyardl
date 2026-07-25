@@ -1,4 +1,4 @@
-"""Bounds tests de cointégration (specs 10, 11, 15)."""
+"""Bounds tests for the existence of a long-run level relationship."""
 
 from pyardl.bounds.pss import BoundsTestResults, bounds_test
 

@@ -284,8 +284,8 @@ class ARDL:
         coefs, _, rank, _ = np.linalg.lstsq(design, y_dep, rcond=None)
         if rank < k:
             warnings.warn(
-                "Design singulier (colinéarité parfaite) : coefficients "
-                "de norme minimale via lstsq, covariance non fiable.",
+                "Singular design matrix (perfect collinearity): minimum-norm "
+                "coefficients are returned and the covariance is unreliable.",
                 PyardlMethodologyWarning,
                 stacklevel=3,
             )
@@ -423,7 +423,7 @@ class ARDL:
                     rows.append(row)
                 return row[ic]
 
-            for _ in range(10):  # itérer jusqu'à stabilité
+            for _ in range(10):  # iterate until the orders stop changing
                 changed = False
                 best_p = min(
                     range(min_p, max_p + 1),
@@ -444,7 +444,7 @@ class ARDL:
                 if not changed:
                     break
         else:
-            raise ValueError('search doit être "grid" ou "per_variable".')
+            raise ValueError('search must be "grid" or "per_variable".')
 
         table = pd.DataFrame(rows).sort_values(ic, kind="stable").reset_index(drop=True)
         best = table.iloc[0]
@@ -514,7 +514,7 @@ class ARDL:
         path: list[dict[str, object]] = []
 
         while True:
-            # retards terminaux candidats à l'élimination
+            # Terminal lags eligible for removal
             candidates: list[tuple[str, float]] = []
             pvals = current.pvalues
             if current_p >= 1:
@@ -535,7 +535,7 @@ class ARDL:
             if drop_p <= alpha:
                 break
 
-            # réduction tentée
+            # Try the reduction
             trial_p, trial_q = current_p, current_q.copy()
             if drop_name.startswith(f"{y_name}.L"):
                 trial_p -= 1
@@ -724,8 +724,11 @@ class ARDLResults:
 
     @property
     def nobs(self) -> int:
-        """Taille de l'échantillon d'estimation réel (voir module :
-        diffère de statsmodels quand max(q) > p)."""
+        """Size of the actual estimation sample.
+
+        Differs from the statsmodels convention when ``max(q) > p``; see
+        the module documentation.
+        """
         return len(self._resid)
 
     @property
