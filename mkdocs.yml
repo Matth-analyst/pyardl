@@ -1,19 +1,15 @@
 site_name: pyardl
-site_description: Économétrie des modèles ARDL — estimation, bounds tests, bootstrap, panels.
+site_description: ARDL models, bounds tests for cointegration, and modern critical values in Python.
 docs_dir: docs
 nav:
-  - Accueil: ../README.md
-  - Spécifications: references/00_INDEX.md
+  - Home: ../README.md
   - Modules:
       - core.transforms: modules/core_transforms.md
       - core.ardl: modules/core_ardl.md
       - bounds (PSS 2001): modules/bounds_pss.md
       - critical_values: modules/critical_values.md
-  - Questions ouvertes: QUESTIONS.md
-  - Écarts documentés: DEVIATIONS.md
 theme:
   name: material
-  language: fr
 markdown_extensions:
   - admonition
   - pymdownx.arithmatex

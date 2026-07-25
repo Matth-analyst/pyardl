@@ -22,8 +22,8 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Ruff (lint + format)
         run: |
-          ruff check src tests validation
-          ruff format --check src tests validation
+          ruff check src tests
+          ruff format --check src tests
       - name: Mypy (strict)
         run: mypy src/pyardl
       - name: Pytest (suite CI + réplications sur valeurs pré-générées)
