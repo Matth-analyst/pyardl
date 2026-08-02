@@ -331,14 +331,56 @@ class BoundsTestResults:
             name="adjustment",
         )
 
-    def diagnostics(self) -> pd.DataFrame:
-        """Residual diagnostics of the fitted error-correction model.
+    def stability(self, alpha: float = 0.05) -> pd.DataFrame:
+        """CUSUM and CUSUM-of-squares tests on the error-correction model.
+
+        Parameters
+        ----------
+        alpha : float, default 0.05
+            Significance level of the boundaries. One of 0.10, 0.05, 0.01.
 
         Returns
         -------
         pandas.DataFrame
-            Ljung-Box (autocorrelation), Jarque-Bera (normality) and
-            Breusch-Pagan (heteroskedasticity), with p-values.
+            One row per test, with ``stable``, ``max_excess`` and
+            ``first_crossing``.
+
+        Notes
+        -----
+        A bounds test assumes the relationship it is testing held
+        unchanged over the whole sample. A break makes the long-run
+        coefficients an average of two different regimes, which is not a
+        long-run relationship at all. These tests check that assumption,
+        and applied work is expected to report both.
+        """
+        from pyardl.diagnostics import stability_tests
+
+        y_dep = self._fit.design @ self._fit.params.to_numpy() + self._fit.resid
+        return stability_tests(y_dep, self._fit.design, alpha=alpha)
+
+    def diagnostics(self, alpha: float = 0.05) -> pd.DataFrame:
+        """Residual and stability diagnostics of the error-correction model.
+
+        Parameters
+        ----------
+        alpha : float, default 0.05
+            Level of the stability boundaries.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Ljung-Box (autocorrelation), Jarque-Bera (normality),
+            Breusch-Pagan (heteroskedasticity), and the two
+            parameter-constancy tests of Brown, Durbin & Evans (1975).
+
+        Notes
+        -----
+        The two stability rows carry no p-value: they are
+        boundary-crossing procedures, not statistics with a null
+        distribution to integrate. Their ``statistic`` column reports the
+        largest excursion beyond the band — zero when the model is
+        stable. Use :meth:`stability` for the full verdict, including
+        where the crossing occurs.
         """
         resid = self._fit.resid
         lb_lags = max(1, min(10, len(resid) // 5))
@@ -348,16 +390,32 @@ class BoundsTestResults:
         if not (bp_design[:, 0] == 1.0).all():
             bp_design = np.column_stack([np.ones(bp_design.shape[0]), bp_design])
         bp_p = float(het_breuschpagan(resid, bp_design)[1])
+        stab = self.stability(alpha=alpha)
+        pct = int(alpha * 100)
         return pd.DataFrame(
             {
                 "statistic": [
                     float(lb["lb_stat"].iloc[0]),
                     float(jb_stat),
                     np.nan,
+                    float(stab.loc["CUSUM", "max_excess"]),
+                    float(stab.loc["CUSUM-of-squares", "max_excess"]),
                 ],
-                "pvalue": [float(lb["lb_pvalue"].iloc[0]), float(jb_p), bp_p],
+                "pvalue": [
+                    float(lb["lb_pvalue"].iloc[0]),
+                    float(jb_p),
+                    bp_p,
+                    np.nan,
+                    np.nan,
+                ],
             },
-            index=[f"Ljung-Box({lb_lags})", "Jarque-Bera", "Breusch-Pagan"],
+            index=[
+                f"Ljung-Box({lb_lags})",
+                "Jarque-Bera",
+                "Breusch-Pagan",
+                f"CUSUM({pct}%) excess",
+                f"CUSUMSQ({pct}%) excess",
+            ],
         )
 
     def summary(self) -> str:

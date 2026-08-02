@@ -945,6 +945,46 @@ class ARDLResults:
             index=[f"Ljung-Box({lb_lags})", "Jarque-Bera", "Breusch-Pagan"],
         )
 
+    def stability(self, alpha: float = 0.05) -> pd.DataFrame:
+        """CUSUM and CUSUM-of-squares tests for parameter constancy.
+
+        Parameters
+        ----------
+        alpha : float, default 0.05
+            Significance level of the boundaries. One of 0.10, 0.05, 0.01.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per test, with ``stable``, ``max_excess`` and
+            ``first_crossing``.
+
+        Notes
+        -----
+        Every long-run coefficient this object reports assumes the
+        parameters did not move over the sample. When they did, the
+        long-run estimate is a blend of two regimes rather than an
+        equilibrium. These tests check that assumption; see
+        :mod:`pyardl.diagnostics` for what each one can and cannot see.
+
+        Examples
+        --------
+        >>> import numpy as np, pandas as pd
+        >>> from pyardl.core.ardl import ARDL
+        >>> rng = np.random.default_rng(0)
+        >>> x = pd.Series(rng.standard_normal(150), name="x")
+        >>> y = pd.Series(np.zeros(150), name="y")
+        >>> for t in range(1, 150):
+        ...     y.iloc[t] = 0.5 * y.iloc[t - 1] + x.iloc[t] + rng.standard_normal()
+        >>> res = ARDL(y, x, order=(1, 1))._fit()
+        >>> res.stability()["stable"].tolist()
+        [True, True]
+        """
+        from pyardl.diagnostics import stability_tests
+
+        design, y_dep, _ = self.model._build_design()
+        return stability_tests(y_dep, design, alpha=alpha)
+
     # -------------------------- presentation --------------------------
     def summary(self) -> str:
         """Return a publication-style summary of the fit as a string."""

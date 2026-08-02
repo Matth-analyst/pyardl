@@ -10,6 +10,7 @@ nav:
       - Bounds test: api/bounds.md
       - Critical values: api/critical-values.md
       - ARDL/ECM algebra: api/transforms.md
+      - Stability diagnostics: api/diagnostics.md
 theme:
   name: material
 markdown_extensions:

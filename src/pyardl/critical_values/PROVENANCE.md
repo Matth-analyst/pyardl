@@ -231,3 +231,70 @@ valeur de référence externe encodée) ; ils sont skip par défaut car ils
 requièrent le fichier de coefficients, absent du cache. Le test
 d'intégration bout-en-bout est un placeholder explicitement skip,
 marqué "bloqué par A3".
+
+---
+
+## Frontières CUSUM et CUSUMSQ (Brown-Durbin-Evans 1975) — `bde1975.py`
+
+### Frontières du CUSUM : coefficient `a`
+
+**Source** : Brown, Durbin & Evans (1975), *JRSS B* 37(2), 149-192, §2.3.
+Valeurs `a = 0.850` (10 %), `0.948` (5 %), `1.143` (1 %) — les trois
+seuils tabulés par les auteurs, et les seuls servis. Toute autre valeur
+d'`alpha` lève une exception explicite : il n'existe pas de quatrième
+valeur publiée, et l'interpolation n'aurait pas de sens ici (`a` résout
+une équation de probabilité de franchissement, ce n'est pas un
+quantile).
+
+**Recoupement** : la suite de frontières produite par `cusum()` est
+comparée à celle de `statsmodels.stats.diagnostic.recursive_olsresiduals`
+sur 3 configurations (n = 80/150/300, k = 2/3/5). **Écart strictement
+nul** après correction d'un décalage d'un pas dans la convention de
+départ (voir ci-dessous). Recoupement géométrique complémentaire : les
+droites passent bien par `(k, a·sqrt(n))` et `(T, 3a·sqrt(n))`, la
+définition de l'article.
+
+**Divergence de convention avec statsmodels** (documentée, assumée) :
+statsmodels fait commencer le chemin CUSUM à `t = k`, où le résidu
+récursif est identiquement nul par construction (le modèle ajuste
+exactement les `k` premières observations). Brown-Durbin-Evans le font
+commencer à `t = k+1`, c'est-à-dire au premier résidu porteur
+d'information. pyardl suit l'article. Conséquence : nos chemins ont un
+point de moins, et la première frontière vaut `a·sqrt(n) + 2a/sqrt(n)`
+au lieu de `a·sqrt(n)`.
+
+### Frontières du CUSUMSQ : table `c0`
+
+**Statut** : GÉNÉRÉE par simulation interne
+(`validation/spec26_cusumsq_c0.py`), non transcrite. Ce n'est pas un
+pis-aller faute de table publiée : la statistique est
+**distribution-free**, et la simulation est donc exacte au bruit de
+Monte Carlo près, à la précision qu'on veut.
+
+**Justification** : si les résidus récursifs sont i.i.d. N(0, sigma²),
+alors `S_t = somme_{s<=t} w_s² / somme_{s<=n} w_s²` ne dépend plus de
+sigma² — c'est un rapport de sommes partielles de n variables chi²(1)
+i.i.d. La loi de `max_t |S_t - t/n|` ne dépend donc que de `n = T - k`.
+
+**Paramètres** (tous journalisés, exécution reproductible) :
+`n_sims = 200 000`, `seed = 20260802 + n` (distincte et déterministe par
+point de grille), `chunk = 20 000`, seuils 10/5/1 %. Grille de 100
+valeurs de `n`, de 4 à 1000, resserrée en petit échantillon où la
+courbure est forte. Interpolation linéaire en `1/sqrt(n)`, échelle sur
+laquelle la fonction est quasi affine.
+
+**Recoupement** (`validation/results/spec26_c0_crosscheck.txt`) :
+`c0(n)·sqrt(n/2)` doit converger vers le quantile de la loi de
+Kolmogorov, puisque `S_t - t/n` se comporte comme un pont brownien
+d'échelle `sqrt(2/n)` (la variance d'un chi²(1) vaut 2). Le ratio croît
+de façon monotone : 0.63 à n = 4, 0.92 à n = 100, 0.98 à n = 1000. Il
+reste inférieur à 1 en échantillon fini — l'approximation asymptotique
+élargit donc la bande et rend le test conservateur, jamais l'inverse.
+C'est aussi ce repli, avec avertissement explicite, qui sert au-delà de
+n = 1000.
+
+**Limite assumée** : aucune comparaison à la table publiée de Durbin
+(1969) n'a pu être faite, faute d'accès à une source consultable
+librement. Le recoupement est interne (asymptotique) et non externe. Si
+une source fiable devient accessible, la comparaison cellule par cellule
+reste à faire — voir `docs/QUESTIONS.md`.

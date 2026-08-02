@@ -3,6 +3,52 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/1.1.0/).
 This project follows [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added — stability diagnostics (`pyardl.diagnostics`)
+
+- `recursive_residuals` — standardised one-step-ahead prediction errors,
+  computed by Sherman-Morrison rank-one updates rather than `T-k` full
+  re-estimations. Exact, and verified against `statsmodels` to 1e-10.
+- `cusum` and `cusumsq` — the two parameter-constancy tests of Brown,
+  Durbin & Evans (1975). Each returns the path, its boundaries, the
+  verdict, the largest excursion beyond the band, and the positions
+  where the path leaves it, so a break can be located and not merely
+  detected.
+- `stability_tests` — both tests in one table.
+- `plot_cusum` / `plot_cusumsq` — the two canonical graphs, bands
+  included. Requires matplotlib, an optional dependency.
+- `BoundsTestResults.stability()` and `ARDLResults.stability()`.
+- `bounds_test(...).diagnostics()` now reports both stability tests
+  alongside the residual diagnostics. The rows are added, not
+  substituted, and carry no p-value: they are boundary-crossing
+  procedures, so the column is `NaN` rather than an invented number.
+
+### Added — critical values (`pyardl.critical_values.bde1975`)
+
+- `cusum_a` — the published boundary coefficients (0.850 / 0.948 /
+  1.143). The resulting boundary sequence agrees exactly with
+  `statsmodels`.
+- `cusumsq_c0` — half-width of the CUSUM-of-squares band, from a
+  simulated table covering `n = 4..1000`, interpolated in `1/sqrt(n)`.
+  The statistic is distribution-free, so the table is computed rather
+  than transcribed; it was cross-checked against its own asymptotic
+  Kolmogorov limit, which it approaches monotonically from below.
+  Beyond the grid, that asymptotic approximation is used with an
+  explicit warning — it widens the band, making the test conservative.
+
+### Notes
+
+- Only the 10%, 5% and 1% levels exist for either test. Any other level
+  raises an error instead of interpolating a value with no meaning.
+- The CUSUM and the CUSUM of squares are not two views of the same
+  thing: a slope break on a zero-mean regressor is invisible to the
+  first and obvious to the second. Both are therefore always reported.
+- Convention difference with `statsmodels`, documented in
+  `PROVENANCE.md`: the recursion starts at `t = k+1` as in the original
+  article, not at `t = k` where the recursive residual is zero by
+  construction.
+
 ## [0.1.0] — 2026-07-25
 
 First public release. Covers ARDL estimation, the exact error-correction
