@@ -254,14 +254,44 @@ départ (voir ci-dessous). Recoupement géométrique complémentaire : les
 droites passent bien par `(k, a·sqrt(n))` et `(T, 3a·sqrt(n))`, la
 définition de l'article.
 
-**Divergence de convention avec statsmodels** (documentée, assumée) :
-statsmodels fait commencer le chemin CUSUM à `t = k`, où le résidu
-récursif est identiquement nul par construction (le modèle ajuste
-exactement les `k` premières observations). Brown-Durbin-Evans le font
-commencer à `t = k+1`, c'est-à-dire au premier résidu porteur
-d'information. pyardl suit l'article. Conséquence : nos chemins ont un
-point de moins, et la première frontière vaut `a·sqrt(n) + 2a/sqrt(n)`
-au lieu de `a·sqrt(n)`.
+#### PIÈGE — décalage d'un pas à l'origine de la récursion
+
+À lire avant toute comparaison de nos frontières CUSUM avec une autre
+implémentation. Ce décalage a coûté un faux diagnostic pendant la
+validation de la spec 26.
+
+**Le fait** : les `k` premières observations sont ajustées EXACTEMENT
+par une régression à `k` régresseurs. Le résidu récursif en `t = k` est
+donc identiquement nul, par construction et non par hasard.
+
+**Les deux conventions** :
+
+| | Premier point du chemin | Première demi-largeur | Longueur |
+|---|---|---|---|
+| Brown-Durbin-Evans 1975 (**pyardl**) | `t = k+1` | `a·sqrt(n) + 2a/sqrt(n)` | `n = T - k` |
+| `statsmodels.recursive_olsresiduals` | `t = k` | `a·sqrt(n)` | `n + 1` |
+
+pyardl suit l'article : le chemin commence au premier résidu porteur
+d'information. statsmodels inclut le point dégénéré.
+
+**Le symptôme si on l'ignore** : la comparaison terme à terme des deux
+suites de frontières donne un écart d'apparence « petite mais non
+nulle » (0.156 sur notre cas de test, soit ~1.3 % de la borne). On est
+alors tenté de conclure à une divergence de formule, voire d'ajuster un
+coefficient pour « rapprocher » les valeurs — ce qui introduirait une
+vraie erreur pour corriger une fausse.
+
+**Le diagnostic correct** : décaler d'un pas avant de comparer. L'écart
+tombe à **0.00e+00 exactement**, sur 3 configurations (n = 80/150/300,
+k = 2/3/5). Un écart strictement nul, et non « petit », est la signature
+d'une pure différence d'indexation ; un écart petit mais non nul aurait
+signalé un vrai problème de formule.
+
+**Verrouillé par test** :
+`tests/unit/diagnostics/test_stability.py::TestBoundaryCrossCheck`, qui
+compare après décalage ET vérifie indépendamment la définition
+géométrique de l'article (les droites passent par `(k, a·sqrt(n))` et
+`(T, 3a·sqrt(n))`).
 
 ### Frontières du CUSUMSQ : table `c0`
 

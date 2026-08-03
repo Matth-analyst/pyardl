@@ -267,6 +267,21 @@ def cusum(y: ArrayLike, x: ArrayLike, alpha: float = 0.05) -> CUSUMResults:
     -------
     CUSUMResults
 
+    Warnings
+    --------
+    **A "stable" verdict here does not mean the model is stable.** This
+    test cumulates the recursive residuals, so it can only see a break
+    that moves their *mean*. A break in the slope on a zero-mean
+    regressor leaves that mean at zero: the path stays flat and the test
+    reports stability, however large the break. On 20 simulated samples
+    with exactly that break, this test concluded "stable" 20 times out
+    of 20, while :func:`cusumsq` detected it 20 times out of 20.
+
+    The blindness is exact, not a matter of low power, and it holds for
+    any correct implementation of the CUSUM. Always read this test
+    together with :func:`cusumsq`, or simply use
+    :func:`stability_tests`, which runs both.
+
     Notes
     -----
     The statistic is
