@@ -14,6 +14,7 @@ nav:
       - Stability diagnostics: api/diagnostics.md
       - Unit-root pre-tests: api/unitroot.md
       - Long-run restrictions: api/restrictions.md
+      - Engle-Granger test: api/cointegration.md
 theme:
   name: material
 markdown_extensions:

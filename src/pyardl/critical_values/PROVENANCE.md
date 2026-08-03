@@ -405,3 +405,79 @@ Second piège, plus coûteux : la sélection de retards opère sur la série
 sur-sélectionner tous les critères et détruit la puissance du test
 (52 % de rejet sur bruit blanc au lieu de 100 %). Détail et mesures dans
 `docs/QUESTIONS.md`.
+
+---
+
+## Valeurs critiques d'Engle-Granger (spec 06) — `mackinnon.py`
+
+**Source primaire** : MacKinnon, J. G. (1994), *JBES* 12(2), 167-176, et
+MacKinnon, J. G. (2010), « Critical Values for Cointegration Tests »,
+Queen's University WP 1227. Surfaces de réponse
+`C(alpha, k, T) = tau_inf + b1/T + b2/T² + b3/T³`, un jeu de
+coefficients par combinaison (seuil, nombre de variables, cas
+déterministe).
+
+**Canal** : les coefficients sont évalués via
+`statsmodels.tsa.adfvalues` (`mackinnoncrit`, `mackinnonp`), qui les
+transcrit. `statsmodels` étant DÉJÀ une dépendance runtime obligatoire
+de pyardl, aucun matériel n'est dupliqué : il existe exactement une
+copie de ces nombres dans l'environnement, et elle n'est pas la nôtre.
+
+Écart assumé à la spec, qui demandait notre propre table de coefficients
+— voir `docs/DEVIATIONS.md`. Raison : une seconde transcription des mêmes
+nombres publiés ajoute un mode de défaillance (erreur de recopie) sans
+ajouter de source. Le précédent inverse (Narayan, spec 12) se justifiait
+parce que dynamac n'est PAS une dépendance de pyardl et qu'il fallait
+donc embarquer les valeurs.
+
+**Recoupement (seconde source, simulation interne)** :
+`validation/spec06_eg_cv.py`, résultats dans
+`validation/results/spec06_eg_cv_crosscheck.txt`.
+
+DGP sous H0 : y et les k régresseurs sont des marches aléatoires
+gaussiennes INDÉPENDANTES — aucune combinaison stationnaire n'existe.
+Étape 1 en MCO, étape 2 en régression ADF sans déterministe ni retard,
+quantiles de queue basse. 50 000 réplications par cellule, seed
+`20260804 + T + 100k` (+7919 pour `ct`), chunk 2 500. Vectorisation sur
+l'axe des réplications par **QR empilée** — chaque réplication a sa
+propre matrice de régresseurs, et l'inversion de X'X reste interdite.
+
+Le générateur batché est lui-même vérifié contre l'implémentation
+scalaire `engle_granger(..., max_lags=0)` : écart maximal 7.6e-15 sur
+les quatre combinaisons (trend, k) testées. Une table générée par un
+générateur non vérifié ne prouverait rien.
+
+**Résultat** : critère dérivé = 3 x l'erreur type du quantile simulé,
+par **bootstrap** (400 rééchantillonnages, aucune estimation de densité
+— même correction que celle apportée en spec 27). L'erreur des surfaces
+publiées étant inconnue, elle n'est PAS ajoutée : le critère est plus
+strict que la réalité. **54 cellules sur 54 dans le critère**
+(trend c/ct x k = 1/2/3 x T = 100/250/500 x seuils 10/5/1 %). Écart
+maximal observé 0.0376 pour une tolérance de 0.0397.
+
+**Couverture et limitations (exceptions explicites)** : `trend='n'` n'a
+pas de surface publiée par MacKinnon (2010) → NaN + warning, et
+`decision()` lève une exception plutôt que de trancher ; jamais de valeur
+empruntée à un cas déterministe voisin. Nombre de variables limité à 12
+(limite des surfaces) → exception orientant vers le bounds test, qui n'a
+pas de régression de première étape.
+
+### PIÈGE — deux conventions d'arrondi qui divergent
+
+1. **Règle de Schwert.** Schwert (1989) définit le nombre maximal de
+   retards comme `floor(12 (T/100)^{1/4})` ; `statsmodels` arrondit
+   AU-DESSUS (`ceil`). pyardl suit la règle publiée. À T = 200 cela fait
+   14 contre 15, et ce retard supplémentaire déplace l'échantillon
+   commun de la sélection : sur une quasi-égalité de l'AIC (0.804796
+   contre 0.805282, soit 0.06 %), le choix bascule de k = 0 à k = 4 et
+   la statistique passe de -14.11 à -7.82. Les tests de concordance
+   passent donc `max_lags` explicitement des deux côtés, pour mesurer un
+   écart de CALCUL et non un écart de règle d'arrondi. Avec max_lags
+   aligné : 18 configurations sur 18 concordent à 1e-13.
+2. **Taille d'échantillon d'évaluation de la surface.** `statsmodels`
+   évalue les valeurs critiques à `nobs - 1`, avec ce commentaire dans
+   son source : « pour coller à egranger de Stata, je ne sais pas
+   pourquoi ». pyardl évalue à `nobs`, la taille réellement utilisée par
+   la régression de première étape. L'écart est de l'ordre de 0.005 à
+   T = 200 et décroît en 1/T ; le test de concordance des valeurs
+   critiques le tolère explicitement à 0.02 avec la raison en commentaire.

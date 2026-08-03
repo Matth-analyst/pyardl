@@ -24,6 +24,31 @@ This project follows [semantic versioning](https://semver.org/).
   substituted, and carry no p-value: they are boundary-crossing
   procedures, so the column is `NaN` rather than an invented number.
 
+### Added — Engle-Granger test (`pyardl.cointegration`)
+
+- `engle_granger(y, x, trend, max_lags, ic, fit_ecm)` — the two-step
+  procedure, with the second-step error-correction model on request.
+  Statistic and p-value agree with `statsmodels.tsa.stattools.coint` to
+  1e-13 across deterministic cases, numbers of regressors and sample
+  sizes.
+- First-step coefficients are reported as point estimates with **no
+  standard errors**: they are super-consistent but non-standard, so the
+  usual ones would be wrong. The summary says so.
+- `critical_values.mackinnon` — response surfaces of MacKinnon (1994,
+  2010), which correct for the fact that the statistic is computed on
+  estimated residuals. Under `trend='n'`, where no surfaces were
+  published, values are `NaN` with a warning and `decision()` raises
+  rather than deciding.
+- The surfaces are cross-checked against an independent in-house
+  simulation of the null: 54 cells, all within three standard errors of
+  the simulated quantile.
+- Two rounding conventions differ from `statsmodels` and are documented
+  in `PROVENANCE.md`: the Schwert rule for the maximum lag (we round
+  down, as published; they round up), and the sample size at which the
+  surface is evaluated. The first can flip a near-tie in the AIC and
+  move the statistic from -14.11 to -7.82, which is why the concordance
+  tests pass `max_lags` explicitly on both sides.
+
 ### Added — long-run restrictions and seasonality (`pyardl.core.restrictions`)
 
 - `ARDLResults.test_longrun_restriction(R, r, impose=False)` — Wald test
