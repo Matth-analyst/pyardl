@@ -65,11 +65,14 @@ This project follows [semantic versioning](https://semver.org/).
   one. Selecting on the latter makes every criterion over-select and
   costs the test half its power — measured, and corroborated by
   `arch`'s own implementation.
-- MAIC over-selects on stationary data, which costs classification
-  accuracy in the screening report (29/40 against 40/40 for BIC on I(0)
-  series). It remains the default because it is what protects against a
-  negative moving-average component; `method` is exposed and the
-  trade-off is documented with figures.
+- The two screening entry points, `report` and `integration_order`,
+  default to BIC; the two targeted tests, `dfgls` and `ng_perron`,
+  default to MAIC. MAIC over-selects on stationary data, which costs
+  classification accuracy when screening (29/40 against 40/40 for BIC
+  on I(0) series), but it is what protects against a negative
+  moving-average component once a series is being tested deliberately.
+  The measured trade-off appears in `help(report)`, not only in the
+  documentation.
 
 ### Added — critical values (`pyardl.critical_values.bde1975`)
 

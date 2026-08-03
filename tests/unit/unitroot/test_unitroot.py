@@ -328,13 +328,24 @@ class TestReport:
     """§2.3 — rapport séquentiel et garde-fou I(2)."""
 
     def test_i1_series_classified(self) -> None:
-        assert integration_order(_random_walk(300, 50), method="bic")["order"] == "I(1)"
+        assert integration_order(_random_walk(300, 50))["order"] == "I(1)"
 
     def test_i0_series_classified(self) -> None:
+        assert integration_order(_stationary(300, 51, rho=0.2))["order"] == "I(0)"
+
+    def test_screening_defaults_to_bic(self) -> None:
+        """Le défaut du dépistage est BIC, celui des tests ciblés MAIC."""
+        import inspect
+
+        from pyardl.unitroot import dfgls as dfgls_fn
+        from pyardl.unitroot import ng_perron as np_fn
+
+        assert inspect.signature(report).parameters["method"].default == "bic"
         assert (
-            integration_order(_stationary(300, 51, rho=0.2), method="bic")["order"]
-            == "I(0)"
+            inspect.signature(integration_order).parameters["method"].default == "bic"
         )
+        assert inspect.signature(dfgls_fn).parameters["method"].default == "maic"
+        assert inspect.signature(np_fn).parameters["method"].default == "maic"
 
     def test_maic_loses_classification_accuracy_on_clean_data(self) -> None:
         """Arbitrage mesuré entre MAIC et BIC dans le rapport séquentiel.
@@ -359,7 +370,7 @@ class TestReport:
     def test_i2_series_flagged(self) -> None:
         """Série I(2) simulée : double intégration -> suspicion."""
         y = np.cumsum(np.cumsum(np.random.default_rng(52).standard_normal(300)))
-        assert integration_order(y, method="bic")["order"] == "I(2)-suspect"
+        assert integration_order(y)["order"] == "I(2)-suspect"
 
     def test_report_frame(self) -> None:
         rng = np.random.default_rng(53)
@@ -369,7 +380,7 @@ class TestReport:
                 "stat": _stationary(250, 54, rho=0.2),
             }
         )
-        table = report(df, method="bic")
+        table = report(df)
         assert list(table.index) == ["rw", "stat"]
         assert table.loc["rw", "order"] == "I(1)"
         assert table.loc["stat", "order"] == "I(0)"
@@ -382,11 +393,11 @@ class TestReport:
 
     def test_report_accepts_series(self) -> None:
         s = pd.Series(_random_walk(200, 56), name="x")
-        assert report(s, method="bic").shape[0] == 1
+        assert report(s).shape[0] == 1
 
     def test_i0_skips_difference_test(self) -> None:
         """Pas de test sur la différence quand le niveau rejette déjà."""
-        out = integration_order(_stationary(300, 57, rho=0.2), method="bic")
+        out = integration_order(_stationary(300, 57, rho=0.2))
         assert np.isnan(out["dfgls_diff"])
         assert out["decision_diff"] == ""
 

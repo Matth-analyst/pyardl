@@ -26,7 +26,7 @@ The two tests here fix those two failures:
   variance and a modified lag criterion, which is what removes the size
   distortion.
 
-## `report(data, trend='c', alpha=0.05, method='maic')`
+## `report(data, trend='c', alpha=0.05, method='bic')`
 
 The everyday entry point: pre-test every column and tabulate the
 verdicts.
@@ -34,7 +34,7 @@ verdicts.
 ```python
 from pyardl.unitroot import report
 
-print(report(data, method="bic"))
+print(report(data))
 ```
 
 ```text
@@ -115,9 +115,9 @@ one estimate.
 
 ## Lag selection, and one thing worth knowing
 
-`method="maic"` is the default and is the heart of Ng & Perron's
-contribution: with a negative moving-average component the plain AIC
-picks too few lags and the test over-rejects massively.
+MAIC is the heart of Ng & Perron's contribution: with a negative
+moving-average component the plain AIC picks too few lags and the test
+over-rejects massively.
 
 But MAIC has a cost, and it is measurable. Its penalty term is large
 precisely when the series looks stationary, so it over-selects on I(0)
@@ -131,9 +131,11 @@ length 250:
 | MAIC | 29/40 | 32/40 | 37/40 |
 | BIC | 40/40 | 40/40 | 35/40 |
 
-So: keep MAIC when you suspect a negative MA component — that is what it
-is for. Prefer `method="bic"` for plain screening. The choice is yours
-and it is exposed; what would be wrong is to make it by inertia.
+So the defaults split along the job being done: `report` and
+`integration_order` — screening, before you know anything about the
+data — default to **BIC**; `dfgls` and `ng_perron` — one series, tested
+deliberately — default to **MAIC**. Override either whenever you have a
+reason; what would be wrong is to choose by inertia.
 
 `select_lags` also returns the criterion value at every candidate order,
 so the choice can be inspected rather than trusted.

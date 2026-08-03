@@ -68,7 +68,7 @@ def integration_order(
     y: ArrayLike,
     trend: Trend = "c",
     alpha: float = 0.05,
-    method: LagMethod = "maic",
+    method: LagMethod = "bic",
 ) -> dict[str, object]:
     """Classify one series as I(0), I(1) or I(2)-suspect.
 
@@ -82,20 +82,18 @@ def integration_order(
         would mean a quadratic trend in the level, which is not what is
         being asked here.
     alpha : float, default 0.05
-    method : str, default 'maic'
-        Lag-selection criterion.
+    method : {'bic', 'maic', 'mbic', 'aic', 't-stat'}, default 'bic'
+        Lag-selection criterion. BIC is the default for the same reason
+        as in :func:`report`, of which this is the single-series
+        version: on screening work it classifies clean data markedly
+        better (40/40 against 29/40 on I(0), 40/40 against 32/40 on
+        I(1), over 40 replications of length 250). The figures and the
+        reasoning are in :func:`report`.
 
-        For *screening*, ``'bic'`` classifies clean data markedly
-        better. Measured on 40 replications of length 250: BIC gets
-        40/40 on I(0) and 40/40 on I(1), against 29/40 and 32/40 for
-        MAIC. MAIC over-selects on stationary data, which costs power at
-        the differencing stage and turns genuine I(1) series into false
-        I(2) suspicions.
-
-        MAIC remains the default because it is what protects the M tests
-        against a negative moving-average component — the situation it
-        was designed for, and one no clean simulation exhibits. Pick
-        deliberately rather than by inertia.
+        :func:`~pyardl.unitroot.dfgls` and
+        :func:`~pyardl.unitroot.ng_perron` keep ``'maic'``, which is
+        what the literature recommends once you are testing one series
+        deliberately.
 
     Returns
     -------
@@ -137,7 +135,7 @@ def report(
     data: pd.DataFrame | pd.Series,
     trend: Trend = "c",
     alpha: float = 0.05,
-    method: LagMethod = "maic",
+    method: LagMethod = "bic",
 ) -> pd.DataFrame:
     """Pre-test every series and tabulate the verdicts.
 
@@ -147,7 +145,33 @@ def report(
         One column per variable.
     trend : {'c', 'ct'}, default 'c'
     alpha : float, default 0.05
-    method : str, default 'maic'
+    method : {'bic', 'maic', 'mbic', 'aic', 't-stat'}, default 'bic'
+        Lag-selection criterion.
+
+        **Why the default here is BIC, and not MAIC.** This function is
+        a first pass, run before you know what the data look like, and
+        on that job BIC classifies clean series markedly better. MAIC's
+        penalty term is large precisely when a series looks stationary,
+        so it over-selects on I(0) data — 6.1 lags on white noise
+        against 0.0 for BIC — which costs power at the differencing
+        stage and turns genuine I(1) series into false I(2) suspicions.
+
+        Measured over 40 replications of length 250:
+
+        ==========  ==============  ==============  ==============
+        criterion   I(0) correct    I(1) correct    I(2) flagged
+        ==========  ==============  ==============  ==============
+        BIC         40/40           40/40           35/40
+        MAIC        29/40           32/40           37/40
+        ==========  ==============  ==============  ==============
+
+        :func:`~pyardl.unitroot.dfgls` and
+        :func:`~pyardl.unitroot.ng_perron` keep ``'maic'`` as their own
+        default: once you are past screening and testing one series
+        deliberately, MAIC is what the literature recommends, because it
+        is what protects against a negative moving-average component —
+        the case these clean simulations do not exercise. Switch back to
+        ``method='maic'`` here whenever you suspect one.
 
     Returns
     -------
