@@ -24,6 +24,53 @@ This project follows [semantic versioning](https://semver.org/).
   substituted, and carry no p-value: they are boundary-crossing
   procedures, so the column is `NaN` rather than an invented number.
 
+### Added — unit-root pre-tests (`pyardl.unitroot`)
+
+- `dfgls` — the DF-GLS test of Elliott, Rothenberg & Stock (1996).
+  Verified against `arch` to 1e-8 across sample sizes, trends and lag
+  orders.
+- `ng_perron` — the four M statistics (MZa, MZt, MSB, MPT), sharing an
+  autoregressive long-run variance. All are lower-tail, so there is no
+  direction to get wrong.
+- `gls_detrend`, `ols_detrend`, `adf_regression`, `select_lags` —
+  the shared machinery, exposed rather than hidden. `select_lags`
+  implements MAIC and MBIC alongside AIC, BIC and the sequential t
+  rule, compares every candidate on a common sample, and returns the
+  criterion value at each order so the choice can be inspected.
+- `report` / `integration_order` — sequential level-then-difference
+  screening, classifying each series as I(0), I(1) or I(2)-suspect. A
+  `PyardlMethodologyWarning` fires on any I(2) suspicion: the bounds
+  test is invalid on I(2) data and cannot detect it itself.
+
+### Added — critical values
+
+- `critical_values.ers1996.dfgls_critical_values` and
+  `critical_values.ngperron2001.m_critical_values`, simulated in-house
+  over `T = 25..2000` for both deterministic cases, interpolated in
+  `1/T`.
+- The two families were verified differently, because their
+  availability differs. DF-GLS has a second source (`arch`) and agrees
+  with it within Monte Carlo error for `T >= 100`. The M statistics
+  have **no second implementation anywhere**, so verification is
+  internal: `MZt` shares the limiting distribution of DF-GLS, and the
+  two independently simulated tables converge as `T` grows — a gap of
+  0.155 at `T = 100` down to 0.006 at `T = 2000`.
+
+### Notes
+
+- The first observation is not quasi-differenced during GLS detrending.
+  Getting this wrong moves the statistic by 45% on a random walk; the
+  convention is locked by a test.
+- Lag selection runs on the OLS-detrended series, not the GLS-detrended
+  one. Selecting on the latter makes every criterion over-select and
+  costs the test half its power — measured, and corroborated by
+  `arch`'s own implementation.
+- MAIC over-selects on stationary data, which costs classification
+  accuracy in the screening report (29/40 against 40/40 for BIC on I(0)
+  series). It remains the default because it is what protects against a
+  negative moving-average component; `method` is exposed and the
+  trade-off is documented with figures.
+
 ### Added — critical values (`pyardl.critical_values.bde1975`)
 
 - `cusum_a` — the published boundary coefficients (0.850 / 0.948 /

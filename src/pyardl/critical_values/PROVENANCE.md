@@ -328,3 +328,80 @@ n = 1000.
 librement. Le recoupement est interne (asymptotique) et non externe. Si
 une source fiable devient accessible, la comparaison cellule par cellule
 reste à faire — voir `docs/QUESTIONS.md`.
+
+---
+
+## Valeurs critiques des pré-tests de racine unitaire (spec 27)
+
+Les deux familles n'ont **pas le même statut de disponibilité**. Elles
+sont donc traitées séparément, avec des protocoles de recoupement
+différents.
+
+### DF-GLS (Elliott, Rothenberg & Stock 1996) — `ers1996.py`
+
+**Statut** : GÉNÉRÉE par simulation interne
+(`validation/spec27_unitroot_cv.py`), avec **recoupement externe
+disponible**.
+
+**Paramètres** : 100 000 réplications par point de grille, marche
+aléatoire gaussienne sous H0, dé-trending sous l'alternative locale
+(c̄ = −7 pour `c`, −13.5 pour `ct`), statistique calculée à retards nuls
+— convention de tabulation, la sélection de retards servant à estimer la
+variance de long terme sur données réelles, pas à définir la loi limite.
+Seed `20260803 + T` (+7919 pour `ct`), chunk 5 000. Grille de 19 valeurs
+de T, de 25 à 2000. Interpolation linéaire en 1/T.
+
+**Seconde source** : le package `arch` (Sheppard, BSD-3) expose des
+surfaces de réponse elles-mêmes re-simulées selon la méthodologie
+MacKinnon. Recoupement dans
+`validation/results/spec27_cv_tolerance.txt`, critère dérivé =
+3 × erreur type du quantile, obtenue par **bootstrap** (500 rééchan-
+tillonnages) et non par la formule asymptotique : celle-ci exige
+d'estimer la densité au quantile, et une fenêtre à pas fixe déborde de
+(0, 1) quand p = 0.01, produisant une erreur type six fois trop grande —
+mesuré, puis corrigé. L'erreur de `arch` étant inconnue, elle n'est PAS
+ajoutée : le critère est donc plus strict que la réalité.
+
+**Résultat** : concordance pour T ≥ 100. Divergence systématique à
+T = 50 — voir OBS-6, tranchée par une expérience de taille en faveur de
+nos valeurs.
+
+### Statistiques M (Ng & Perron 2001) — `ngperron2001.py`
+
+**Statut** : GÉNÉRÉE par la même simulation, **sans aucune seconde
+implémentation disponible**.
+
+Ni `arch` ni `statsmodels` ne fournissent les statistiques MZα, MZt, MSB
+ou MPT — vérifié par inspection des espaces de noms des deux packages.
+Aucun recoupement externe n'est donc possible, et aucune table publiée
+librement consultable n'a été trouvée.
+
+**Recoupement interne, non trivial** : MZt partage la loi asymptotique
+du DF-GLS (Ng-Perron 2001, §2). Les deux tables étant simulées
+séparément dans le même run, leur convergence quand T croît est une
+preuve qu'aucune des deux ne repose sur une formule fausse. Mesuré
+(`spec27_cv_crosscheck.txt`), cas `ct` à 10 % : écart 0.155 à T = 100,
+0.070 à T = 200, 0.026 à T = 500, 0.012 à T = 1000, 0.006 à T = 2000 —
+décroissance monotone au rythme attendu.
+
+**Recoupement algébrique** : l'identité MZt = MZα × MSB est vérifiée à
+1e-12 sur données réelles (test dédié). Elle lie trois des quatre
+statistiques : une erreur dans l'une la romprait.
+
+**Limite assumée** : les quatre tables n'ont pas de seconde source. Si
+une devient accessible, la comparaison cellule par cellule reste à
+faire — `docs/QUESTIONS.md`.
+
+### PIÈGE — sur quelle série sélectionner les retards
+
+Les tables sont indexées sur la **longueur de la série** (`len(y)`),
+l'axe sur lequel elles ont été simulées, et non sur le nombre de lignes
+de la régression ADF. Évaluer une surface de réponse externe à
+1/(T−1) plutôt qu'à 1/T pour « corriger » un écart aggrave celui-ci —
+vérifié, l'écart passe de 0.035 à 0.041 à T = 50.
+
+Second piège, plus coûteux : la sélection de retards opère sur la série
+**MCO-détrendée**, pas GLS. Sélectionner sur la série GLS fait
+sur-sélectionner tous les critères et détruit la puissance du test
+(52 % de rejet sur bruit blanc au lieu de 100 %). Détail et mesures dans
+`docs/QUESTIONS.md`.
