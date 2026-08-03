@@ -24,6 +24,37 @@ This project follows [semantic versioning](https://semver.org/).
   substituted, and carry no p-value: they are boundary-crossing
   procedures, so the column is `NaN` rather than an invented number.
 
+### Added — long-run restrictions and seasonality (`pyardl.core.restrictions`)
+
+- `ARDLResults.test_longrun_restriction(R, r, impose=False)` — Wald test
+  of `R theta = r` on the long-run coefficients, using the same
+  delta-method covariance as the standard errors in `.longrun`, so the
+  two cannot disagree. The discrepancy `R theta - r` is returned signed.
+- `impose=True` re-estimates the error-correction model with the
+  homogeneity restriction `theta_j = 1` applied — the level term becomes
+  the ratio `(y - x_j)` — and reports the regression F test. The
+  unrestricted design reproduces the ARDL regression exactly (residuals
+  to 1e-10), which is what makes that F test legitimate; a test verifies
+  it across lag orders and deterministic cases. Any other restriction
+  raises rather than imposing something different from what was tested.
+- `utils.diff(x, d, D, s)` — the operator `(1-L)^d (1-L^s)^D`. A Series
+  keeps the tail of its index, so a differenced series stays attached to
+  its dates instead of silently shifting.
+- `ARDL(..., seasonal=True, seasonal_periods=4)` — seasonal dummies,
+  `s-1` of them when an intercept is present. The season of each
+  observation is read from its position in the original series, so
+  `hold_back` cannot relabel the quarters.
+- The verdict is `not_rejected`, never `accept`.
+
+### Not shipped
+
+- `datasets.load_uk_consumption()`, called for by the same specification,
+  is **not** included. The DHSY data come from a 1978 article behind an
+  access barrier and no freely redistributable source was identified.
+  Fabricating a plausible series under the name of a real source would
+  have been worse than inventing a critical value: it could be
+  cross-checked against nothing. See `docs/QUESTIONS.md`.
+
 ### Added — unit-root pre-tests (`pyardl.unitroot`)
 
 - `dfgls` — the DF-GLS test of Elliott, Rothenberg & Stock (1996).

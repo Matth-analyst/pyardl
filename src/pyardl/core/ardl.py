@@ -39,7 +39,7 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 from itertools import product
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -59,6 +59,9 @@ from pyardl.core.transforms import (
 )
 from pyardl.exceptions import PyardlMethodologyWarning
 from pyardl.utils import check_series, lag_matrix
+
+if TYPE_CHECKING:  # pragma: no cover
+    from pyardl.core.restrictions import LongRunRestrictionResults
 
 FloatArray = npt.NDArray[np.float64]
 
@@ -114,7 +117,12 @@ class ARDL:
         Deterministic terms: none, an intercept, or an intercept plus a
         linear trend (``"trend"`` always includes the intercept).
     seasonal : bool
-        Not implemented yet.
+        Add seasonal dummies. One period is dropped when an intercept is
+        present, to avoid the dummy trap; with ``det="none"`` all
+        ``seasonal_periods`` dummies are kept.
+    seasonal_periods : int
+        Length of the seasonal cycle, 4 for quarterly data. Ignored
+        unless ``seasonal=True``.
     fixed_regressors : array-like, shape (T, m), optional
         Variables entered without lags, such as dummies.
     hold_back : int, optional
@@ -140,11 +148,14 @@ class ARDL:
         order: tuple[int, int | dict[str, int]] | int = (1, 0),
         det: DetType = "const",
         seasonal: bool = False,
+        seasonal_periods: int = 4,
         fixed_regressors: npt.ArrayLike | None = None,
         hold_back: int | None = None,
     ) -> None:
-        if seasonal:
-            raise NotImplementedError("Seasonal dummies are not implemented yet.")
+        if seasonal and seasonal_periods < 2:
+            raise ValueError(f"seasonal_periods={seasonal_periods} must be at least 2.")
+        self.seasonal = bool(seasonal)
+        self.seasonal_periods = int(seasonal_periods)
         if det not in ("none", "const", "trend"):
             raise ValueError('det must be "none", "const" or "trend".')
 
@@ -186,6 +197,7 @@ class ARDL:
         n_params = (
             (0 if det == "none" else 1)
             + (1 if det == "trend" else 0)
+            + self._n_seasonal()
             + self.p
             + sum(qj + 1 for qj in self.q)
             + len(self._fixed_names)
@@ -195,6 +207,27 @@ class ARDL:
                 f"Not enough observations: the estimation sample has {n_est} "
                 f"points for {n_params} parameters."
             )
+
+    def _n_seasonal(self) -> int:
+        """Number of seasonal dummy columns."""
+        if not self.seasonal:
+            return 0
+        # One period is dropped when an intercept is already there; the
+        # full set would be perfectly collinear with it.
+        return self.seasonal_periods - (1 if self.det in ("const", "trend") else 0)
+
+    def _seasonal_dummies(self) -> FloatArray:
+        """Seasonal dummy columns over the estimation sample."""
+        n = self._y.shape[0]
+        hb = self.hold_back
+        s = self.seasonal_periods
+        # Phase is taken from the position in the ORIGINAL series, so
+        # that hold_back does not silently relabel the seasons.
+        phase = np.arange(n)[hb:] % s
+        drop = 1 if self.det in ("const", "trend") else 0
+        return np.column_stack(
+            [(phase == k).astype(np.float64) for k in range(drop, s)]
+        )
 
     # ------------------------------------------------------------------
     # Design matrix (column order matches statsmodels, see module docstring)
@@ -212,6 +245,12 @@ class ARDL:
         if self.det == "trend":
             cols.append(np.arange(hb + 1, n + 1, dtype=np.float64))
             names.append("trend")
+
+        if self.seasonal:
+            dummies = self._seasonal_dummies()
+            cols.extend(dummies.T)
+            drop = 1 if self.det in ("const", "trend") else 0
+            names.extend(f"season.{k + 1}" for k in range(drop, self.seasonal_periods))
 
         if self.p > 0:
             y_lags = lag_matrix(y, hb, first_lag=1)[:, : self.p]
@@ -944,6 +983,38 @@ class ARDLResults:
             },
             index=[f"Ljung-Box({lb_lags})", "Jarque-Bera", "Breusch-Pagan"],
         )
+
+    def test_longrun_restriction(
+        self,
+        r_matrix: npt.ArrayLike,
+        value: npt.ArrayLike | float = 0.0,
+        impose: bool = False,
+    ) -> LongRunRestrictionResults:
+        """Wald test of ``R theta = r`` on the long-run coefficients.
+
+        See :func:`pyardl.core.restrictions.longrun_restriction`.
+        The canonical use is the homogeneity restriction of Davidson,
+        Hendry, Srba & Yeo (1978): a unit long-run elasticity, which
+        turns the level term into a ratio.
+
+        Examples
+        --------
+        >>> import numpy as np, pandas as pd
+        >>> from pyardl.core.ardl import ARDL
+        >>> rng = np.random.default_rng(1)
+        >>> x = pd.Series(np.cumsum(rng.standard_normal(200)), name="x")
+        >>> y = pd.Series(np.zeros(200), name="y")
+        >>> for t in range(1, 200):
+        ...     y.iloc[t] = (
+        ...         0.6 * y.iloc[t - 1] + 0.4 * x.iloc[t] + rng.standard_normal()
+        ...     )
+        >>> res = ARDL(y, x, order=(1, 1))._fit()
+        >>> res.test_longrun_restriction([[1.0]], 1.0).df
+        1
+        """
+        from pyardl.core.restrictions import longrun_restriction
+
+        return longrun_restriction(self, r_matrix, value, impose=impose)
 
     def stability(self, alpha: float = 0.05) -> pd.DataFrame:
         """CUSUM and CUSUM-of-squares tests for parameter constancy.

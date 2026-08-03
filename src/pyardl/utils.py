@@ -121,6 +121,90 @@ def lag_matrix(
     return np.column_stack(cols)
 
 
+def diff(
+    x: npt.ArrayLike,
+    d: int = 1,
+    D: int = 0,
+    s: int = 4,
+) -> npt.NDArray[np.float64] | pd.Series:
+    r"""Apply the differencing operator :math:`(1-L)^d (1-L^s)^D`.
+
+    Parameters
+    ----------
+    x : array-like or pandas.Series, shape (T,)
+        Input series.
+    d : int, default 1
+        Order of ordinary differencing.
+    D : int, default 0
+        Order of seasonal differencing.
+    s : int, default 4
+        Seasonal period. Quarterly data by default, as in the
+        consumption function of Davidson, Hendry, Srba & Yeo (1978).
+
+    Returns
+    -------
+    ndarray or pandas.Series, shape (T - d - D*s,)
+        The differenced series. A Series keeps the tail of the original
+        index, so the result stays aligned with the dates it belongs to
+        rather than silently shifting by ``d + D*s`` periods.
+
+    Raises
+    ------
+    ValueError
+        If ``d`` or ``D`` is negative, if ``s < 1``, or if the series is
+        too short to survive the requested differencing.
+
+    Notes
+    -----
+    The two operators commute, so the order of application does not
+    matter; ordinary differencing is applied first here.
+
+    Seasonal differencing is not a detrending convenience: on quarterly
+    data :math:`\Delta_4 y_t = y_t - y_{t-4}` removes a fixed seasonal
+    pattern *and* a unit root at the same time, which is why DHSY built
+    their consumption function on it. Combining it with an ordinary
+    difference, ``d=1, D=1``, removes a seasonal pattern that itself
+    drifts.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from pyardl.utils import diff
+    >>> x = np.arange(8.0)
+    >>> diff(x, d=1)
+    array([1., 1., 1., 1., 1., 1., 1.])
+    >>> diff(x, d=0, D=1, s=4)
+    array([4., 4., 4., 4.])
+    """
+    if d < 0 or D < 0:
+        raise ValueError(f"d={d} and D={D} must be non-negative.")
+    if s < 1:
+        raise ValueError(f"s={s} must be at least 1.")
+
+    index = x.index if isinstance(x, pd.Series) else None
+    name = x.name if isinstance(x, pd.Series) else None
+    arr = np.asarray(x, dtype=np.float64)
+    if arr.ndim != 1:
+        raise ValueError("x must be 1-D.")
+
+    dropped = d + D * s
+    if arr.shape[0] <= dropped:
+        raise ValueError(
+            f"Series is too short: T={arr.shape[0]} observations cannot "
+            f"survive (1-L)^{d} (1-L^{s})^{D}, which drops {dropped}."
+        )
+
+    out: npt.NDArray[np.float64] = arr
+    for _ in range(d):
+        out = np.asarray(out[1:] - out[:-1], dtype=np.float64)
+    for _ in range(D):
+        out = np.asarray(out[s:] - out[:-s], dtype=np.float64)
+
+    if index is not None:
+        return pd.Series(out, index=index[dropped:], name=name)
+    return out
+
+
 def check_series(
     y: npt.ArrayLike,
     x: npt.ArrayLike | None = None,

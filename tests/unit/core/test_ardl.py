@@ -62,10 +62,15 @@ class TestInternalConsistency:
         with pytest.raises(ValueError, match="hold_back"):
             ARDL(y, x, order=(2, 3), hold_back=2)
 
-    def test_seasonal_not_implemented(self) -> None:
+    def test_seasonal_dummies_available(self) -> None:
+        """Les dummies saisonnières existent désormais (spec 04 §2.3).
+
+        Ce test remplace celui qui verrouillait le NotImplementedError :
+        la fonctionnalité est implémentée, pas contournée.
+        """
         y, x = _dgp_clean(seed=4)
-        with pytest.raises(NotImplementedError, match="not implemented"):
-            ARDL(y, x, order=(1, 1), seasonal=True)
+        res = ARDL(y, x, order=(1, 1), seasonal=True, seasonal_periods=4)._fit()
+        assert sum("season" in n for n in res.params.index) == 3
 
     def test_fixed_regressors_match_statsmodels(self) -> None:
         from statsmodels.tsa.ardl import ARDL as SM_ARDL
