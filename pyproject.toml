@@ -25,6 +25,16 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.6",
     "mypy>=1.10",
+    # Dépendances optionnelles du package, requises en test : sans elles
+    # les verrous de concordance externe (DF-GLS contre arch) et les
+    # tests de tracés sont SKIP en silence, et la CI passe au vert en
+    # ayant sauté sa validation la plus importante.
+    "arch>=6.3",
+    "matplotlib>=3.8",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -45,7 +55,13 @@ ignore = []
 quote-style = "double"
 
 [tool.mypy]
-python_version = "3.11"
+# 3.12, alors que le package supporte 3.11+ : les stubs de numpy >= 2.5
+# utilisent la syntaxe `type` (PEP 695), que mypy refuse de parser sous
+# une cible 3.11 — il s'arrête sur numpy/__init__.pyi avant même de
+# regarder notre code. Le typage n'est pas un comportement d'exécution ;
+# la compatibilité 3.11 réelle est vérifiée par la matrice pytest, et le
+# style 3.11 par ruff (target-version = "py311").
+python_version = "3.12"
 packages = ["pyardl"]
 mypy_path = "src"
 strict = true

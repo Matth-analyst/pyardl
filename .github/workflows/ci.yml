@@ -2,15 +2,73 @@ name: CI
 
 on:
   push:
+    branches: [main]
+    tags: ["v*"]
   pull_request:
+  schedule:
+    # Monte Carlo complets, une fois par nuit (03:00 UTC).
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Une seule exécution par branche : un push qui en suit un autre annule
+# le précédent au lieu de faire la queue.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      # validation/ n'est pas publié (outillage local) : le linter ne
+      # voit que ce que le dépôt contient réellement.
+      - name: ruff check
+        run: ruff check src tests
+      - name: ruff format --check
+        run: ruff format --check src tests
+
+  types:
+    name: Types (mypy strict)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Le typage est une propriété statique, pas un comportement
+    # d'exécution : il est vérifié une fois, sur une version fixée, et
+    # non répété sur toute la matrice. Cela évite aussi que la CI dépende
+    # de la version de stubs que chaque Python résout.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: mypy src/pyardl
+
   test:
+    name: Tests (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -18,33 +76,95 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - name: Install
-        run: pip install -e ".[dev]"
-      - name: Ruff (lint + format)
-        run: |
-          ruff check src tests
-          ruff format --check src tests
-      - name: Mypy (strict)
-        run: mypy src/pyardl
-      - name: Pytest (suite CI + réplications sur valeurs pré-générées)
-        run: pytest -m "not slow" --doctest-modules src/pyardl tests --cov=pyardl
+          cache-dependency-path: pyproject.toml
 
-  nightly-slow:
-    # Monte Carlo complets (recoupement des tables de CV, taille/puissance)
-    if: github.event_name == 'schedule'
+      # Les extras optionnels sont installés : sans arch, le verrou de
+      # concordance DF-GLS est SKIP et la CI passerait au vert en ayant
+      # sauté sa validation externe la plus importante.
+      - name: Install (avec extras optionnels)
+        run: pip install -e ".[dev,plot,bootstrap]"
+
+      - name: Pytest + doctests + couverture
+        run: >
+          pytest -m "not slow"
+          --doctest-modules src/pyardl tests
+          --cov=pyardl --cov-report=term-missing --cov-report=xml
+
+      # Un test ignoré faute de dépendance ne doit jamais passer
+      # inaperçu. Les seuls skips tolérés sont ceux qui attendent une
+      # autorisation externe, marqués comme tels dans le code.
+      - name: Aucun test ignoré pour cause de dépendance manquante
+        shell: bash
+        run: |
+          out=$(pytest -m "not slow" -q -rs 2>&1 || true)
+          if echo "$out" | grep -q "could not import"; then
+            echo "::error::Des tests ont été ignorés faute d'une dépendance :"
+            echo "$out" | grep "could not import"
+            exit 1
+          fi
+          echo "OK : aucun skip pour dépendance manquante."
+
+      - name: Conserver la couverture
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+
+  package:
+    name: Paquet (build + métadonnées)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install
-        run: pip install -e ".[dev]"
+          cache-dependency-path: pyproject.toml
+      - run: pip install build twine
+      - name: Construire la roue et l'archive
+        run: python -m build
+      - name: Vérifier les métadonnées (rendu PyPI compris)
+        run: twine check --strict dist/*
+      - name: Installer la roue dans un env vierge et importer
+        run: |
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/pip install dist/*.whl
+          /tmp/fresh/bin/python -c "import pyardl; print('pyardl', pyardl.__version__)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  docs:
+    name: Documentation (mkdocs --strict)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[docs]"
+      # --strict transforme tout lien mort ou page orpheline en erreur.
+      - run: mkdocs build --strict
+
+  nightly-slow:
+    name: Monte Carlo complets (nightly)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev,plot,bootstrap]"
       - name: Pytest slow
         run: pytest -m slow -q
-
-# Pour activer le nightly, ajouter :
-# on:
-#   schedule:
-#     - cron: "0 3 * * *"

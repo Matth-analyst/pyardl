@@ -1,30 +1,97 @@
+<div align="center">
+
 # pyardl
 
-ARDL models and bounds tests for cointegration in Python.
+**ARDL models, bounds tests for cointegration, and critical values you can trace back to their source.**
 
-`pyardl` estimates autoregressive distributed lag models, converts them
-to their error-correction form, and runs the Pesaran-Shin-Smith bounds
-test for the existence of a long-run relationship — the test you reach
-for when you do not know in advance whether your series are I(0) or
-I(1).
+[![CI](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml/badge.svg)](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Coverage 96%](https://img.shields.io/badge/coverage-96%25-brightgreen)](#validation)
 
-It fills a gap: the bounds test is standard in applied econometrics and
-available in Stata and R, but Python support has been partial. `pyardl`
-covers all five deterministic cases, gives you three critical-value
-sources including modern response surfaces with p-values, and never
-reduces an inconclusive result to a yes/no answer.
+</div>
+
+---
+
+## The problem this solves
+
+You have macroeconomic series and you suspect a long-run relationship. The
+classical route — Engle-Granger, Johansen — asks you to establish the
+integration order of every series first, and is invalid if you get it wrong or
+if the orders are mixed.
+
+Mixed orders are the normal case. Here is what happens on the Danish
+money-demand data shipped with this package:
+
+```python
+from pyardl.datasets import load_denmark
+from pyardl.unitroot import report
+
+data = load_denmark()
+print(report(data[["LRM", "LRY", "IBO", "IDE"]]))
+```
+
+```text
+         order dfgls_level decision_level dfgls_diff decision_diff mzt_level
+variable
+LRM       I(1)   -1.047542      unit_root  -2.378078    stationary -1.152137
+LRY       I(1)   -0.819062      unit_root  -4.630152    stationary -0.813225
+IBO       I(1)   -1.744509      unit_root  -2.925082    stationary  -1.64134
+IDE       I(0)   -2.445024     stationary        NaN               -2.612435
+```
+
+Three I(1) series and one I(0). Engle-Granger has no right to run on this, and
+when you run it anyway it finds nothing:
+
+```text
+Engle-Granger test (1987) - trend 'c', 4 variables, lags=3, nobs=55
+  statistic = -3.3147   p-value = 0.2611
+  decision (5%): no_cointegration
+```
+
+The bounds test of Pesaran, Shin & Smith does not need the orders to be known,
+and on the same data it finds the relationship:
+
+```text
+F_overall = 6.2059   decision (5%): cointegration
+t_BDM     = -4.5479   decision (5%): cointegration
+joint decision (F and t): cointegration
+```
+
+That gap is the reason this library exists.
+
+---
+
+## Install
+
+`pyardl` is not on PyPI yet. Install from source:
+
+```bash
+pip install git+https://github.com/Matth-analyst/pyardl.git
+```
+
+Or clone it, which is what you want if you intend to read the code:
+
+```bash
+git clone https://github.com/Matth-analyst/pyardl.git
+cd pyardl
+pip install -e ".[dev,plot,bootstrap]"
+```
+
+Requires Python 3.11+. Runtime dependencies are numpy, scipy, pandas and
+statsmodels — nothing else. `matplotlib` (extra `plot`) and `arch` (extra
+`bootstrap`) are optional and imported lazily.
+
+---
+
+## Sixty seconds
 
 ```python
 from pyardl.bounds import bounds_test
 from pyardl.datasets import load_denmark
 
 data = load_denmark()
-res = bounds_test(
-    data["LRM"],                       # log real money demand
-    data[["LRY", "IBO", "IDE"]],       # income, bond rate, deposit rate
-    case=3,                            # unrestricted intercept, no trend
-    order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}),
-)
+res = bounds_test(data["LRM"], data[["LRY", "IBO", "IDE"]], case=3)
 print(res.summary())
 ```
 
@@ -43,133 +110,565 @@ alpha
 0.01   4.311  5.543 -3.430 -4.370
 ```
 
-## Installation
+---
 
-```bash
-pip install -e .
+## Table of contents
+
+- [Design principles](#design-principles)
+- [The workflow](#the-workflow)
+  - [Step 0 — Screen for I(2)](#step-0--screen-for-i2)
+  - [Step 1 — Choose lag orders](#step-1--choose-lag-orders)
+  - [Step 2 — Run the bounds test](#step-2--run-the-bounds-test)
+  - [Step 3 — Read the long run](#step-3--read-the-long-run)
+  - [Step 4 — Test what theory says](#step-4--test-what-theory-says)
+  - [Step 5 — Check the model held still](#step-5--check-the-model-held-still)
+- [API reference](#api-reference)
+- [Validation](#validation)
+- [Compatibility](#compatibility)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Citing](#citing)
+- [References](#references)
+
+---
+
+## Design principles
+
+Four rules shape the API. They are the reason to prefer this library over
+writing the same tests yourself.
+
+**An inconclusive result stays inconclusive.** The bounds test compares a
+statistic against a *pair* of critical values, so the verdict has three states —
+`cointegration`, `no_cointegration`, `inconclusive` — and never collapses to a
+boolean. When the answer lands in the middle you get the p-value interval, so
+you can see how close it was.
+
+**Nothing is silently substituted.** Ask for a critical value that does not
+exist — a level nobody tabulated, more regressors than the tables cover,
+`trend='n'` for Engle-Granger — and you get an exception naming a source that
+does have it. Never a neighbouring cell quietly returned in its place.
+
+**Invalid inference is refused, not decorated.** A confidence interval on the
+speed of adjustment is produced only once cointegration is established; before
+that its distribution is non-standard, so you get `NaN` and a warning.
+First-step Engle-Granger coefficients come with no standard errors at all,
+because the usual ones are wrong there.
+
+**Every number is traceable.** Every critical value ships with its exact source,
+and every table was cross-checked against an independent one or against an
+in-house Monte Carlo engine. See [Validation](#validation).
+
+---
+
+## The workflow
+
+### Step 0 — Screen for I(2)
+
+The bounds test tolerates a mix of I(0) and I(1). It is **invalid if any series
+is I(2)**, and it cannot detect that itself — it would return a number.
+
+```python
+from pyardl.unitroot import report
+
+print(report(data))          # DF-GLS on the level, then on the difference
 ```
 
-Requires Python 3.11+ and numpy, scipy, pandas, statsmodels. Not yet on
-PyPI; install from a clone for now.
+Each series is tested twice, because failing to reject a unit root in the level
+is compatible with I(1) *and* I(2):
 
-## What it does
+| Level | First difference | Verdict |
+|---|---|---|
+| rejects | (not needed) | I(0) |
+| does not reject | rejects | I(1) |
+| does not reject | does not reject | **I(2) suspect** |
 
-**Estimation** — `pyardl.core.ardl.ARDL` fits ARDL(p, q) models by OLS
-with robust covariance options (HC0-HC3, Newey-West), reports the usual
-regression output, and checks the residuals for autocorrelation
-automatically, because long-run inference is not valid without it.
+"Suspect" is literal. A double failure to reject is also what a short, noisy
+sample looks like. A `PyardlMethodologyWarning` fires when it happens.
+
+### Step 1 — Choose lag orders
 
 ```python
 from pyardl.core.ardl import ARDL
 
-res = ARDL(y, x, order=(2, {"income": 1, "price": 2})).fit()
-res.longrun        # long-run coefficients with delta-method std. errors
-res.adjustment     # speed of adjustment and half-life
-res.to_ecm()       # exact error-correction reparameterisation
-res.is_stable      # are all AR roots outside the unit circle?
-res.diagnostics()  # Ljung-Box, Jarque-Bera, Breusch-Pagan
+sel = ARDL.select_order(y, x, max_p=3, max_q=3, ic="bic")
+print(sel.top(4).round(3))
 ```
 
-**Order selection** — a grid or per-variable search over AIC, BIC and
-HQ. All candidates are estimated on the same sample, so the criteria are
-actually comparable; the selected model is then re-estimated on its own
-maximal sample.
+```text
+   p  q_LRY  q_IBO  q_IDE      aic      bic       hq      llf  nobs
+0  3      1      0      0 -248.783 -231.222 -242.050  133.391    52
+1  3      1      0      1 -247.580 -228.067 -240.099  133.790    52
+2  3      2      0      0 -247.304 -227.792 -239.823  133.652    52
+3  3      1      1      0 -246.834 -227.322 -239.354  133.417    52
+```
+
+Every candidate is estimated on the **same sample** — note the constant `nobs`
+column. Comparing information criteria computed on different numbers of
+observations is a silent, common mistake that biases the choice towards short
+lags. Look at `top(n)` rather than only the winner: criteria often separate the
+leading specifications by very little.
+
+### Step 2 — Run the bounds test
 
 ```python
-sel = ARDL.select_order(y, x, max_p=4, max_q=4, ic="bic")
-sel.best_order
-sel.top(5)         # inspect near-optimal specifications too
+from pyardl.bounds import bounds_test
+
+res = bounds_test(y, x, case=3, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}))
 ```
 
-**General-to-specific reduction** — `ARDL.gets` reduces an
-over-parameterised model while keeping the residual diagnostics clean,
-and records every step in `reduction_path` so the sequence can be
-audited.
+Two statistics, and both must agree:
 
-**Bounds testing** — all five deterministic cases, the F and t
-statistics, and a three-state verdict (`cointegration`,
-`no_cointegration`, `inconclusive`) that is never collapsed into a
-boolean. When the F and t tests disagree in the specific way that
-signals a degenerate relationship, that is reported too rather than
-hidden.
+- **`F_overall`** tests that all level terms are jointly zero.
+- **`t_BDM`** tests the adjustment coefficient alone. Left-tailed: rejection
+  requires a *negative* estimate, an actual pull back towards equilibrium.
 
-**Critical values** — three sources, selected with `cv_source`:
-
-| Source | Use it for | Coverage |
+| F | t | `decision_joint` |
 |---|---|---|
-| `"kripfganz"` (default) | everyday work; precise values at any level, with p-values | cases 1-5, k = 1-10, F |
-| `"pss"` | reproducing published results exactly | cases 1-5, k = 0-10, F and t |
-| `"narayan"` | small samples, 30 ≤ T ≤ 80 | cases 2, 3, 5, k ≤ 7, F |
+| rejects | rejects | `cointegration` |
+| rejects | does not | `degenerate_suspicion` |
+| does not | does not | `no_cointegration` |
+| any other disagreement | | `inconclusive` |
 
-Every shipped table documents its exact source and how it was
-cross-checked in
-[`PROVENANCE.md`](src/pyardl/critical_values/PROVENANCE.md). A Monte
-Carlo engine (`simulate_bounds`) is also available for configurations
-no published table covers.
+`degenerate_suspicion` means the level terms are jointly significant while the
+dependent variable shows no error-correction force — the apparent relationship
+is carried by the regressors alone. That is not cointegration, and the library
+says so rather than rounding up.
 
-## Design choices
+### Step 3 — Read the long run
 
-A few decisions that shape how the library behaves:
+```python
+model = ARDL(y, x, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2})).fit()
+print(model.longrun.round(4))
+print(res.adjustment().round(4))
+```
 
-- **Inconclusive means inconclusive.** The bounds test genuinely has a
-  region where no conclusion follows. `pyardl` reports it as such, and
-  shows the p-value interval so the result can be read on a continuous
-  scale.
-- **Methodological warnings are real warnings.** Autocorrelated
-  residuals, an adjustment speed with the wrong sign, unstable dynamics:
-  each raises a `PyardlMethodologyWarning` you can turn into an error
-  with `warnings.filterwarnings("error", category=...)`.
-- **Confidence intervals are withheld when they would be invalid.** The
-  interval for the adjustment speed only appears once cointegration is
-  established, since its distribution is non-standard under the null.
-- **Nothing is silently substituted.** Asking for a critical value
-  outside a source's coverage raises an error naming a source that does
-  cover it, rather than quietly returning a neighbouring cell.
+```text
+      theta      se
+LRY  0.9965  0.1239
+IBO -4.5381  0.5203
+IDE  2.8915  0.9951
+
+lambda     -0.4169
+se          0.0917
+ci_lower   -0.5965
+ci_upper   -0.2372
+```
+
+Standard errors come from the delta method with an analytical gradient. About
+42% of a disequilibrium is corrected each quarter. The confidence interval
+appears only because cointegration was established.
+
+### Step 4 — Test what theory says
+
+An income elasticity of 0.9965 *looks* like one. With a standard error of 0.124,
+so would 0.85. Ask properly:
+
+```python
+out = model.test_longrun_restriction([[1.0, 0.0, 0.0]], 1.0, impose=True)
+print(out.summary())
+```
+
+```text
+Long-run restriction test - Wald chi2(1) = 0.0008, p = 0.9773
+  decision (5%): not_rejected
+  R.theta - r = [-0.0035]
+
+  imposed: F = 0.0008, p = 0.9774
+  SSR unrestricted = 0.014228, restricted = 0.014229
+```
+
+With `impose=True` the two level terms collapse into `(LRM − LRY)` — the
+velocity of money, a ratio theory expects to be stationary. The restriction
+costs nothing in fit and buys an interpretable model plus a degree of freedom.
+This is the discipline of Davidson, Hendry, Srba & Yeo (1978).
+
+### Step 5 — Check the model held still
+
+A long-run coefficient estimated across a structural break is an average of two
+regimes, not an equilibrium.
+
+```python
+print(model.stability())
+```
+
+```text
+                  stable  max_excess  first_crossing
+test
+CUSUM               True         0.0             NaN
+CUSUM-of-squares    True         0.0             NaN
+```
+
+Both are reported, always, because they fail differently — see
+[Stability diagnostics](#stability-diagnostics).
+
+---
+
+## API reference
+
+### Unit-root pre-tests
+
+`pyardl.unitroot`
+
+| Function | Purpose |
+|---|---|
+| `report(data, trend, alpha, method)` | Sequential screening, one row per variable |
+| `integration_order(y, ...)` | Same, for a single series |
+| `dfgls(y, trend, lags, method, max_lags)` | DF-GLS test (Elliott, Rothenberg & Stock 1996) |
+| `ng_perron(y, ...)` | The four M statistics (Ng & Perron 2001) |
+| `gls_detrend`, `ols_detrend`, `adf_regression`, `select_lags` | The shared machinery, exposed |
+
+The classical ADF removes the mean by ordinary least squares, which is what
+costs it most of its power under a near-unit root. DF-GLS detrends under a
+*local alternative* instead and recovers it. The M tests add an autoregressive
+long-run variance and a modified lag criterion, which is what removes the size
+distortion the ADF suffers when the errors carry a negative moving-average
+component.
+
+```text
+Ng-Perron M tests (2001) - trend 'c', lags=2 (maic), nobs=52
+  long-run variance (autoregressive): 0.0050
+
+  statistic        value    5% bound  decision (5%)
+  MZa            -3.9863     -9.3800  unit_root
+  MZt            -1.1521     -2.1023  unit_root
+  MSB             0.2890      0.2205  unit_root
+  MPT             6.4313      2.8557  unit_root
+
+  H0: the series has a unit root (reject when below)
+```
+
+All four are lower-tail, so there is no direction to get wrong.
+
+**On lag selection.** `maic` is the default for `dfgls` and `ng_perron`: it is
+what protects against a negative MA component, and it is Ng & Perron's central
+contribution. It has a measurable cost, though — its penalty is large exactly
+when a series looks stationary, so it over-selects on I(0) data. The screening
+functions `report` and `integration_order` therefore default to `bic`, which
+classifies clean data better. Over 40 replications of length 250:
+
+| criterion | I(0) correct | I(1) correct | I(2) flagged |
+|---|---|---|---|
+| BIC | 40/40 | 40/40 | 35/40 |
+| MAIC | 29/40 | 32/40 | 37/40 |
+
+### ARDL estimation
+
+`pyardl.core.ardl`
+
+```python
+ARDL(y, x, order=(p, q), det="const", seasonal=False, seasonal_periods=4,
+     fixed_regressors=None, hold_back=None).fit(cov_type="nonrobust")
+```
+
+| Argument | Meaning |
+|---|---|
+| `order` | `(p, q)` with `q` an int or a dict `{name: q_j}` |
+| `det` | `"none"`, `"const"`, `"trend"` (which includes the intercept) |
+| `seasonal` | adds `s-1` seasonal dummies (`s` when `det="none"`) |
+| `fixed_regressors` | variables entered without lags, e.g. dummies |
+| `hold_back` | initial observations excluded, to force a common sample |
+| `cov_type` | `"nonrobust"`, `"HC0"`–`"HC3"`, `"HAC"` |
+
+`q_j = 0` is supported: the regressor enters contemporaneously with no dynamics
+of its own. `statsmodels` rejects this case; `pyardl` and Stata's `ardl` both
+accept it.
+
+Every fit runs a Ljung-Box test and warns when it rejects. Valid long-run
+inference requires enough lags to whiten the errors, so this is a condition of
+validity, not an optional diagnostic.
+
+**Results.** `params`, `bse`, `tvalues`, `pvalues`, `resid`, `fittedvalues`,
+`aic`/`bic`/`hqic`, `rsquared`, plus the error-correction views: `to_ecm()`,
+`longrun`, `adjustment`, `ar_roots`, `is_stable`, `diagnostics()`,
+`stability()`, `test_longrun_restriction()`, `summary()`.
+
+**Order selection.** `ARDL.select_order(...)` searches by grid or per-variable.
+`ARDL.gets(...)` performs a general-to-specific reduction over terminal lags,
+guarded by residual diagnostics and an F test, and returns the full
+`reduction_path` so the reduction is auditable rather than a black box.
+
+### Bounds test
+
+```python
+pyardl.bounds.bounds_test(
+    y, x, case=3, order=None, ic="aic", max_p=4, max_q=4,
+    alpha=0.05, cv_source="kripfganz", finite_t=False, fixed_regressors=None,
+)
+```
+
+The five deterministic cases of PSS:
+
+| `case` | Intercept | Trend | Use |
+|---|---|---|---|
+| 1 | none | none | demeaned data only |
+| 2 | restricted | none | no trend anywhere |
+| 3 | unrestricted | none | **the usual choice** |
+| 4 | unrestricted | restricted | trending data, no trend in the relation |
+| 5 | unrestricted | unrestricted | trending data and relation |
+
+Under cases 2 and 4 the restricted deterministic term is part of the tested
+vector, giving `k+2` restrictions instead of `k+1`.
+
+**Results.** `f_stat`, `t_stat`, `decision_f`, `decision_t`, `decision_joint`,
+`bounds`, `p_values`, `uecm`, `adjustment(alpha)`, `stability(alpha)`,
+`diagnostics(alpha)`, `summary()`.
+
+`diagnostics()` reports residual tests *and* both stability tests:
+
+```text
+                    statistic  pvalue
+Ljung-Box(10)         12.2814  0.2667
+Jarque-Bera           85.2392  0.0000
+Breusch-Pagan             NaN  0.9731
+CUSUM(5%) excess       0.0000     NaN
+CUSUMSQ(5%) excess     0.0000     NaN
+```
+
+The stability rows carry no p-value, and the column is `NaN` rather than a
+plausible-looking number: they are boundary-crossing procedures, not statistics
+with a null distribution to integrate.
+
+**Assumptions.** The test is valid if the regressors are weakly exogenous, are
+not cointegrated among themselves, no series is I(2), and the residuals are not
+autocorrelated. Only the last is checked automatically — hence step 0.
+
+### Critical values
+
+`pyardl.critical_values`
+
+Because the limiting distribution depends on the unknown integration order of
+the regressors, critical values come in pairs: a lower bound assuming all
+regressors are I(0), an upper bound assuming all are I(1).
+
+| `cv_source` | Use for | Coverage |
+|---|---|---|
+| `"kripfganz"` | everyday work — the default | cases 1–5, `k = 1..10`, F, any level, with p-values |
+| `"pss"` | reproducing published results exactly | cases 1–5, `k = 0..10`, F and t, 10/5/2.5/1% |
+| `"narayan"` | small samples, `30 ≤ T ≤ 80` | cases 2, 3, 5, `k ≤ 7`, F, 10/5/1% |
+
+Asymptotic bounds over-reject when `T` is between 30 and 80 — where annual data
+lands. Using them there produces spurious findings.
+
+Also available: `simulate_bounds(...)`, a reproducible Monte Carlo engine for
+configurations no table covers, recording seed, replications and batch size on
+the result so a run reproduces exactly; and `bde1975`, `ers1996`,
+`ngperron2001`, `mackinnon` for the other tests' bounds.
+
+### Long-run restrictions
+
+```python
+ARDLResults.test_longrun_restriction(R, r, impose=False)
+```
+
+Wald test of `R θ = r` on the long-run coefficients, using the same delta-method
+covariance as the standard errors in `.longrun`, so the two cannot disagree.
+The discrepancy `R θ − r` is returned **signed**.
+
+With `impose=True` the error-correction model is re-estimated with `θ_j = 1`
+applied — the level term becomes the ratio `(y − x_j)` — and a regression F test
+compares the two residual sums of squares. That comparison is legitimate only
+because the unrestricted error-correction design reproduces the ARDL regression
+exactly, residuals identical to 1e-10; a test verifies it across lag orders and
+deterministic cases rather than assuming it.
+
+The verdict is `not_rejected`, never `accept`.
+
+### Stability diagnostics
+
+`pyardl.diagnostics`
+
+| Function | Detects |
+|---|---|
+| `cusum(y, x, alpha)` | a shift in the **mean** of the coefficients |
+| `cusumsq(y, x, alpha)` | a change in **variance** |
+| `stability_tests(y, x, alpha)` | both, in one table |
+| `recursive_residuals(y, x)` | the standardised one-step-ahead prediction errors |
+| `plot_cusum`, `plot_cusumsq` | the two canonical graphs, bands included |
+
+**The two are not interchangeable.** A break in the slope on a zero-mean
+regressor leaves the recursive residuals centred on zero: the CUSUM path stays
+flat and reports stability, however large the break, while the inflated variance
+pushes the CUSUM of squares straight out of its band. On 20 simulated samples
+with exactly that break, the CUSUM said "stable" 20 times out of 20 and the
+CUSUM of squares detected it 20 times out of 20.
+
+Reporting only the CUSUM — as much applied work does — leaves an entire family
+of common instabilities untested. `pyardl` always produces both.
+
+Results carry `stable`, `max_excess` (how far from stability, not merely
+whether) and `crossings` (when the break happened).
+
+### Engle-Granger
+
+```python
+pyardl.cointegration.engle_granger(y, x, trend="c", max_lags=None,
+                                   ic="aic", fit_ecm=False)
+```
+
+Provided for comparison, and because much of the literature reports it. Three
+limitations are structural:
+
+- **The normalisation is arbitrary.** Regressing `y` on `x` and `x` on `y` are
+  different tests and can disagree; the test suite demonstrates it.
+- **Only one relationship can be found**, with no warning that others exist.
+- **Every series must be I(1)** — as the opening example shows, that is often
+  false, and the test fails silently rather than complaining.
+
+First-step coefficients are reported without standard errors: they are
+super-consistent but non-standard, so the usual ones would be wrong.
+
+### ARDL ↔ ECM algebra
+
+`pyardl.core.transforms`
+
+`ardl_to_ecm` and `ecm_to_ardl` are exact inverses: fit either representation on
+the same data and you get identical residuals. Also `longrun_coefs`,
+`longrun_covariance` (delta method, analytical gradient), `speed_of_adjustment`
+and `half_life`. Degenerate configurations return `NaN` with a warning rather
+than a number produced by dividing by something near zero.
+
+### Utilities and datasets
+
+```python
+from pyardl.utils import diff, lag_matrix, check_series
+from pyardl.datasets import load_denmark, load_pss2001
+```
+
+`diff(x, d=1, D=0, s=4)` applies `(1-L)^d (1-L^s)^D`. A `Series` keeps the tail
+of its index, so a differenced series stays attached to its dates instead of
+silently shifting by `d + D·s` periods.
+
+`load_denmark()` — Danish money demand, quarterly.
+`load_pss2001()` — the UK wage-price data of Pesaran, Shin & Smith (2001).
+
+---
 
 ## Validation
 
-Estimation results agree with `statsmodels.tsa.ardl` to 1e-10, and with
-the R `ARDL` package to 1e-6 on the Danish dataset. The bounds test
-reproduces the UK real-wage application of Pesaran, Shin & Smith (2001)
-to 1e-4 on both statistics. The shipped critical value tables were
-cross-checked cell by cell against independent sources and an internal
-Monte Carlo engine.
+This is the part worth reading before trusting any number.
+
+**Against reference implementations.** Coefficients, standard errors and
+residuals agree with `statsmodels` to 1e-10, and with the R package `ARDL` to
+1e-6. The UK wage equation of PSS (2001) is reproduced to 1e-4 on the F and t
+statistics. DF-GLS agrees with `arch` to 1e-8 across sample sizes, trends and
+lag orders. Engle-Granger agrees with `statsmodels.tsa.stattools.coint` to
+1e-13.
+
+**Critical values.** Every shipped table documents its source, its transcription
+channel and its cross-check in
+[`PROVENANCE.md`](src/pyardl/critical_values/PROVENANCE.md). Where a second
+published source exists it is used; where none does, the table is generated by
+an in-house Monte Carlo engine with recorded seeds and verified against a
+theoretical limit. The comparison criterion is derived from the Monte Carlo
+standard error of each quantile — published tables carry their own simulation
+error, so a flat tolerance is not defensible.
+
+**What the protocol surfaced.** A typo in a published R package's transcription
+(`11.60` for `1.60`), three cells where independent sources disagree with a
+printed table, a response surface that is conservative at the edge of its fitted
+range, and two rounding conventions where reference implementations differ from
+the published rule. All documented rather than smoothed over.
+
+**Test suite.** 501 tests including doctests, 96% coverage, `mypy --strict`
+clean, on Linux, Windows and macOS across Python 3.11–3.13. Monte Carlo
+experiments run nightly at full replication counts.
+
+---
+
+## Compatibility
+
+| | |
+|---|---|
+| Python | 3.11, 3.12, 3.13 |
+| OS | Linux, Windows, macOS |
+| Required | numpy, scipy, pandas, statsmodels |
+| Optional | matplotlib (`plot`), arch (`bootstrap`) |
+
+Tested against numpy 2.5 and pandas 3.0.
+
+---
+
+## Roadmap
+
+Released:
+
+- **0.1.0** — ARDL/UECM estimation, bounds test with the five deterministic
+  cases, joint F and t decision, PSS critical values.
+- **0.2.0** — small-sample and response-surface critical values with p-values,
+  CUSUM/CUSUMSQ stability, DF-GLS and Ng-Perron pre-tests, long-run restriction
+  testing and seasonality, Engle-Granger.
+
+Planned:
+
+- **0.3** — bootstrap ARDL, the three-test framework with degeneracy
+  classification, Johansen on the regressors.
+- **0.4** — NARDL (asymmetric).
+- **0.5+** — Fourier ARDL, dynamic simulations, QARDL, heterogeneous panels
+  (MG, PMG, CS-ARDL).
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR:
 
 ```bash
-pytest -m "not slow"     # full suite
-pytest -m slow           # long Monte Carlo runs
+pip install -e ".[dev,plot,bootstrap]"
+ruff check src tests && ruff format --check src tests
+mypy src/pyardl
+pytest -m "not slow" --doctest-modules src/pyardl tests --cov=pyardl
 ```
 
-## Status
+Two expectations specific to this project. Every statistical claim needs a test
+that would fail if the claim were false — not a smoke test. And **no numerical
+value is ever written from memory**: critical values, docstring examples,
+doctest expectations and figures quoted in documentation are all computed by a
+real run and pasted from it.
 
-Version 0.1.0. The estimation core, the error-correction algebra, the
-bounds test and the critical-value machinery are implemented, tested
-and validated. Work continues on parameter-stability tests, unit-root
-pre-tests, bootstrap inference, and the non-linear and panel
-extensions.
+---
+
+## Citing
+
+If you use `pyardl` in published work, please cite the software (see
+[`CITATION.cff`](CITATION.cff)) as well as the methodological articles behind
+the part you used — they are listed in each module's docstring.
+
+---
 
 ## References
 
-Pesaran, M. H., Shin, Y. & Smith, R. J. (2001). "Bounds Testing
-Approaches to the Analysis of Level Relationships", *Journal of Applied
-Econometrics*, 16(3), 289-326.
+- Pesaran, M. H., Shin, Y. & Smith, R. J. (2001). Bounds testing approaches to
+  the analysis of level relationships. *Journal of Applied Econometrics*, 16(3),
+  289–326.
+- Banerjee, A., Dolado, J. & Mestre, R. (1998). Error-correction mechanism tests
+  for cointegration in a single-equation framework. *Journal of Time Series
+  Analysis*, 19(3), 267–283.
+- Narayan, P. K. (2005). The saving and investment nexus for China. *Applied
+  Economics*, 37(17), 1979–1990.
+- Kripfganz, S. & Schneider, D. C. (2020). Response surface regressions for
+  critical value bounds and approximate p-values in equilibrium correction
+  models. *Oxford Bulletin of Economics and Statistics*, 82(6), 1456–1481.
+- Brown, R. L., Durbin, J. & Evans, J. M. (1975). Techniques for testing the
+  constancy of regression relationships over time. *JRSS B*, 37(2), 149–192.
+- Elliott, G., Rothenberg, T. J. & Stock, J. H. (1996). Efficient tests for an
+  autoregressive unit root. *Econometrica*, 64(4), 813–836.
+- Ng, S. & Perron, P. (2001). Lag length selection and the construction of unit
+  root tests with good size and power. *Econometrica*, 69(6), 1519–1554.
+- Davidson, J. E. H., Hendry, D. F., Srba, F. & Yeo, S. (1978). Econometric
+  modelling of the aggregate time-series relationship between consumers'
+  expenditure and income in the United Kingdom. *The Economic Journal*, 88(352),
+  661–692.
+- Engle, R. F. & Granger, C. W. J. (1987). Co-integration and error correction.
+  *Econometrica*, 55(2), 251–276.
+- MacKinnon, J. G. (2010). Critical values for cointegration tests. Queen's
+  University Working Paper 1227.
+- Hendry, D. F., Pagan, A. R. & Sargan, J. D. (1984). Dynamic specification.
+  *Handbook of Econometrics*, vol. 2.
 
-Kripfganz, S. & Schneider, D. C. (2020). "Response Surface Regressions
-for Critical Value Bounds and Approximate p-values in Equilibrium
-Correction Models", *Oxford Bulletin of Economics and Statistics*,
-82(6), 1456-1481.
+---
 
-Narayan, P. K. (2005). "The saving and investment nexus for China:
-evidence from cointegration tests", *Applied Economics*, 37(17),
-1979-1990.
+<div align="center">
 
-Banerjee, A., Dolado, J. & Mestre, R. (1998). "Error-correction
-Mechanism Tests for Cointegration in a Single-equation Framework",
-*Journal of Time Series Analysis*, 19(3), 267-283.
+MIT licensed · [Documentation](docs/) · [Changelog](CHANGELOG.md)
 
-## Licence
-
-MIT — see [LICENSE](LICENSE). The encoded critical values come from
-published tables; their provenance and licensing are documented in
-[`PROVENANCE.md`](src/pyardl/critical_values/PROVENANCE.md). No
-third-party material is redistributed without a clear licence.
+</div>
