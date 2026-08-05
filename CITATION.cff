@@ -12,8 +12,8 @@ authors:
   - family-names: Adjoh
     given-names: Komlan Matthania
     email: komlanadjohmatthania@gmail.com
-version: 0.1.0
-date-released: "2026-07-25"
+version: 0.2.0
+date-released: "2026-08-05"
 license: MIT
 repository-code: "https://github.com/Matth-analyst/pyardl"
 keywords:

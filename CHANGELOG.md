@@ -3,7 +3,11 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/1.1.0/).
 This project follows [semantic versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] — 2026-08-05
+
+Second release. Modern critical values with p-values, parameter-stability
+diagnostics, unit-root pre-tests, long-run restriction testing, and the
+Engle-Granger test for comparison.
 
 ### Added — stability diagnostics (`pyardl.diagnostics`)
 
@@ -71,14 +75,28 @@ This project follows [semantic versioning](https://semver.org/).
   `hold_back` cannot relabel the quarters.
 - The verdict is `not_rejected`, never `accept`.
 
-### Not shipped
+### Decided — the DHSY method travels, the DHSY data do not
 
-- `datasets.load_uk_consumption()`, called for by the same specification,
-  is **not** included. The DHSY data come from a 1978 article behind an
-  access barrier and no freely redistributable source was identified.
-  Fabricating a plausible series under the name of a real source would
-  have been worse than inventing a critical value: it could be
-  cross-checked against nothing. See `docs/QUESTIONS.md`.
+The walkthrough for this feature is built on the Danish money-demand
+data already shipped, not on UK consumption. That is a deliberate
+choice, settled and closed, not a gap waiting to be filled.
+
+The original DHSY series come from a 1978 article behind an access
+barrier, and no freely redistributable version exists. Reconstructing
+something similar from current ONS releases was considered and rejected:
+those are revised vintages on a different period, so the result would
+not have been the DHSY data either — it would have carried the same
+caveat while adding reconstruction choices that can be checked against
+nothing.
+
+Nothing is lost methodologically. The Danish data make the same point
+with the same structure: the long-run income elasticity of money demand
+is 0.9965, the homogeneity restriction is not rejected (Wald 0.0008,
+p = 0.977), and imposing it turns the level term into `(LRM - LRY)` —
+the velocity of money, a ratio theory expects to be stationary, exactly
+as `log(C/Y)` is in the original paper. See
+[Testing an economic restriction](docs/long-run-restrictions.md), where
+DHSY is credited as the source of the *method* and never of the data.
 
 ### Added — unit-root pre-tests (`pyardl.unitroot`)
 
