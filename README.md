@@ -7,7 +7,7 @@
 [![CI](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml/badge.svg)](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Coverage 96%](https://img.shields.io/badge/coverage-96%25-brightgreen)](#validation)
+[![codecov](https://codecov.io/gh/Matth-analyst/pyardl/branch/main/graph/badge.svg)](https://codecov.io/gh/Matth-analyst/pyardl)
 
 </div>
 
@@ -569,7 +569,7 @@ printed table, a response surface that is conservative at the edge of its fitted
 range, and two rounding conventions where reference implementations differ from
 the published rule. All documented rather than smoothed over.
 
-**Test suite.** 501 tests including doctests, 96% coverage, `mypy --strict`
+**Test suite.** 501 tests including doctests, `mypy --strict`
 clean, on Linux, Windows and macOS across Python 3.11–3.13. Monte Carlo
 experiments run nightly at full replication counts.
 

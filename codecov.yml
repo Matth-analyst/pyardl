@@ -1,0 +1,35 @@
+# Configuration Codecov — https://docs.codecov.com/docs/codecov-yaml
+#
+# Le seuil dur (90 %) est appliqué localement par pytest-cov, qui fait
+# échouer la suite avant même l'envoi. Codecov sert donc au suivi et à la
+# revue de PR, pas de garde-fou redondant : ses statuts sont informatifs.
+
+coverage:
+  precision: 2
+  round: down
+  range: "85...100"
+  status:
+    project:
+      default:
+        target: auto
+        # Une PR peut faire varier la couverture de 0.5 point sans que
+        # cela signifie quoi que ce soit : on ne bloque pas là-dessus.
+        threshold: 0.5%
+        informational: true
+    patch:
+      default:
+        # Le code NOUVEAU, lui, doit être testé : c'est la règle du
+        # projet (90 % sur tout nouveau module).
+        target: 90%
+        threshold: 0%
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true
+
+ignore:
+  # Expérimental et bloqué par une demande d'autorisation en cours :
+  # ses tests sont skip, sa couverture n'aurait aucun sens.
+  - "src/pyardl/critical_values/ks2020_finite.py"
