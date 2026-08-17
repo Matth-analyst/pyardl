@@ -180,5 +180,33 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: pip install -e ".[dev,plot,bootstrap]"
+
+      # Ressources avant/après : un échec à mi-parcours sans assertion
+      # ressemble à un processus tué (mémoire), pas à un test rouge.
+      # Sans cette trace, la cause reste indevinable.
+      - name: Ressources de la machine
+        run: |
+          echo "--- mémoire ---"; free -h
+          echo "--- disque ---"; df -h /
+          echo "--- cœurs ---"; nproc
+
+      # -v nomme chaque test au fil de l'eau : si le processus meurt, le
+      # dernier nom affiché est le test en cours. --durations montre où
+      # part le temps. Le rapport JUnit survit à un arrêt brutal.
       - name: Pytest slow
-        run: pytest -m slow -q
+        run: >
+          pytest -m slow -v -ra --durations=20
+          --junit-xml=slow-results.xml
+        timeout-minutes: 170
+
+      - name: Mémoire après exécution
+        if: always()
+        run: free -h
+
+      - name: Conserver le rapport
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slow-results
+          path: slow-results.xml
+          if-no-files-found: warn
