@@ -3,6 +3,62 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/1.1.0/).
 This project follows [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added — bootstrap bounds test (`pyardl.bootstrap`)
+
+- `bootstrap_bounds_test(y, x, case, order, n_boot, resample, seed, ...)`
+  — the procedure of McNown, Sam & Goh (2018). Instead of bracketing the
+  null distribution between an I(0) and an I(1) bound, it builds that
+  distribution by regenerating the data under a null that is true by
+  construction. The verdict is binary: **there is no inconclusive zone**.
+- Both resampling schemes: `"iid"`, and `"wild"` for heteroskedastic
+  residuals. Residuals are drawn **by date**, so the contemporaneous
+  correlation between the conditional equation and the marginal block
+  survives — drawing equations independently would inflate the critical
+  values in the optimistic direction with nothing in the output to show
+  it.
+- The p-value is `(1 + #)/(B + 1)` and never exactly zero: `B`
+  replications cannot resolve more than `1/(B+1)`.
+- A replication that cannot be estimated is counted and reported, never
+  replaced by a fresh draw — replacing it would bias the distribution
+  towards estimable samples.
+- Reproducibility is a property of the result, not of luck: the seed is
+  drawn from entropy and **recorded** when the caller omits it, so any
+  run can be reproduced after the fact. Same seed, same critical values,
+  bit for bit.
+- Building blocks exposed: `estimate_null_dgp`, `simulate_paths`,
+  `simulate_path`, `resample_residuals`.
+
+### Performance
+
+- Both hot paths are vectorised across replications. The regeneration
+  advances all paths together, and the `B` least-squares fits are solved
+  by one stacked QR — never the normal equations, which would square the
+  condition number of a design built on lagged levels of integrated
+  series.
+- Measured end to end: 20x to 53x faster than the first working version.
+  A test at `B = 2999` runs in 0.19-1.81 s depending on the
+  specification; the specification's own validation study went from
+  hours to minutes. The profile was re-measured after each change and is
+  recorded rather than asserted.
+
+### Validation
+
+- Checked against the R package `bootCT`: observed statistics agree to
+  4e-10 and decisions agree at all three levels. The `F` bootstrap
+  bounds differ by 0.6-13%, as two bootstraps with different generators
+  do. The `t` bounds differ by 21-30%, systematically in the direction
+  that makes ours more demanding; the likely cause is documented as an
+  open question rather than settled by assertion.
+
+### Fixed
+
+- The trend of the null model was estimated, stored, and then ignored
+  when regenerating data. Under deterministic case 5 the bootstrap
+  samples therefore lacked the trend the null model describes, making
+  that case's critical values wrong.
+
 ## [0.2.0] — 2026-08-05
 
 Second release. Modern critical values with p-values, parameter-stability

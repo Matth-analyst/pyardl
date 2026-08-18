@@ -15,6 +15,7 @@ nav:
       - Unit-root pre-tests: api/unitroot.md
       - Long-run restrictions: api/restrictions.md
       - Engle-Granger test: api/cointegration.md
+      - Bootstrap bounds test: api/bootstrap.md
 theme:
   name: material
 markdown_extensions:

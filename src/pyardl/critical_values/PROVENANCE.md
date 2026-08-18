@@ -481,3 +481,48 @@ pas de régression de première étape.
    la régression de première étape. L'écart est de l'ordre de 0.005 à
    T = 200 et décroît en 1/T ; le test de concordance des valeurs
    critiques le tolère explicitement à 0.02 avec la raison en commentaire.
+
+---
+
+## Valeurs critiques bootstrap (spec 14) — `pyardl.bootstrap`
+
+**Nature** : elles ne sont pas tabulées. Elles sont calculées à chaque
+appel, à partir des données de l'utilisateur, en régénérant des séries
+sous une hypothèse nulle vraie par construction. Il n'y a donc rien à
+transcrire ni à recouper contre une table — la question de provenance se
+déplace vers la reproductibilité et l'exactitude de l'algorithme.
+
+**Reproductibilité** : seed obligatoire dans l'objet résultat, tirée de
+l'entropie système et JOURNALISÉE quand l'utilisateur n'en fournit pas.
+Même seed -> mêmes valeurs critiques au bit près, vérifié par test.
+Le nombre de réplications, le schéma de rééchantillonnage, l'ordre du
+VAR marginal et le burn-in sont également journalisés.
+
+**Validation externe (§4.5)** : package R **bootCT** (CRAN), exécuté le
+2026-08-17 sur les données danoises livrées, B = 2000 des deux côtés.
+Script `validation/external/spec14_bootct.R`, sortie brute dans
+`validation/results/external_logs/`, comparaison dans
+`validation/results/spec14_bootct_comparison.txt`.
+
+- Statistiques OBSERVÉES : concordance à **4e-10** sur le F et **5e-10**
+  sur le t. Les deux implémentations estiment bien le même modèle.
+- Valeurs critiques du F : écart de 0.6 % à 13 %, cohérent avec deux
+  bootstraps à générateurs différents.
+- Valeurs critiques du t : écart de 21 % à 30 %, systématiquement dans
+  le même sens — les nôtres sont plus exigeantes. Point ouvert
+  documenté dans `docs/QUESTIONS.md` (hypothèse : DGP nul du t).
+- Décisions à 10, 5 et 1 % : identiques des deux côtés.
+
+### PIÈGE — la convention de `fix.ardl` dans bootCT
+
+`fix.ardl` désigne les ordres des **différences retardées de l'UECM**,
+pas les ordres de l'ARDL en niveaux. Pour comparer avec un ordre PSS
+(p ; q_1, ..., q_k) il faut passer (p-1 ; q_1-1, ..., q_k-1).
+
+Symptôme si on l'ignore : avec le mapping naïf `c(3,1,3,2)` pour notre
+ordre (3 ; 1, 3, 2), bootCT ajuste 17 régresseurs au lieu de 13 et rend
+F = 3.93 contre nos 6.21. On aurait conclu à un désaccord de 58 % entre
+deux implémentations qui, en réalité, estimaient deux modèles
+différents. Diagnostic : lire les NOMS des coefficients du modèle
+ajusté (`names(coef(res$ARDL))`), qui montrent immédiatement trois
+retards de ΔLRM là où la paramétrisation PSS en compte deux.
