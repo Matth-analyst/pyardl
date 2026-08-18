@@ -395,16 +395,15 @@ class TestValidation:
         distribution vers les échantillons estimables."""
         import pyardl.bootstrap.bounds as mod
 
-        real = mod._estimate_uecm
-        state = {"n": 0}
+        real = mod.batch_uecm_statistics
 
         def flaky(*args, **kwargs):  # type: ignore[no-untyped-def]
-            state["n"] += 1
-            if state["n"] % 10 == 0:
-                raise np.linalg.LinAlgError("singular")
-            return real(*args, **kwargs)
+            f_val, t_val, ok = real(*args, **kwargs)
+            ok = ok.copy()
+            ok[::10] = False  # une réplication sur dix devient inestimable
+            return f_val, t_val, ok
 
-        monkeypatch.setattr(mod, "_estimate_uecm", flaky)
+        monkeypatch.setattr(mod, "batch_uecm_statistics", flaky)
         y, x = _cointegrated(90, seed=54)
         with pytest.warns(PyardlMethodologyWarning, match="discarded"):
             res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=199, seed=1)
@@ -421,11 +420,7 @@ class TestVectorisedRecursion:
     """
 
     def _naive_path(self, dgp, inn, y0, x0, burn_in):  # type: ignore[no-untyped-def]
-        """Récursion scalaire écrite indépendamment, période par période.
-
-        Référence volontairement naïve : aucune vectorisation, la
-        formule du modèle nul recopiée depuis la spec.
-        """
+        """Récursion scalaire écrite indépendamment, période par période."""
         k = dgp.n_regressors
         r = dgp.var_order
         n_total = inn.shape[0]
@@ -486,7 +481,6 @@ class TestVectorisedRecursion:
         y, x = _cointegrated(120, seed=74)
         dgp = estimate_null_dgp(y, x, p=1, q=(1,), case=5)
         assert dgp.y_trend != 0.0
-
         inn = np.zeros((1, 30 + 120, 2))  # aucune innovation
         y_star, _ = simulate_paths(dgp, inn, y0=0.0, x0=np.zeros(1), burn_in=30)
         # Sans bruit, Delta y = c + delta * t : y suit une parabole, donc
@@ -519,3 +513,83 @@ class TestVectorisedRecursion:
             simulate_paths(dgp, np.zeros((2, 80, 5)), y0=0.0, x0=np.zeros(1))
         with pytest.raises(ValueError, match="must be 2-D"):
             simulate_path(dgp, np.zeros((2, 80, 2)), y0=0.0, x0=np.zeros(1))
+
+
+class TestBatchedEstimator:
+    """§2.5 — la QR empilée == l'estimateur mono-échantillon.
+
+    L'estimation concentrait 76 à 96 % du temps après vectorisation de
+    la régénération. Elle est maintenant résolue par QR empilée pour tout
+    le bloc. Le verrou : les statistiques doivent être celles de
+    l'estimateur de la spec 10, sur les CINQ cas déterministes — sinon le
+    bootstrap testerait un autre modèle que celui d'où vient la
+    statistique observée.
+    """
+
+    @pytest.mark.parametrize("case", [1, 2, 3, 4, 5])
+    @pytest.mark.parametrize("k,p,q", [(1, 1, 1), (2, 2, 1), (3, 3, 2), (2, 1, 0)])
+    def test_matches_single_sample_estimator(
+        self, case: int, k: int, p: int, q: int
+    ) -> None:
+        from pyardl.bootstrap.batch import batch_uecm_statistics
+        from pyardl.bounds.pss import _estimate_uecm, _wald_f
+
+        rng = np.random.default_rng(100 + case + k + p + q)
+        n_rep, n_obs = 8, 120
+        y_b = np.cumsum(rng.standard_normal((n_rep, n_obs)), axis=1)
+        x_b = np.cumsum(rng.standard_normal((n_rep, n_obs, k)), axis=1)
+        q_tuple = tuple([q] * k)
+        names = tuple(f"x{j}" for j in range(k))
+
+        f_batch, t_batch, ok = batch_uecm_statistics(y_b, x_b, p, q_tuple, case)
+        assert ok.all()
+
+        for b in range(n_rep):
+            fit = _estimate_uecm(y_b[b], x_b[b], names, "y", p, q_tuple, case)
+            pos = fit.names.index(fit.lam_name)
+            t_ref = float(fit.params[fit.lam_name]) / float(np.sqrt(fit.cov[pos][pos]))
+            f_ref = _wald_f(fit)
+            assert abs(f_batch[b] - f_ref) < 1e-9 * max(1.0, f_ref)
+            assert abs(t_batch[b] - t_ref) < 1e-9
+
+    def test_restricted_deterministic_is_tested_in_cases_2_and_4(self) -> None:
+        """Sous les cas 2 et 4 le vecteur testé compte k+2 restrictions.
+
+        Le F en dépend directement : oublier le déterministe restreint
+        donnerait un test à k+1 restrictions, donc une statistique et un
+        degré de liberté faux.
+        """
+        from pyardl.bootstrap.batch import _build_designs
+
+        rng = np.random.default_rng(200)
+        y_b = np.cumsum(rng.standard_normal((3, 100)), axis=1)
+        x_b = np.cumsum(rng.standard_normal((3, 100, 2)), axis=1)
+        for case, expected in ((1, 3), (2, 4), (3, 3), (4, 4), (5, 3)):
+            _, _, tested, _ = _build_designs(y_b, x_b, 1, (1, 1), case)
+            assert len(tested) == expected, f"case {case}"
+
+    def test_singular_replication_flagged_not_raised(self) -> None:
+        """Une réplication dégénérée est signalée, pas propagée.
+
+        Avec B en milliers, interrompre tout le run parce qu'un
+        échantillon régénéré a dégénéré serait pire que le compter.
+        """
+        from pyardl.bootstrap.batch import batch_uecm_statistics
+
+        rng = np.random.default_rng(300)
+        y_b = np.cumsum(rng.standard_normal((4, 100)), axis=1)
+        x_b = np.cumsum(rng.standard_normal((4, 100, 1)), axis=1)
+        # Réplication 2 : régresseur constant -> design singulier.
+        x_b[2, :, 0] = 1.0
+        _, _, ok = batch_uecm_statistics(y_b, x_b, 1, (1,), 3)
+        assert not ok[2]
+        assert ok[[0, 1, 3]].all()
+
+    def test_too_few_observations_rejected(self) -> None:
+        from pyardl.bootstrap.batch import batch_uecm_statistics
+
+        rng = np.random.default_rng(400)
+        y_b = np.cumsum(rng.standard_normal((2, 12)), axis=1)
+        x_b = np.cumsum(rng.standard_normal((2, 12, 3)), axis=1)
+        with pytest.raises(ValueError, match="cannot be estimated"):
+            batch_uecm_statistics(y_b, x_b, 4, (4, 4, 4), 5)

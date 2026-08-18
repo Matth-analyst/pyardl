@@ -41,9 +41,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
+from pyardl.bootstrap.batch import batch_uecm_statistics
 from pyardl.bootstrap.dgp import estimate_null_dgp, simulate_paths
 from pyardl.bootstrap.resample import ResampleScheme, resample_residuals
-from pyardl.bounds.pss import _estimate_uecm, _wald_f, bounds_test
+from pyardl.bounds.pss import bounds_test
 from pyardl.exceptions import PyardlMethodologyWarning
 from pyardl.utils import check_series
 
@@ -62,42 +63,6 @@ _ALPHAS = (0.10, 0.05, 0.01)
 # (chunk x periods x equations x 8 bytes) without giving up the gain from
 # vectorising, which saturates well below this.
 _CHUNK = 256
-
-
-def _accumulate(
-    y_b: FloatArray,
-    x_b: FloatArray,
-    x_names: tuple[str, ...],
-    y_name: str,
-    p_order: int,
-    q_order: tuple[int, ...],
-    case: int,
-    f_star: FloatArray,
-    t_star: FloatArray,
-    state: dict[str, int],
-) -> None:
-    """Estimate one regenerated replication and store its statistics.
-
-    A replication that cannot be estimated is counted and dropped, never
-    replaced by a fresh draw: replacing it would bias the distribution
-    towards the samples that happen to be estimable.
-    """
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            fit = _estimate_uecm(y_b, x_b, x_names, y_name, p_order, q_order, case)
-            f_val = _wald_f(fit)
-            pos = fit.names.index(fit.lam_name)
-            t_val = float(fit.params[fit.lam_name]) / float(np.sqrt(fit.cov[pos][pos]))
-    except (ValueError, np.linalg.LinAlgError):
-        state["failed"] += 1
-        return
-    if not (np.isfinite(f_val) and np.isfinite(t_val)):
-        state["failed"] += 1
-        return
-    f_star[state["kept"]] = f_val
-    t_star[state["kept"]] = t_val
-    state["kept"] += 1
 
 
 @dataclass(frozen=True)
@@ -317,7 +282,8 @@ def bootstrap_bounds_test(
     n_obs = y_arr.shape[0]
     f_star = np.empty(n_boot, dtype=np.float64)
     t_star = np.empty(n_boot, dtype=np.float64)
-    state = {"kept": 0, "failed": 0}
+    kept = 0
+    n_failed = 0
 
     # The innovations are still drawn one replication at a time, in the
     # same order as before: the generator stream is unchanged, so a given
@@ -337,23 +303,15 @@ def bootstrap_bounds_test(
         y_block, x_block = simulate_paths(
             dgp, block, y0=y_arr[0], x0=x_arr[0], burn_in=burn_in
         )
-        for i in range(size):
-            _accumulate(
-                y_block[i],
-                x_block[i],
-                x_names,
-                y_name,
-                p_order,
-                q_order,
-                case,
-                f_star,
-                t_star,
-                state,
-            )
+        f_block, t_block, ok = batch_uecm_statistics(
+            y_block, x_block, p_order, q_order, case
+        )
+        n_ok = int(ok.sum())
+        f_star[kept : kept + n_ok] = f_block[ok]
+        t_star[kept : kept + n_ok] = t_block[ok]
+        kept += n_ok
+        n_failed += size - n_ok
         done += size
-
-    kept = state["kept"]
-    n_failed = state["failed"]
 
     if kept < n_boot // 2:
         raise ValueError(
