@@ -41,7 +41,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
-from pyardl.bootstrap.dgp import estimate_null_dgp, simulate_path
+from pyardl.bootstrap.dgp import estimate_null_dgp, simulate_paths
 from pyardl.bootstrap.resample import ResampleScheme, resample_residuals
 from pyardl.bounds.pss import _estimate_uecm, _wald_f, bounds_test
 from pyardl.exceptions import PyardlMethodologyWarning
@@ -57,6 +57,47 @@ if TYPE_CHECKING:  # pragma: no cover
 __all__ = ["bootstrap_bounds_test", "BootstrapBoundsResults"]
 
 _ALPHAS = (0.10, 0.05, 0.01)
+
+# Block size: bounds the memory held by the regenerated paths
+# (chunk x periods x equations x 8 bytes) without giving up the gain from
+# vectorising, which saturates well below this.
+_CHUNK = 256
+
+
+def _accumulate(
+    y_b: FloatArray,
+    x_b: FloatArray,
+    x_names: tuple[str, ...],
+    y_name: str,
+    p_order: int,
+    q_order: tuple[int, ...],
+    case: int,
+    f_star: FloatArray,
+    t_star: FloatArray,
+    state: dict[str, int],
+) -> None:
+    """Estimate one regenerated replication and store its statistics.
+
+    A replication that cannot be estimated is counted and dropped, never
+    replaced by a fresh draw: replacing it would bias the distribution
+    towards the samples that happen to be estimable.
+    """
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            fit = _estimate_uecm(y_b, x_b, x_names, y_name, p_order, q_order, case)
+            f_val = _wald_f(fit)
+            pos = fit.names.index(fit.lam_name)
+            t_val = float(fit.params[fit.lam_name]) / float(np.sqrt(fit.cov[pos][pos]))
+    except (ValueError, np.linalg.LinAlgError):
+        state["failed"] += 1
+        return
+    if not (np.isfinite(f_val) and np.isfinite(t_val)):
+        state["failed"] += 1
+        return
+    f_star[state["kept"]] = f_val
+    t_star[state["kept"]] = t_val
+    state["kept"] += 1
 
 
 @dataclass(frozen=True)
@@ -276,40 +317,43 @@ def bootstrap_bounds_test(
     n_obs = y_arr.shape[0]
     f_star = np.empty(n_boot, dtype=np.float64)
     t_star = np.empty(n_boot, dtype=np.float64)
-    n_failed = 0
-    kept = 0
+    state = {"kept": 0, "failed": 0}
 
-    for _ in range(n_boot):
-        innovations = resample_residuals(dgp.residuals, burn_in + n_obs, rng, resample)
-        y_b, x_b = simulate_path(
-            dgp, innovations, y0=y_arr[0], x0=x_arr[0], burn_in=burn_in
+    # The innovations are still drawn one replication at a time, in the
+    # same order as before: the generator stream is unchanged, so a given
+    # seed still yields exactly the same critical values. Drawing is ~2%
+    # of the cost; it is the regeneration that is batched.
+    n_periods = burn_in + n_obs
+    n_eq = 1 + dgp.n_regressors
+    chunk = max(1, min(n_boot, _CHUNK))
+
+    done = 0
+    while done < n_boot:
+        size = min(chunk, n_boot - done)
+        block = np.empty((size, n_periods, n_eq), dtype=np.float64)
+        for i in range(size):
+            block[i] = resample_residuals(dgp.residuals, n_periods, rng, resample)
+
+        y_block, x_block = simulate_paths(
+            dgp, block, y0=y_arr[0], x0=x_arr[0], burn_in=burn_in
         )
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                fit = _estimate_uecm(y_b, x_b, x_names, y_name, p_order, q_order, case)
-                f_val = _wald_f(fit)
-                lam = float(fit.params[fit.lam_name])
-                se = float(
-                    np.sqrt(
-                        fit.cov[fit.names.index(fit.lam_name)][
-                            fit.names.index(fit.lam_name)
-                        ]
-                    )
-                )
-                t_val = lam / se
-        except (ValueError, np.linalg.LinAlgError):
-            # A regenerated sample can be singular; it is discarded and
-            # counted, never silently replaced by a retry that would
-            # bias the distribution towards estimable draws.
-            n_failed += 1
-            continue
-        if not (np.isfinite(f_val) and np.isfinite(t_val)):
-            n_failed += 1
-            continue
-        f_star[kept] = f_val
-        t_star[kept] = t_val
-        kept += 1
+        for i in range(size):
+            _accumulate(
+                y_block[i],
+                x_block[i],
+                x_names,
+                y_name,
+                p_order,
+                q_order,
+                case,
+                f_star,
+                t_star,
+                state,
+            )
+        done += size
+
+    kept = state["kept"]
+    n_failed = state["failed"]
 
     if kept < n_boot // 2:
         raise ValueError(

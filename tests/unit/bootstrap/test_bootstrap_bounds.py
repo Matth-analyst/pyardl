@@ -23,6 +23,7 @@ from pyardl.bootstrap import (
     estimate_null_dgp,
     simulate_path,
 )
+from pyardl.bootstrap.dgp import simulate_paths
 from pyardl.bootstrap.resample import resample_residuals
 from pyardl.bounds import bounds_test
 from pyardl.exceptions import PyardlMethodologyWarning
@@ -409,3 +410,112 @@ class TestValidation:
             res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=199, seed=1)
         assert res.n_failed > 0
         assert res.n_boot + res.n_failed == 199
+
+
+class TestVectorisedRecursion:
+    """§2.5 — la récursion batchée == la récursion scalaire.
+
+    La régénération représentait jusqu'à 79 % du temps ; elle est
+    désormais vectorisée sur l'axe des réplications. Le gain ne vaut que
+    si l'arithmétique est rigoureusement inchangée.
+    """
+
+    def _naive_path(self, dgp, inn, y0, x0, burn_in):  # type: ignore[no-untyped-def]
+        """Récursion scalaire écrite indépendamment, période par période.
+
+        Référence volontairement naïve : aucune vectorisation, la
+        formule du modèle nul recopiée depuis la spec.
+        """
+        k = dgp.n_regressors
+        r = dgp.var_order
+        n_total = inn.shape[0]
+        lag_max = max(dgp.p, max(dgp.q, default=0), r, 1)
+        dx = np.zeros((n_total, k))
+        dy = np.zeros(n_total)
+        for t in range(lag_max, n_total):
+            acc = dgp.x_const.copy()
+            for i in range(r):
+                acc = acc + dgp.x_ar[i] @ dx[t - i - 1]
+            dx[t] = acc + inn[t, 1:]
+            val = dgp.y_const + dgp.y_trend * (t - burn_in + 1)
+            for i in range(1, dgp.p):
+                val += dgp.psi[i - 1] * dy[t - i]
+            for j in range(k):
+                for i in range(dgp.q[j]):
+                    val += dgp.omega[j][i] * dx[t - i, j]
+            dy[t] = val + inn[t, 0]
+        return (
+            np.cumsum(dy[burn_in:]) + y0,
+            np.cumsum(dx[burn_in:], axis=0) + x0,
+        )
+
+    @pytest.mark.parametrize("case", [1, 3, 5])
+    @pytest.mark.parametrize("k", [1, 3])
+    def test_batched_matches_naive_recursion(self, case: int, k: int) -> None:
+        y, x = _cointegrated(120, seed=60 + case + k, k=k)
+        dgp = estimate_null_dgp(y, x, p=2, q=tuple([1] * k), case=case, var_order=1)
+        rng = np.random.default_rng(71)
+        block = np.stack(
+            [resample_residuals(dgp.residuals, 30 + 120, rng) for _ in range(5)]
+        )
+        y_batch, x_batch = simulate_paths(dgp, block, y0=y[0], x0=x[0], burn_in=30)
+        for b in range(5):
+            y_ref, x_ref = self._naive_path(dgp, block[b], y[0], x[0], burn_in=30)
+            assert np.max(np.abs(y_batch[b] - y_ref)) < 1e-10
+            assert np.max(np.abs(x_batch[b] - x_ref)) < 1e-10
+
+    def test_single_path_is_the_batched_one(self) -> None:
+        """simulate_path délègue : les deux routes ne peuvent pas diverger."""
+        y, x = _cointegrated(100, seed=72, k=2)
+        dgp = estimate_null_dgp(y, x, p=2, q=(1, 1), case=3)
+        inn = resample_residuals(dgp.residuals, 40 + 100, np.random.default_rng(73))
+        y_one, x_one = simulate_path(dgp, inn, y0=y[0], x0=x[0], burn_in=40)
+        y_many, x_many = simulate_paths(
+            dgp, inn[None, ...], y0=y[0], x0=x[0], burn_in=40
+        )
+        assert np.array_equal(y_one, y_many[0])
+        assert np.array_equal(x_one, x_many[0])
+
+    def test_trend_enters_the_regenerated_data(self) -> None:
+        """Sous le cas 5, la tendance du modèle nul doit être régénérée.
+
+        Elle était estimée puis ignorée : les données bootstrap ne
+        portaient pas la tendance que le modèle nul décrit, et les
+        valeurs critiques du cas 5 s'en trouvaient fausses.
+        """
+        y, x = _cointegrated(120, seed=74)
+        dgp = estimate_null_dgp(y, x, p=1, q=(1,), case=5)
+        assert dgp.y_trend != 0.0
+
+        inn = np.zeros((1, 30 + 120, 2))  # aucune innovation
+        y_star, _ = simulate_paths(dgp, inn, y0=0.0, x0=np.zeros(1), burn_in=30)
+        # Sans bruit, Delta y = c + delta * t : y suit une parabole, donc
+        # sa différence seconde vaut exactement delta.
+        second_diff = np.diff(np.diff(y_star[0]))
+        assert np.allclose(second_diff, dgp.y_trend, atol=1e-9)
+
+    def test_chunking_does_not_change_results(self) -> None:
+        """Le découpage en blocs est un détail d'exécution, pas de calcul."""
+        import pyardl.bootstrap.bounds as mod
+
+        y, x = _cointegrated(100, seed=75)
+        original = mod._CHUNK
+        try:
+            mod._CHUNK = 1000
+            big = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=299, seed=9)
+            mod._CHUNK = 7
+            small = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=299, seed=9)
+        finally:
+            mod._CHUNK = original
+        assert big.f_critical[0.05] == small.f_critical[0.05]
+        assert big.t_critical[0.05] == small.t_critical[0.05]
+
+    def test_batch_shape_validation(self) -> None:
+        y, x = _cointegrated(80, seed=76)
+        dgp = estimate_null_dgp(y, x, p=1, q=(1,), case=3)
+        with pytest.raises(ValueError, match="must be 3-D"):
+            simulate_paths(dgp, np.zeros((10, 2)), y0=0.0, x0=np.zeros(1))
+        with pytest.raises(ValueError, match="columns for"):
+            simulate_paths(dgp, np.zeros((2, 80, 5)), y0=0.0, x0=np.zeros(1))
+        with pytest.raises(ValueError, match="must be 2-D"):
+            simulate_path(dgp, np.zeros((2, 80, 2)), y0=0.0, x0=np.zeros(1))

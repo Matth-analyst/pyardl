@@ -68,7 +68,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
     FloatArray = NDArray[np.float64]
 
-__all__ = ["NullDGP", "estimate_null_dgp", "simulate_path"]
+__all__ = ["NullDGP", "estimate_null_dgp", "simulate_path", "simulate_paths"]
 
 
 @dataclass(frozen=True)
@@ -248,73 +248,122 @@ def estimate_null_dgp(
     )
 
 
-def simulate_path(
+def simulate_paths(
     dgp: NullDGP,
     innovations: FloatArray,
-    y0: FloatArray,
+    y0: float,
     x0: FloatArray,
     burn_in: int = 50,
 ) -> tuple[FloatArray, FloatArray]:
-    r"""Regenerate one bootstrap sample under the null.
+    r"""Regenerate many bootstrap samples at once.
 
     Parameters
     ----------
     dgp : NullDGP
         Output of :func:`estimate_null_dgp`.
-    innovations : numpy.ndarray, shape (burn_in + T, 1 + k)
-        Resampled residual rows, column 0 for the conditional equation.
-    y0, x0 : numpy.ndarray
-        Initial values, taken from the observed data so the regenerated
-        series start in the same region as the sample.
+    innovations : numpy.ndarray, shape (B, burn_in + T, 1 + k)
+        Resampled residual rows, one plane per replication. Column 0 of
+        the last axis feeds the conditional equation, the rest the
+        marginal block.
+    y0 : float
+    x0 : numpy.ndarray, shape (k,)
+        Initial values, taken from the observed data.
     burn_in : int, default 50
-        Number of initial periods discarded, so the path does not carry
-        the arbitrary starting values into the statistic.
+        Initial periods discarded from every path.
 
     Returns
     -------
-    y_star, x_star : numpy.ndarray
+    y_star : numpy.ndarray, shape (B, T)
+    x_star : numpy.ndarray, shape (B, T, k)
 
     Notes
     -----
-    The regressors are generated first, from the marginal VAR, and the
-    dependent variable second, conditionally on them. That ordering is
-    the definition of the conditional model — reversing it would make
-    ``y`` cause ``x``.
+    The recursion is sequential in ``t`` — period ``t`` needs period
+    ``t-1`` — but **independent across replications**. So the loop runs
+    over ``T`` periods with every replication advanced together, instead
+    of over ``B x T`` scalar steps. The arithmetic is identical; only
+    the interpreter overhead disappears.
 
-    Neither the level of ``y`` nor the levels of ``x`` enter the
-    recursion: under the null the level terms are absent, which is
-    precisely why the regenerated series carry no long-run relationship.
+    The trend of the null model, when the deterministic case carries one,
+    is indexed so that the first *kept* observation sits at ``t = 1``,
+    matching the estimation. Burn-in periods therefore take
+    non-positive trend values — the same straight line extended
+    backwards, which is the only choice that leaves no discontinuity at
+    the join.
     """
+    inn = np.asarray(innovations, dtype=np.float64)
+    if inn.ndim != 3:
+        raise ValueError(
+            f"innovations must be 3-D (B, periods, 1+k), got shape {inn.shape}."
+        )
+    n_rep, n_total, n_eq = inn.shape
     k = dgp.n_regressors
-    r = dgp.var_order
-    n_total = innovations.shape[0]
-    n_keep = n_total - burn_in
-    if n_keep <= 0:
+    if n_eq != 1 + k:
+        raise ValueError(
+            f"innovations has {n_eq} columns for {k} regressors; expected {1 + k}."
+        )
+    if n_total - burn_in <= 0:
         raise ValueError(f"burn_in={burn_in} leaves no observation out of {n_total}.")
 
+    r = dgp.var_order
     lag_max = max(dgp.p, max(dgp.q, default=0), r, 1)
 
-    dx = np.zeros((n_total, k), dtype=np.float64)
-    dy = np.zeros(n_total, dtype=np.float64)
+    dx = np.zeros((n_rep, n_total, k), dtype=np.float64)
+    dy = np.zeros((n_rep, n_total), dtype=np.float64)
 
     for t in range(lag_max, n_total):
-        acc = dgp.x_const.copy()
+        acc = np.broadcast_to(dgp.x_const, (n_rep, k)).copy()
         for i in range(r):
-            acc = acc + dgp.x_ar[i] @ dx[t - i - 1]
-        dx[t] = acc + innovations[t, 1:]
+            acc += dx[:, t - i - 1] @ dgp.x_ar[i].T
+        dx[:, t] = acc + inn[:, t, 1:]
 
-        val = dgp.y_const
+        val = np.full(n_rep, dgp.y_const, dtype=np.float64)
+        if dgp.y_trend:
+            val += dgp.y_trend * float(t - burn_in + 1)
         for i in range(1, dgp.p):
-            val += dgp.psi[i - 1] * dy[t - i]
+            val += dgp.psi[i - 1] * dy[:, t - i]
         for j in range(k):
             for i in range(dgp.q[j]):
-                val += dgp.omega[j][i] * dx[t - i, j]
-        dy[t] = val + innovations[t, 0]
+                val += dgp.omega[j][i] * dx[:, t - i, j]
+        dy[:, t] = val + inn[:, t, 0]
 
-    # Cumulate to levels, anchored on the observed starting values.
     x_star = np.asarray(
-        np.cumsum(dx[burn_in:], axis=0) + np.asarray(x0, dtype=np.float64),
+        np.cumsum(dx[:, burn_in:], axis=1) + np.asarray(x0, dtype=np.float64),
         dtype=np.float64,
     )
-    y_star = np.asarray(np.cumsum(dy[burn_in:]) + float(y0), dtype=np.float64)
+    y_star = np.asarray(
+        np.cumsum(dy[:, burn_in:], axis=1) + float(y0), dtype=np.float64
+    )
     return y_star, x_star
+
+
+def simulate_path(
+    dgp: NullDGP,
+    innovations: FloatArray,
+    y0: float,
+    x0: FloatArray,
+    burn_in: int = 50,
+) -> tuple[FloatArray, FloatArray]:
+    """Regenerate a single bootstrap sample.
+
+    Thin wrapper over :func:`simulate_paths` with one replication. The
+    single-path and many-path routes therefore cannot drift apart: there
+    is only one recursion in the code.
+
+    Parameters
+    ----------
+    dgp : NullDGP
+    innovations : numpy.ndarray, shape (burn_in + T, 1 + k)
+    y0, x0 : ...
+    burn_in : int, default 50
+
+    Returns
+    -------
+    y_star : numpy.ndarray, shape (T,)
+    x_star : numpy.ndarray, shape (T, k)
+    """
+    inn = np.asarray(innovations, dtype=np.float64)
+    if inn.ndim != 2:
+        raise ValueError("innovations must be 2-D (periods, 1+k).")
+    y_star, x_star = simulate_paths(dgp, inn[None, ...], y0, x0, burn_in)
+    return y_star[0], x_star[0]
