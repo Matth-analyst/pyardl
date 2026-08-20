@@ -203,6 +203,56 @@ class TestResultsObject:
 # --- Refus explicites ----------------------------------------------------
 
 
+class TestComplexEigenvalues:
+    """La conversion complexe -> reel est deliberee, pas silencieuse."""
+
+    def test_rounding_level_imaginary_part_is_accepted(self) -> None:
+        from pyardl.cointegration.johansen import _real_part
+
+        values = np.array([1.0 + 1e-14j, -2.0 - 5e-15j])
+        assert _real_part(values, "eigenvalues") == pytest.approx([1.0, -2.0])
+
+    def test_a_real_imaginary_part_is_refused(self) -> None:
+        """Une valeur propre franchement complexe ne se tronque pas : le
+        probleme resolu n'est plus celui que le test suppose."""
+        from pyardl.cointegration.johansen import _real_part
+
+        with pytest.raises(ValueError, match="came back complex"):
+            _real_part(np.array([1.0 + 0.5j]), "eigenvalues")
+
+    def test_dependency_warning_does_not_escape(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+        """Regression : statsmodels emet un ComplexWarning en calculant
+        ses statistiques sur certaines plateformes. Il ne doit pas
+        remonter jusqu'a l'appelant, qui n'a rien a en faire — c'est
+        exactement ce qui avait fait tomber la CI la ou la machine de
+        developpement ne le reproduisait pas.
+        """
+        import warnings as _w
+
+        import statsmodels.tsa.vector_ar.vecm as sm_vecm
+
+        real = sm_vecm.coint_johansen
+
+        def noisy(*args, **kwargs):  # type: ignore[no-untyped-def]
+            _w.warn("casting complex", np.exceptions.ComplexWarning, stacklevel=2)
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(sm_vecm, "coint_johansen", noisy)
+        with _w.catch_warnings(record=True) as caught:
+            _w.simplefilter("always")
+            johansen(_rank0(seed=77, k=2), det_order=0, k_ar_diff=1)
+        assert not [
+            w for w in caught if issubclass(w.category, np.exceptions.ComplexWarning)
+        ]
+
+    def test_real_input_passes_through(self) -> None:
+        from pyardl.cointegration.johansen import _real_part
+
+        assert _real_part(np.array([1.0, 2.0]), "eigenvalues") == pytest.approx(
+            [1.0, 2.0]
+        )
+
+
 class TestValidation:
     def test_single_series_is_refused(self) -> None:
         with pytest.raises(ValueError, match="at least two series"):
@@ -251,13 +301,24 @@ class TestCheckAmongX:
         assert check_no_cointegration_among_x(np.cumsum(np.ones((50, 1)))) is None
 
     def test_independent_walks_pass_silently(self) -> None:
+        """Aucun avertissement DE LA BIBLIOTHEQUE n'est emis.
+
+        L'assertion vise nos propres classes d'avertissement, pas toutes
+        celles du processus : une dependance peut legitimement en emettre
+        (statsmodels le fait sur des valeurs propres a partie imaginaire
+        de l'ordre de l'arrondi), et transformer cela en echec ferait
+        tomber le test pour une raison etrangere a ce qu'il verifie.
+        """
         import warnings
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
             res = check_no_cointegration_among_x(
                 _rank0(seed=42, k=2), det_order=0, k_ar_diff=1
             )
+        assert not [
+            w for w in caught if issubclass(w.category, PyardlMethodologyWarning)
+        ]
         assert res is not None
         assert res.selected_rank == 0
 

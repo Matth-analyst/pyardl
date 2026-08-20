@@ -167,6 +167,38 @@ class JohansenResults:
         return "\n".join(lines)
 
 
+def _real_part(values: npt.ArrayLike, what: str) -> npt.NDArray[np.float64]:
+    """Take the real part of a possibly complex array, deliberately.
+
+    The generalised eigenvalue problem behind the test is solved
+    numerically, and on some BLAS builds it returns eigenvalues carrying
+    a rounding-level imaginary part. Casting those straight to ``float``
+    discards the imaginary part **silently** — which is fine when it is
+    rounding noise and a serious error when it is not. So the size of
+    what is being discarded is checked rather than assumed.
+
+    Raises
+    ------
+    ValueError
+        If any imaginary part is large enough to mean something. A
+        genuinely complex eigenvalue is not a numerical detail: it says
+        the problem being solved is not the one the test assumes.
+    """
+    arr = np.asarray(values)
+    if not np.iscomplexobj(arr):
+        return np.asarray(arr, dtype=np.float64)
+    imag = np.abs(arr.imag)
+    scale = max(float(np.max(np.abs(arr.real))), 1.0)
+    if float(np.max(imag)) > 1e-8 * scale:
+        raise ValueError(
+            f"The {what} of the Johansen problem came back complex "
+            f"(largest imaginary part {float(np.max(imag)):.3e} against a "
+            f"scale of {scale:.3e}). That is not rounding noise, and the "
+            "rank cannot be read from it."
+        )
+    return np.asarray(arr.real, dtype=np.float64)
+
+
 def _sequential_rank(stat: npt.NDArray[np.float64], cv: npt.NDArray[np.float64]) -> int:
     """Rank retained by the sequential procedure.
 
@@ -279,12 +311,27 @@ def johansen(
             "could be taken from them."
         )
 
-    raw = coint_johansen(arr, det_order, k_ar_diff)
+    # statsmodels computes the trace and max-eigenvalue statistics from
+    # eigenvalues that may carry a rounding-level imaginary part, and
+    # emits a ComplexWarning while doing so. The warning is about their
+    # cast, not about a problem with the data; we silence it here and
+    # check the magnitude ourselves, just below, where we can act on it.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", np.exceptions.ComplexWarning)
+        raw = coint_johansen(arr, det_order, k_ar_diff)
+
+    # Checked before anything is read from them: a complex statistic
+    # would mean the eigenvalue problem did not solve as assumed.
+    _real_part(raw.eig, "eigenvalues")
 
     index = ["r = 0"] + [f"r <= {r}" for r in range(1, n_vars)]
-    trace_stat = pd.Series(np.asarray(raw.lr1, dtype=float), index=index, name="trace")
+    trace_stat = pd.Series(
+        _real_part(raw.lr1, "trace statistics"), index=index, name="trace"
+    )
     maxeig_stat = pd.Series(
-        np.asarray(raw.lr2, dtype=float), index=index, name="maxeig"
+        _real_part(raw.lr2, "maximum-eigenvalue statistics"),
+        index=index,
+        name="maxeig",
     )
     cols = [_CV_COLUMNS[a] for a in _ALPHAS]
     trace_cv = pd.DataFrame(
@@ -298,7 +345,7 @@ def johansen(
     # by its first element so two runs can be compared. A first element
     # numerically indistinguishable from zero is left unscaled rather
     # than divided by, which would manufacture huge coefficients.
-    evec = np.asarray(raw.evec, dtype=float)
+    evec = _real_part(raw.evec, "eigenvectors")
     beta = evec.copy()
     for j in range(beta.shape[1]):
         head = beta[0, j]
@@ -320,7 +367,7 @@ def johansen(
         maxeig_stat=maxeig_stat,
         trace_cv=trace_cv,
         maxeig_cv=maxeig_cv,
-        eigenvalues=np.asarray(raw.eig, dtype=float),
+        eigenvalues=_real_part(raw.eig, "eigenvalues"),
         beta=beta_df,
         selected_rank=selected,
         n_vars=n_vars,

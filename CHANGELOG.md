@@ -182,6 +182,14 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- The Johansen wrapper cast possibly-complex eigenvalues, eigenvectors
+  and statistics straight to `float`, discarding any imaginary part in
+  silence. It now checks the size of what it discards: rounding-level
+  imaginary parts (which some BLAS builds produce) pass through, and a
+  genuinely complex eigenvalue raises instead of being truncated — it
+  would mean the problem solved is not the one the test assumes. The
+  dependency's own `ComplexWarning` no longer escapes to the caller.
+  Caught by CI on platforms the development machine did not reproduce.
 - The trend of the null model was estimated, stored, and then ignored
   when regenerating data. Under deterministic case 5 the bootstrap
   samples therefore lacked the trend the null model describes, making
