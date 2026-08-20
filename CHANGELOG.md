@@ -5,6 +5,21 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-21
+
+Third release, and the end of phase 3: bootstrap inference, the
+three-test framework that names the degeneracies instead of suspecting
+them, the Johansen system test, and one simulator for every Monte Carlo
+study in the library.
+
+Three conventions in this release were settled by **measurement rather
+than by reading**: which null the bootstrap draws from (OBS-8), what the
+unconditional model actually removes (locked against bootCT to 1e-12),
+and which Johansen statistic meets the specification's own criterion
+(OBS-10). Two limits are recorded rather than smoothed over: `F_indep`
+is oversized at `T = 100` (OBS-11), and the bootstrap's decisiveness
+costs accuracy under a type 2 degeneracy (OBS-12).
+
 ### Added — conditional and unconditional models
 
 - `conditional=True | False` on `bounds_test`, `bootstrap_bounds_test`
