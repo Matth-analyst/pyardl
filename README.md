@@ -1,6 +1,10 @@
 <div align="center">
 
-# pyardl
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pyardl-lockup-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/pyardl-lockup-light.svg">
+  <img src="docs/assets/pyardl-lockup-light.svg" alt="pyardl" width="300">
+</picture>
 
 **ARDL models, bounds tests for cointegration, and critical values you can trace back to their source.**
 

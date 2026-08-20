@@ -23,3 +23,8 @@ docs/DEVIATIONS.md
 docs/VALIDATION_OBSERVATIONS.md
 docs/ardl_references.pdf
 validation/
+
+# Archives de travail (ex. le zip source du logo) : les fichiers utiles
+# en sont extraits dans docs/assets/, l'archive elle-meme n'a rien a faire
+# dans le depot.
+*.zip
