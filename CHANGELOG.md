@@ -5,6 +5,56 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — conditional and unconditional models
+
+- `conditional=True | False` on `bounds_test`, `bootstrap_bounds_test`
+  and the whole bootstrap path — the distinction of Bertelli, Vacca &
+  Zoia (2022). The unconditional form drops the contemporaneous
+  differences of the regressors and changes nothing else; the tested
+  vector is untouched, so the two forms test the same restriction on two
+  specifications.
+- The setting is threaded through the observed statistic, the null
+  model, the regenerated data and each replication's re-estimation. If
+  the null model kept `Dx_t` while the statistic did not, the simulated
+  null would not be the null being tested — and nothing in the output
+  would say so.
+- The convention was **measured, not read**: bootCT reports its own
+  unconditional `F_indep` (3.405600 on the Danish data), and of the two
+  candidate specifications only one reproduces it, to 1e-12. Locked by
+  `tests/replication/test_spec16.py`.
+- `res.summary()` states which specification produced the numbers.
+
+### Added — VECM simulator (`pyardl.simulate`)
+
+- `vecm_ardl(n_obs, alpha, beta, gammas, case, sigma, ...)` — one
+  generator for every Monte Carlo study in the library, so a
+  disagreement between two validation studies is a disagreement about
+  estimators rather than about data.
+- Writing `Pi = alpha @ beta.T` makes the rank chosen rather than hoped
+  for. The reported `rank` is the rank of `Pi`, not the number of
+  columns supplied: a zero `alpha` creates no relation, and saying
+  otherwise would claim a relation the data do not contain.
+- `degenerate_system(kind, k, speed)` builds the canonical systems the
+  three-test framework has to tell apart, written once.
+- Seeds are recorded even when drawn from entropy. Deterministic terms a
+  case does not carry are refused rather than absorbed.
+- Verified by what estimators recover from it, not by what it prints:
+  Johansen finds the injected rank, and the three-test classification
+  never calls an injected degeneracy cointegration.
+
+### Measured
+
+- The specification asks for three distinct constrained null DGPs, one
+  per test. Measured on 1200 paired Monte Carlo samples, that variant
+  over-rejects for `F_indep` too (8.5% against 6.7% in case III,
+  McNemar p = 1e-05), in the same direction as OBS-8. One joint null is
+  kept; the deviation and its evidence are in `docs/DEVIATIONS.md`.
+- The same run showed that `F_indep` is itself oversized at `T = 100` —
+  6.4-6.7% at a nominal 5%, where the `t` holds its size. Recorded as
+  OBS-11 rather than left unsaid; the first 400-sample pass had
+  suggested 4.75%, and the discrepancy was checked to be sampling luck,
+  not a bug, before being written down.
+
 ### Added — Johansen test (`pyardl.cointegration`)
 
 - `johansen(y, det_order, k_ar_diff, alpha, method)` — a thin wrapper

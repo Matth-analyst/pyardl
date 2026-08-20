@@ -10,6 +10,8 @@ nav:
       - ARDL estimation: api/ardl.md
       - Bounds test: api/bounds.md
       - Three-test framework: api/three-tests.md
+      - Conditional vs unconditional: api/conditional.md
+      - VECM simulator: api/simulate.md
       - Critical values: api/critical-values.md
       - ARDL/ECM algebra: api/transforms.md
       - Stability diagnostics: api/diagnostics.md

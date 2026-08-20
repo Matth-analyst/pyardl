@@ -101,8 +101,16 @@ def _estimate_uecm(
     case: int,
     fixed: FloatArray | None = None,
     fixed_names: tuple[str, ...] = (),
+    conditional: bool = True,
 ) -> _UECMFit:
-    """Build and fit the error-correction model for the requested case."""
+    """Build and fit the error-correction model for the requested case.
+
+    ``conditional=False`` drops the contemporaneous differences of the
+    regressors and changes nothing else — the unconditional form of
+    Bertelli, Vacca & Zoia (2022). That convention was established by
+    reproducing bootCT's own unconditional statistic, not read off the
+    text: see ``docs/api/conditional.md``.
+    """
     n, k = x.shape
     start = max([p, *q]) if q else p
     if start < 1:
@@ -146,8 +154,9 @@ def _estimate_uecm(
     for i in range(1, p):
         cols.append(dy[start - i - 1 : n - i - 1])
         names.append(f"D.{y_name}.L{i}")
+    first_lag = 0 if conditional else 1
     for j, name in enumerate(x_names):
-        for i in range(q[j]):
+        for i in range(first_lag, q[j]):
             cols.append(dx[start - i - 1 : n - i - 1, j])
             names.append(f"D.{name}.L{i}")
 
@@ -315,7 +324,7 @@ class BoundsTestResults:
     uecm : pandas.DataFrame
         Coefficients, standard errors and t-ratios of the fitted
         error-correction model.
-    case, k, order, alpha, cv_source
+    case, k, order, alpha, cv_source, conditional
         Settings the test was run with.
     """
 
@@ -333,6 +342,7 @@ class BoundsTestResults:
     decision_joint: JointDecision | None
     uecm: pd.DataFrame
     cv_source: str
+    conditional: bool
     p_values: pd.Series | None  # (p_I0, p_I1) du F — None si indisponible
     _fit: _UECMFit = field(repr=False)
 
@@ -519,7 +529,8 @@ class BoundsTestResults:
         label, reason = self.classification()
         lines = [
             f"Bounds test (Pesaran, Shin & Smith 2001) - case {self.case}, "
-            f"k={self.k}, ECM({p}; {q_desc}), critical values: {self.cv_source}",
+            f"k={self.k}, ECM({p}; {q_desc}), critical values: {self.cv_source}"
+            + ("" if self.conditional else ", UNCONDITIONAL (no contemporaneous Dx)"),
             "",
             f"F_overall = {self.f_stat:.4f}   decision ({self.alpha:.0%}): "
             f"{decision_f_txt}",
@@ -561,6 +572,7 @@ def _finalize_results(
     decision_indep: Decision | None,
     decision_joint: JointDecision | None,
     cv_source: str,
+    conditional: bool,
     p_values: pd.Series | None,
     fit: _UECMFit,
 ) -> BoundsTestResults:
@@ -591,6 +603,7 @@ def _finalize_results(
         decision_joint=decision_joint,
         uecm=uecm_table,
         cv_source=cv_source,
+        conditional=conditional,
         p_values=p_values,
         _fit=fit,
     )
@@ -608,6 +621,7 @@ def bounds_test(
     cv_source: Literal["kripfganz", "pss", "narayan"] = "kripfganz",
     finite_t: bool = False,
     fixed_regressors: npt.ArrayLike | None = None,
+    conditional: bool = True,
 ) -> BoundsTestResults:
     """Test whether a long-run level relationship exists between y and x.
 
@@ -737,7 +751,16 @@ def bounds_test(
             fixed_names = tuple(f"z.{j}" for j in range(fixed_arr.shape[1]))
 
     fit = _estimate_uecm(
-        y_arr, x_arr, x_names, y_name, p, q, case, fixed_arr, fixed_names
+        y_arr,
+        x_arr,
+        x_names,
+        y_name,
+        p,
+        q,
+        case,
+        fixed_arr,
+        fixed_names,
+        conditional=conditional,
     )
 
     f_stat = _wald_f(fit)
@@ -815,6 +838,7 @@ def bounds_test(
             decision_indep,
             decision_joint,
             cv_source,
+            conditional,
             p_values_fin,
             fit,
         )
@@ -906,6 +930,7 @@ def bounds_test(
         decision_indep,
         decision_joint,
         cv_source,
+        conditional,
         p_values,
         fit,
     )

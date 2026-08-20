@@ -209,6 +209,7 @@ def bootstrap_bounds_test(
     var_order: int = 1,
     burn_in: int = 50,
     store_distribution: bool = False,
+    conditional: bool = True,
     **kwargs: object,
 ) -> BootstrapBoundsResults:
     r"""Bounds test with bootstrap critical values.
@@ -285,7 +286,14 @@ def bootstrap_bounds_test(
         seed = int(entropy) % (2**63) if isinstance(entropy, int) else 0
     rng = np.random.default_rng(seed)
 
-    classical = bounds_test(y, x, case=case, order=order, **kwargs)  # type: ignore[arg-type]
+    classical = bounds_test(
+        y,
+        x,
+        case=case,
+        order=order,
+        conditional=conditional,
+        **kwargs,  # type: ignore[arg-type]
+    )
 
     y_arr, x_arr, _, y_name, x_names = check_series(y, x)
     if x_arr is None:
@@ -297,7 +305,13 @@ def bootstrap_bounds_test(
     q_order = tuple(int(q_map[name]) for name in x_names)
 
     dgp = estimate_null_dgp(
-        y_arr, x_arr, p=p_order, q=q_order, case=case, var_order=var_order
+        y_arr,
+        x_arr,
+        p=p_order,
+        q=q_order,
+        case=case,
+        var_order=var_order,
+        conditional=conditional,
     )
 
     n_obs = y_arr.shape[0]
@@ -326,7 +340,7 @@ def bootstrap_bounds_test(
             dgp, block, y0=y_arr[0], x0=x_arr[0], burn_in=burn_in
         )
         f_block, t_block, i_block, ok = batch_uecm_statistics(
-            y_block, x_block, p_order, q_order, case
+            y_block, x_block, p_order, q_order, case, conditional
         )
         n_ok = int(ok.sum())
         f_star[kept : kept + n_ok] = f_block[ok]

@@ -54,6 +54,7 @@ def _build_designs(
     p: int,
     q: tuple[int, ...],
     case: int,
+    conditional: bool = True,
 ) -> tuple[FloatArray, FloatArray, list[int], int]:
     """Stack the design matrices of every replication.
 
@@ -112,8 +113,9 @@ def _build_designs(
     for i in range(1, p):
         cols.append(dy[:, start - i - 1 : n_obs - i - 1])
         names.append(f"D.y.L{i}")
+    first_lag = 0 if conditional else 1
     for j in range(k):
-        for i in range(q[j]):
+        for i in range(first_lag, q[j]):
             cols.append(dx[:, start - i - 1 : n_obs - i - 1, j])
             names.append(f"D.x{j}.L{i}")
 
@@ -129,6 +131,7 @@ def batch_uecm_statistics(
     p: int,
     q: tuple[int, ...],
     case: int,
+    conditional: bool = True,
 ) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray]:
     r"""The three bounds-test statistics for a stack of regenerated samples.
 
@@ -142,6 +145,9 @@ def batch_uecm_statistics(
         Lag orders of the error-correction model.
     case : int
         Deterministic case, 1 to 5.
+    conditional : bool, default True
+        When ``False``, the contemporaneous differences of the
+        regressors are excluded — the unconditional form.
 
     Returns
     -------
@@ -178,7 +184,7 @@ def batch_uecm_statistics(
     stopping the whole run because one regenerated sample degenerated
     would be worse than dropping it and saying so.
     """
-    design, target, tested, lam_pos = _build_designs(y, x, p, q, case)
+    design, target, tested, lam_pos = _build_designs(y, x, p, q, case, conditional)
     n_rep, n_est, k_par = design.shape
     if n_est <= k_par:
         raise ValueError(

@@ -95,8 +95,13 @@ class NullDGP:
     psi : numpy.ndarray, shape (p-1,)
         Coefficients on the lagged differences of ``y``.
     omega : tuple of numpy.ndarray
-        Per regressor, the coefficients on its current and lagged
-        differences.
+        Per regressor, the coefficients on its differences, starting at
+        lag :attr:`first_lag`.
+    conditional : bool
+        Whether the conditional equation carries the contemporaneous
+        differences of the regressors. ``False`` is the unconditional
+        form of Bertelli, Vacca & Zoia (2022): the contemporaneous terms
+        are removed and nothing else changes.
     x_const : numpy.ndarray, shape (k,)
         Intercepts of the marginal VAR — the drift of the regressors.
     x_ar : numpy.ndarray, shape (r, k, k)
@@ -120,6 +125,12 @@ class NullDGP:
     p: int
     q: tuple[int, ...]
     start: int
+    conditional: bool = True
+
+    @property
+    def first_lag(self) -> int:
+        """First lag of the regressors' differences that enters."""
+        return 0 if self.conditional else 1
 
     @property
     def n_regressors(self) -> int:
@@ -167,6 +178,7 @@ def estimate_null_dgp(
     q: tuple[int, ...],
     case: int,
     var_order: int = 1,
+    conditional: bool = True,
 ) -> NullDGP:
     r"""Estimate the null model and the marginal model of the regressors.
 
@@ -183,6 +195,12 @@ def estimate_null_dgp(
         removed along with the level terms.
     var_order : int, default 1
         Lag order of the marginal VAR on the differenced regressors.
+    conditional : bool, default True
+        When ``False``, the contemporaneous differences of the
+        regressors are excluded from the conditional equation — the
+        unconditional form. Must match the model the statistics are
+        computed on, or the null being simulated is not the null being
+        tested.
 
     Returns
     -------
@@ -210,8 +228,9 @@ def estimate_null_dgp(
 
     for i in range(1, p):
         cols.append(dy[start - i - 1 : n - i - 1])
+    first_lag = 0 if conditional else 1
     for j in range(k):
-        for i in range(q[j]):
+        for i in range(first_lag, q[j]):
             cols.append(dx[start - i - 1 : n - i - 1, j])
 
     target = dy[start - 1 :]
@@ -234,8 +253,9 @@ def estimate_null_dgp(
     pos += p - 1
     omega: list[FloatArray] = []
     for j in range(k):
-        omega.append(np.asarray(coefs[pos : pos + q[j]], dtype=np.float64))
-        pos += q[j]
+        width = max(q[j] - first_lag, 0)
+        omega.append(np.asarray(coefs[pos : pos + width], dtype=np.float64))
+        pos += width
 
     x_const, x_ar, eta = _fit_marginal_var(dx, var_order)
 
@@ -255,6 +275,7 @@ def estimate_null_dgp(
         p=p,
         q=q,
         start=start,
+        conditional=conditional,
     )
 
 
@@ -333,8 +354,8 @@ def simulate_paths(
         for i in range(1, dgp.p):
             val += dgp.psi[i - 1] * dy[:, t - i]
         for j in range(k):
-            for i in range(dgp.q[j]):
-                val += dgp.omega[j][i] * dx[:, t - i, j]
+            for i in range(dgp.first_lag, dgp.q[j]):
+                val += dgp.omega[j][i - dgp.first_lag] * dx[:, t - i, j]
         dy[:, t] = val + inn[:, t, 0]
 
     x_star = np.asarray(
