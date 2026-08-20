@@ -317,7 +317,9 @@ class BoundsTestResults:
         which separates the two degeneracies instead of merely suspecting
         one, is :meth:`classification`.
     bounds : pandas.DataFrame
-        Lower and upper bounds for F and t at the 10%, 5% and 1% levels.
+        Lower and upper bounds for the three statistics at the 10%, 5%
+        and 1% levels. ``NaN`` where nothing is tabulated for the
+        configuration — never a neighbouring value.
     p_values : pandas.Series or None
         Approximate p-values at both bounds, when the critical-value
         source provides them.
@@ -788,8 +790,20 @@ def bounds_test(
         for a in (0.10, 0.05, 0.01):
             f_lo, f_up = crit_value_bounds_finite(case, k, fit.nobs, sr, a)
             t_lo, t_up = crit_value_bounds_finite(case, k, fit.nobs, sr, a, stat="t")
+            try:
+                i_lo, i_up = findep_bounds(case, k, a)
+            except ValueError:
+                i_lo = i_up = np.nan
             rows.append(
-                {"alpha": a, "F_I0": f_lo, "F_I1": f_up, "t_I0": t_lo, "t_I1": t_up}
+                {
+                    "alpha": a,
+                    "F_I0": f_lo,
+                    "F_I1": f_up,
+                    "t_I0": t_lo,
+                    "t_I1": t_up,
+                    "F_indep_I0": i_lo,
+                    "F_indep_I1": i_up,
+                }
             )
         bounds_df = pd.DataFrame(rows).set_index("alpha")
 
@@ -852,8 +866,20 @@ def bounds_test(
             t_lo, t_up = get_bounds("t", case=case, k=k, alpha=a)
         except ValueError:
             t_lo = t_up = np.nan
+        try:
+            i_lo, i_up = findep_bounds(case, k, a)
+        except ValueError:
+            i_lo = i_up = np.nan
         rows.append(
-            {"alpha": a, "F_I0": f_lo, "F_I1": f_up, "t_I0": t_lo, "t_I1": t_up}
+            {
+                "alpha": a,
+                "F_I0": f_lo,
+                "F_I1": f_up,
+                "t_I0": t_lo,
+                "t_I1": t_up,
+                "F_indep_I0": i_lo,
+                "F_indep_I1": i_up,
+            }
         )
     bounds_df = pd.DataFrame(rows).set_index("alpha")
 

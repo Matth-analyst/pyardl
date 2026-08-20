@@ -231,6 +231,69 @@ class TestDecisions:
         assert reason
 
 
+class TestComparisonWithBounds:
+    """Spec 16 §2.3 — les deux routes en regard."""
+
+    def test_comparison_has_one_row_per_test(self) -> None:
+        y, x = _cointegrated(120, seed=61)
+        res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=199, seed=1)
+        comp = res.comparison()
+        assert list(comp.index) == ["F_overall", "t_BDM", "F_indep"]
+        assert list(comp.columns) == [
+            "statistic",
+            "boot_cv",
+            "boot_p",
+            "boot_decision",
+            "bound_I0",
+            "bound_I1",
+            "bound_decision",
+        ]
+
+    def test_statistics_match_the_result_object(self) -> None:
+        y, x = _cointegrated(120, seed=62)
+        res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=199, seed=1)
+        comp = res.comparison()
+        assert comp.loc["F_overall", "statistic"] == pytest.approx(res.f_stat)
+        assert comp.loc["t_BDM", "statistic"] == pytest.approx(res.t_stat)
+        assert comp.loc["F_indep", "statistic"] == pytest.approx(res.f_indep_stat)
+
+    def test_classical_bounds_are_the_classical_ones(self) -> None:
+        """Aucune borne n'est recalculee dans la comparaison : elle lit
+        celles du test classique, sinon les deux routes pourraient
+        diverger sans que personne le voie."""
+        y, x = _cointegrated(120, seed=63)
+        res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=199, seed=1)
+        comp = res.comparison(0.05)
+        assert comp.loc["F_overall", "bound_I0"] == pytest.approx(
+            res.classical.bounds.loc[0.05, "F_I0"]
+        )
+        assert comp.loc["F_indep", "bound_I1"] == pytest.approx(
+            res.classical.bounds.loc[0.05, "F_indep_I1"]
+        )
+
+    def test_unavailable_classical_decision_is_named_not_hidden(self) -> None:
+        """Cas II : PSS ne tabule pas le t. La cellule le DIT au lieu de
+        laisser une case vide qu'on lirait comme un non-rejet."""
+        y, x = _cointegrated(120, seed=64)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = bootstrap_bounds_test(y, x, case=2, order=(1, 1), n_boot=199, seed=1)
+        assert res.comparison().loc["t_BDM", "bound_decision"] == "unavailable"
+
+    def test_agreement_flag_matches_the_two_classifications(self) -> None:
+        y, x = _cointegrated(120, seed=65)
+        res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=199, seed=1)
+        expected = res.classification(0.05)[0] == res.classical.classification()[0]
+        assert res.agrees_with_bounds(0.05) is expected
+
+    def test_summary_shows_both_routes(self) -> None:
+        y, x = _cointegrated(120, seed=66)
+        res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=199, seed=1)
+        text = res.summary()
+        assert "bootstrap against classical bounds" in text
+        assert "classification: bootstrap ->" in text
+
+
 class TestSizeAndPower:
     """§4.1 et §4.2 — taille et puissance."""
 
@@ -328,7 +391,9 @@ class TestResultsObject:
         text = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=199, seed=1).summary()
         assert "Bootstrap bounds test" in text
         assert "bootstrap critical values" in text
-        assert "for comparison, the classical bounds" in text
+        # Spec 16 §2.3 : la comparaison est devenue un tableau test par
+        # test, plus une ligne resumee ; la phrase d'origine a disparu.
+        assert "bootstrap against classical bounds" in text
         assert "seed=1" in text
 
     def test_distribution_optional(self) -> None:

@@ -153,13 +153,97 @@ class BootstrapBoundsResults:
             self.decision_indep(alpha),
         )
 
+    def comparison(self, alpha: float = 0.05) -> pd.DataFrame:
+        """The three tests, bootstrap against classical bounds.
+
+        Spec 16 §2.3: the two routes are reported side by side, because
+        a disagreement between them is itself a result. The bootstrap
+        leaves no inconclusive zone; the bounds do, and the row that
+        differs is the one worth looking at.
+
+        Parameters
+        ----------
+        alpha : float, default 0.05
+            Significance level of both verdicts.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per test: the statistic, the bootstrap critical
+            value, p-value and verdict, then the classical I(0)/I(1)
+            bounds and their verdict. ``NaN`` and ``"unavailable"``
+            where the classical route tabulates nothing.
+        """
+        cls = self.classical
+        rows = []
+        for _name, stat, crit, pval, boot_dec, lo_col, up_col, cls_dec in (
+            (
+                "F_overall",
+                self.f_stat,
+                self.f_critical[alpha],
+                self.f_pvalue,
+                self.decision_f(alpha),
+                "F_I0",
+                "F_I1",
+                cls.decision_f,
+            ),
+            (
+                "t_BDM",
+                self.t_stat,
+                self.t_critical[alpha],
+                self.t_pvalue,
+                self.decision_t(alpha),
+                "t_I0",
+                "t_I1",
+                cls.decision_t,
+            ),
+            (
+                "F_indep",
+                self.f_indep_stat,
+                self.f_indep_critical[alpha],
+                self.f_indep_pvalue,
+                self.decision_indep(alpha),
+                "F_indep_I0",
+                "F_indep_I1",
+                cls.decision_indep,
+            ),
+        ):
+            lo = float(cls.bounds.loc[alpha, lo_col])
+            up = float(cls.bounds.loc[alpha, up_col])
+            rows.append(
+                {
+                    "statistic": float(stat),
+                    "boot_cv": float(crit),
+                    "boot_p": float(pval),
+                    "boot_decision": boot_dec,
+                    "bound_I0": lo,
+                    "bound_I1": up,
+                    "bound_decision": (
+                        cls_dec if cls_dec is not None else "unavailable"
+                    ),
+                }
+            )
+        frame = pd.DataFrame(rows, index=["F_overall", "t_BDM", "F_indep"])
+        frame.index.name = f"alpha={alpha}"
+        return frame
+
+    def agrees_with_bounds(self, alpha: float = 0.05) -> bool:
+        """Whether the two routes reach the same classification.
+
+        A disagreement is not an error: the bootstrap has no
+        inconclusive zone and the bounds do, so the two can legitimately
+        differ. It is a reason to report both rather than to pick one.
+        """
+        return self.classification(alpha)[0] == self.classical.classification()[0]
+
     def summary(self) -> str:
         """Readable report, with the classical bounds for comparison."""
         p, q = self.order
         lines = [
             f"Bootstrap bounds test (McNown, Sam & Goh 2018) - case "
             f"{self.case}, B={self.n_boot}, resample='{self.resample}', "
-            f"seed={self.seed}",
+            f"seed={self.seed}"
+            + ("" if self.classical.conditional else ", UNCONDITIONAL"),
             "",
             f"F_overall = {self.f_stat:.4f}   bootstrap p = {self.f_pvalue:.4f}"
             f"   decision (5%): {self.decision_f(0.05)}",
@@ -183,13 +267,31 @@ class BootstrapBoundsResults:
                 f"  {a:>7}{self.f_critical[a]:>12.4f}{self.t_critical[a]:>12.4f}"
                 f"{self.f_indep_critical[a]:>12.4f}"
             )
-        classical = self.classical
+        # Spec 16 §2.3 — les deux routes en regard, test par test.
+        comp = self.comparison(0.05)
         lines += [
             "",
-            "  for comparison, the classical bounds at 5%: "
-            f"F in [{classical.bounds.loc[0.05, 'F_I0']:.3f}, "
-            f"{classical.bounds.loc[0.05, 'F_I1']:.3f}]"
-            f" -> {classical.decision_f}",
+            "  bootstrap against classical bounds (5%)",
+            f"  {'test':>10}{'stat':>10}{'boot cv':>10}{'boot p':>9}"
+            f"{'I(0)':>9}{'I(1)':>9}  {'boot':<17}{'bounds':<17}",
+        ]
+        for name, row in comp.iterrows():
+            lo = (
+                "     -   " if np.isnan(row["bound_I0"]) else f"{row['bound_I0']:>9.3f}"
+            )
+            up = (
+                "     -   " if np.isnan(row["bound_I1"]) else f"{row['bound_I1']:>9.3f}"
+            )
+            lines.append(
+                f"  {name:>10}{row['statistic']:>10.4f}{row['boot_cv']:>10.4f}"
+                f"{row['boot_p']:>9.4f}{lo}{up}  "
+                f"{row['boot_decision']:<17}{row['bound_decision']:<17}"
+            )
+        cls_label = self.classical.classification()[0]
+        lines += [
+            "",
+            f"  classification: bootstrap -> {label}, bounds -> {cls_label}"
+            + ("" if self.agrees_with_bounds(0.05) else "   (THEY DISAGREE)"),
         ]
         if self.n_failed:
             lines.append(

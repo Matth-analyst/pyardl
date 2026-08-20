@@ -24,6 +24,19 @@ This project follows [semantic versioning](https://semver.org/).
   `tests/replication/test_spec16.py`.
 - `res.summary()` states which specification produced the numbers.
 
+### Added — both routes reported side by side
+
+- `res.comparison(alpha)` returns one row per test with the statistic,
+  the bootstrap critical value, p-value and verdict, then the classical
+  I(0)/I(1) bounds and their verdict. `res.agrees_with_bounds(alpha)`
+  answers the same question as a boolean, and `summary()` prints the
+  table plus both classifications.
+- Where the classical route tabulates nothing — the `t` under cases II
+  and IV — the cell reads `unavailable` rather than being left blank: a
+  blank cell reads as a non-rejection.
+- `bounds` on the classical result now carries the `F_indep` bounds
+  alongside those of `F` and `t`, `NaN` outside the simulated grid.
+
 ### Added — VECM simulator (`pyardl.simulate`)
 
 - `vecm_ardl(n_obs, alpha, beta, gammas, case, sigma, ...)` — one
@@ -44,6 +57,17 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Measured
 
+- What the bootstrap actually buys, on 1000 replications over the four
+  canonical systems: almost entirely the removal of the inconclusive
+  zone. Under no cointegration the bounds leave 24.8% of samples without
+  a verdict and the bootstrap settles them (91.5% correct against
+  71.3%); under clear cointegration both give 100% and the bootstrap
+  adds nothing. It also costs something — under a type 2 degeneracy the
+  bootstrap claims cointegration 3.7% of the time against 0.1%. OBS-12.
+- The article's own tables are behind an access barrier, so the
+  specification's numeric criterion could not be checked against them.
+  That is stated rather than papered over; what is verified is the set
+  of qualitative claims, measured on our own DGPs.
 - The specification asks for three distinct constrained null DGPs, one
   per test. Measured on 1200 paired Monte Carlo samples, that variant
   over-rejects for `F_indep` too (8.5% against 6.7% in case III,
