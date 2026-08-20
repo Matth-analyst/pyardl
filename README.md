@@ -55,10 +55,15 @@ and on the same data it finds the relationship:
 ```text
 F_overall = 6.2059   decision (5%): cointegration
 t_BDM     = -4.5479   decision (5%): cointegration
-joint decision (F and t): cointegration
+F_indep   = 8.1619   decision (5%): cointegration
+
+CLASSIFICATION (5%): cointegration
 ```
 
 That gap is the reason this library exists.
+
+Engle-Granger and Johansen ship here too — you should be able to compare — but
+they are the point of reference, not the recommended route.
 
 ---
 
@@ -101,13 +106,16 @@ Bounds test (Pesaran, Shin & Smith 2001) - case 3, k=3, ECM(3; LRY:1, IBO:3, IDE
 F_overall = 6.2059   decision (5%): cointegration
 F p-values: p_I0 = 0.0005, p_I1 = 0.0039
 t_BDM     = -4.5479   decision (5%): cointegration
-joint decision (F and t): cointegration
+F_indep   = 8.1619   decision (5%): cointegration
 
-        F_I0   F_I1   t_I0   t_I1
-alpha
-0.10   2.730  3.747 -2.570 -3.460
-0.05   3.229  4.322 -2.860 -3.780
-0.01   4.311  5.543 -3.430 -4.370
+CLASSIFICATION (5%): cointegration
+  F_overall, t_BDM and F_indep all reject: the level terms are jointly significant, y adjusts back towards equilibrium, and the regressors carry the long-run relationship.
+
+        F_I0   F_I1   t_I0   t_I1  F_indep_I0  F_indep_I1
+alpha                                                    
+0.10   2.730  3.747 -2.570 -3.460       2.084       3.864
+0.05   3.229  4.322 -2.860 -3.780       2.619       4.646
+0.01   4.311  5.543 -3.430 -4.370       3.814       6.311
 ```
 
 ---
@@ -122,7 +130,11 @@ alpha
   - [Step 3 — Read the long run](#step-3--read-the-long-run)
   - [Step 4 — Test what theory says](#step-4--test-what-theory-says)
   - [Step 5 — Check the model held still](#step-5--check-the-model-held-still)
+  - [Step 6 — Remove the inconclusive zone](#step-6--remove-the-inconclusive-zone)
 - [API reference](#api-reference)
+  - [Bootstrap bounds test](#bootstrap-bounds-test)
+  - [Johansen test](#johansen-test)
+  - [VECM simulator](#vecm-simulator)
 - [Validation](#validation)
 - [Compatibility](#compatibility)
 - [Roadmap](#roadmap)
@@ -216,23 +228,38 @@ from pyardl.bounds import bounds_test
 res = bounds_test(y, x, case=3, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}))
 ```
 
-Two statistics, and both must agree:
+Three statistics, and **all three** must reject:
 
 - **`F_overall`** tests that all level terms are jointly zero.
 - **`t_BDM`** tests the adjustment coefficient alone. Left-tailed: rejection
   requires a *negative* estimate, an actual pull back towards equilibrium.
+- **`F_indep`** tests the regressors' levels alone. Without it, two situations
+  that are not cointegration pass for it.
 
-| F | t | `decision_joint` |
-|---|---|---|
-| rejects | rejects | `cointegration` |
-| rejects | does not | `degenerate_suspicion` |
-| does not | does not | `no_cointegration` |
-| any other disagreement | | `inconclusive` |
+```python
+label, reason = res.classification()
+```
 
-`degenerate_suspicion` means the level terms are jointly significant while the
-dependent variable shows no error-correction force — the apparent relationship
-is carried by the regressors alone. That is not cointegration, and the library
-says so rather than rounding up.
+| `F_overall` | `t_BDM` | `F_indep` | `classification()` |
+|---|---|---|---|
+| rejects | rejects | rejects | `cointegration` |
+| rejects | rejects | does not | `degenerate_1` |
+| rejects | does not | rejects | `degenerate_2` |
+| does not | does not | does not | `no_cointegration` |
+| anything else | | | `inconclusive` |
+
+**`degenerate_1`** — `y` adjusts towards its own past while the regressors
+carry nothing. What looks like error correction is `y` returning to a constant.
+
+**`degenerate_2`** — the regressors' levels are jointly significant, but
+nothing pulls `y` back. No mechanism restores the relationship, so nothing
+holds it together.
+
+The mapping is total: every combination of three three-state verdicts lands on
+a named outcome, and `reason` says in one sentence which test decided. The
+older two-test `decision_joint` is still there, but it can only *suspect* a
+degeneracy — with two tests, the information needed to tell them apart does not
+exist.
 
 ### Step 3 — Read the long run
 
@@ -300,6 +327,75 @@ CUSUM-of-squares    True         0.0             NaN
 
 Both are reported, always, because they fail differently — see
 [Stability diagnostics](#stability-diagnostics).
+
+---
+
+### Step 6 — Remove the inconclusive zone
+
+The bounds test compares a statistic against *two* critical values, because the
+true distribution depends on integration orders nobody knows. When the
+statistic lands between them the answer is **inconclusive** — and on the sample
+sizes this literature works with, that happens often enough to be a practical
+problem.
+
+The bootstrap builds the distribution instead of bracketing it: regenerate the
+data many times under a null that is true by construction, recompute the
+statistic each time, read the critical value off the result.
+
+```python
+from pyardl.bootstrap import bootstrap_bounds_test
+
+res = bootstrap_bounds_test(
+    y, x, case=3, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}),
+    n_boot=2999, seed=42,
+)
+print(res.summary())
+```
+
+```text
+Bootstrap bounds test (McNown, Sam & Goh 2018) - case 3, B=2999, resample='iid', seed=42
+
+F_overall = 6.2059   bootstrap p = 0.0123   decision (5%): cointegration
+t_BDM     = -4.5479   bootstrap p = 0.0110   decision (5%): cointegration
+F_indep   = 8.1619   bootstrap p = 0.0090   decision (5%): cointegration
+
+  CLASSIFICATION (5%): cointegration
+  F_overall, t_BDM and F_indep all reject: the level terms are jointly significant, y adjusts back towards equilibrium, and the regressors carry the long-run relationship.
+
+  bootstrap critical values
+    alpha           F           t     F_indep
+      0.1      4.1105     -3.3914      4.8594
+     0.05      4.8319     -3.7780      5.7467
+     0.01      6.5195     -4.5739      7.8825
+
+  bootstrap against classical bounds (5%)
+        test      stat   boot cv   boot p     I(0)     I(1)  boot             bounds           
+   F_overall    6.2059    4.8319   0.0123    3.229    4.322  cointegration    cointegration    
+       t_BDM   -4.5479   -3.7780   0.0110   -2.860   -3.780  cointegration    cointegration    
+     F_indep    8.1619    5.7467   0.0090    2.619    4.646  cointegration    cointegration    
+
+  classification: bootstrap -> cointegration, bounds -> cointegration
+```
+
+Both routes are reported side by side, because a disagreement between them is
+itself a result: `res.comparison()` returns it as a frame,
+`res.agrees_with_bounds()` as a boolean.
+
+**What the bootstrap buys, measured** — 1000 replications, `T = 100`, on the
+four canonical systems:
+
+| DGP | bootstrap correct | bounds correct | bounds inconclusive |
+|---|---|---|---|
+| cointegration | 100.0% | 100.0% | 0.0% |
+| degenerate_1 | 99.4% | 93.2% | 5.5% |
+| degenerate_2 | 96.3% | 99.8% | 0.1% |
+| no cointegration | 91.5% | 71.3% | 24.8% |
+
+Almost all of the gain is the disappearance of the inconclusive zone, and it
+shows only where that zone is wide. Where neither route hesitates, the
+bootstrap adds nothing — and under a type 2 degeneracy it is confidently wrong
+3.7% of the time against the bounds' 0.1%. Deciding has a price, and it is
+recorded rather than advertised away.
 
 ---
 
@@ -393,6 +489,7 @@ guarded by residual diagnostics and an F test, and returns the full
 pyardl.bounds.bounds_test(
     y, x, case=3, order=None, ic="aic", max_p=4, max_q=4,
     alpha=0.05, cv_source="kripfganz", finite_t=False, fixed_regressors=None,
+    conditional=True,
 )
 ```
 
@@ -409,9 +506,11 @@ The five deterministic cases of PSS:
 Under cases 2 and 4 the restricted deterministic term is part of the tested
 vector, giving `k+2` restrictions instead of `k+1`.
 
-**Results.** `f_stat`, `t_stat`, `decision_f`, `decision_t`, `decision_joint`,
-`bounds`, `p_values`, `uecm`, `adjustment(alpha)`, `stability(alpha)`,
-`diagnostics(alpha)`, `summary()`.
+**Results.** `f_stat`, `t_stat`, `f_indep_stat`, `decision_f`, `decision_t`,
+`decision_indep`, `classification()`, `decision_joint` (the older two-test
+verdict, kept for continuity), `bounds`, `p_values`, `uecm`,
+`adjustment(alpha)`, `stability(alpha)`, `diagnostics(alpha)`, `conditional`,
+`summary()`.
 
 `diagnostics()` reports residual tests *and* both stability tests:
 
@@ -498,6 +597,115 @@ of common instabilities untested. `pyardl` always produces both.
 Results carry `stable`, `max_excess` (how far from stability, not merely
 whether) and `crossings` (when the break happened).
 
+### Bootstrap bounds test
+
+```python
+pyardl.bootstrap.bootstrap_bounds_test(
+    y, x, case=3, order=None, n_boot=2999, resample="iid", seed=None,
+    var_order=1, burn_in=50, store_distribution=False, conditional=True,
+)
+```
+
+The verdict is **binary**: no inconclusive zone. The p-value is
+`(1 + #)/(B + 1)` and never exactly zero — `B` replications cannot resolve more
+than `1/(B+1)`. A replication that cannot be estimated is counted and reported,
+never replaced by a fresh draw, which would bias the distribution towards
+estimable samples.
+
+Same seed, same critical values, bit for bit. When no seed is given, one is
+drawn from entropy and **recorded**, so any run can be reproduced after the
+fact.
+
+All three statistics are drawn under the **same joint null**. That is a
+measured choice, not a reading: giving each test its own weaker null inflates
+size to 9.3% at a nominal 5% for the `t`, and to 8.5% for `F_indep`. See OBS-8
+and the deviation note in [`DEVIATIONS.md`](docs/DEVIATIONS.md).
+
+**Results.** `f_stat`, `t_stat`, `f_indep_stat`, the matching `*_critical` and
+`*_pvalue`, `classification(alpha)`, `comparison(alpha)`,
+`agrees_with_bounds(alpha)`, `classical`, `distribution`, `summary()`.
+
+Building blocks are exposed, because a bootstrap you cannot inspect is a
+bootstrap you cannot debug: `estimate_null_dgp`, `simulate_paths`,
+`simulate_path`, `resample_residuals`.
+
+**Cost.** 0.19 to 1.81 s for a full test at `B = 2999`, depending on the
+specification. Both hot paths are vectorised across replications and the `B`
+fits are solved by one stacked QR — never the normal equations, which would
+square the condition number of a design built on lagged levels of integrated
+series.
+
+### Conditional and unconditional models
+
+`conditional=False`, on `bounds_test` and `bootstrap_bounds_test` alike, drops
+the contemporaneous differences of the regressors and changes nothing else —
+the distinction of Bertelli, Vacca and Zoia (2022). The tested vector is
+untouched, so the two forms test the same restriction on two specifications.
+
+The setting is threaded through the observed statistic, the null model, the
+regenerated data and each replication. If the null model kept `Δx_t` while the
+statistic did not, the simulated null would not be the null being tested — and
+nothing in the output would say so.
+
+The convention was measured against `bootCT`, which reports its own
+unconditional statistic: of two candidate specifications, only one reproduces
+it, to 1e-12.
+
+### Johansen test
+
+```python
+pyardl.cointegration.johansen(y, det_order=0, k_ar_diff=1, alpha=0.05, method="trace")
+```
+
+```text
+Johansen test (1988, 1991) - 4 variables (LRM, LRY, IBO, IDE), det_order=0, k_ar_diff=1
+
+        H0       trace     cv 5%      maxeig     cv 5%
+     r = 0     48.8037   47.8545     31.5136   27.5858
+    r <= 1     17.2902   29.7961     10.1453   21.1314
+    r <= 2      7.1449   15.4943      6.5889   14.2639
+    r <= 3      0.5560    3.8415      0.5560    3.8415
+
+selected rank (trace, 5%): 1
+```
+
+A thin wrapper over `statsmodels`, plus what it leaves to the caller: the
+**sequential decision** (stop at the *first* non-rejection — continuing past it
+is a different procedure with a different size), the result object, and
+normalised cointegrating vectors.
+
+`check_no_cointegration_among_x(x, ...)` checks the assumption the bounds test
+makes and never reveals on its own: that the regressors are not cointegrated
+among themselves. It warns, naming the number of relations found.
+
+Measured (OBS-10): the trace statistic **over-selects** the rank — 87.8%
+correct against `maxeig`'s 92.5% on a rank-1 DGP — and never under-selects.
+`trace` remains the default because it is what the applied literature reports;
+a borderline rank deserves a second reading by `maxeig`, and both are always
+computed.
+
+Deterministic conventions differ across implementations and the naming is a
+trap: `urca`'s `ecdet="none"` matches `det_order=0`, **not** `det_order=-1`.
+The correspondence was established by running both sides, not by reading either
+manual — see [`docs/api/johansen.md`](docs/api/johansen.md).
+
+### VECM simulator
+
+```python
+pyardl.simulate.vecm_ardl(n_obs, alpha, beta, gammas=(), case=3, sigma=None, ...)
+pyardl.simulate.degenerate_system(kind, k=1, speed=-0.4)
+```
+
+One generator for every Monte Carlo study in the library, so a disagreement
+between two validation studies is a disagreement about estimators rather than
+about data. Writing `Π = α β'` makes the rank *chosen* rather than hoped for,
+and the reported `rank` is the rank of `Π` — a zero `alpha` creates no
+relation, and saying otherwise would claim one the data do not contain.
+
+`degenerate_system` builds the canonical systems the three-test framework has
+to tell apart. Stability is deliberately **not** enforced: an explosive system
+is a legitimate thing to simulate.
+
 ### Engle-Granger
 
 ```python
@@ -569,9 +777,27 @@ printed table, a response surface that is conservative at the edge of its fitted
 range, and two rounding conventions where reference implementations differ from
 the published rule. All documented rather than smoothed over.
 
-**Test suite.** 501 tests including doctests, `mypy --strict`
-clean, on Linux, Windows and macOS across Python 3.11–3.13. Monte Carlo
-experiments run nightly at full replication counts.
+**Conventions settled by measurement, not by reading.** Three times, a
+specification admitted two readings and the choice was made by measuring both:
+which null the bootstrap draws from (a per-test null inflates size to 9.3% at a
+nominal 5%), what the unconditional model actually removes (only one of two
+candidate specifications reproduces `bootCT`'s own statistic, to 1e-12), and
+which Johansen statistic meets the criterion the specification itself sets.
+Each is recorded in
+[`VALIDATION_OBSERVATIONS.md`](docs/VALIDATION_OBSERVATIONS.md) with the
+numbers that decided it — including one hypothesis of mine that the data
+refuted, kept in the record with its full trajectory.
+
+**Limits, recorded rather than smoothed over.** `F_indep` is oversized at
+`T = 100` — 6.5% at a nominal 5%, where the `t` holds its size. The bootstrap's
+decisiveness costs accuracy under a type 2 degeneracy. The bounds of `F_indep`
+are simulated in-house because the published ones are behind an access barrier,
+so their cross-checks are structural rather than external, and that is weaker.
+None of this is hidden in a footnote: it is OBS-9, OBS-11 and OBS-12.
+
+**Test suite.** 722 tests including doctests, `mypy --strict` clean, on Linux,
+Windows and macOS across Python 3.11–3.13. Monte Carlo experiments run nightly
+at full replication counts.
 
 ---
 
@@ -597,11 +823,13 @@ Released:
 - **0.2.0** — small-sample and response-surface critical values with p-values,
   CUSUM/CUSUMSQ stability, DF-GLS and Ng-Perron pre-tests, long-run restriction
   testing and seasonality, Engle-Granger.
+- **0.3.0** — bootstrap ARDL with no inconclusive zone, the three-test
+  framework that names both degeneracies, the Johansen system test and its
+  regressor diagnostic, conditional/unconditional models, and one VECM
+  simulator for every Monte Carlo study.
 
 Planned:
 
-- **0.3** — bootstrap ARDL, the three-test framework with degeneracy
-  classification, Johansen on the regressors.
 - **0.4** — NARDL (asymmetric).
 - **0.5+** — Fourier ARDL, dynamic simulations, QARDL, heterogeneous panels
   (MG, PMG, CS-ARDL).
