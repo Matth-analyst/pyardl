@@ -42,6 +42,16 @@ first differences,
 which reproduces integrated regressors with the observed short-run
 dependence, and no cointegration among them by construction.
 
+One null, both statistics
+-------------------------
+The same null model drives the distribution of the F statistic *and* of
+the t statistic, rather than one null per test. That is a measured
+choice, not a reading of the article: building the t distribution under
+the weaker null :math:`\lambda = 0` alone — leaving the level terms of
+the regressors free — nearly doubles the empirical size of the test,
+9.3% against a nominal 5% in case III. The joint null holds the size.
+See ``docs/VALIDATION_OBSERVATIONS.md``, OBS-8.
+
 Why the two residual vectors travel together
 --------------------------------------------
 :math:`\varepsilon_t` and :math:`\eta_t` are contemporaneously

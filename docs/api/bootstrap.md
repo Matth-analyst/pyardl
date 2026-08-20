@@ -136,10 +136,21 @@ decisions agree at all three levels. The bootstrap critical values for
 generators produce.
 
 The `t` critical values differ more — 21% to 30%, systematically in the
-direction that makes ours more demanding. The likely cause is a
-difference in which null the `t` distribution is built under; it is
-documented as an open point rather than settled by assertion. Ours being
-the more demanding, the test errs on the conservative side.
+direction that makes ours more demanding. That gap has since been
+**resolved by measurement**, not left as a caveat.
+
+Both statistics are bootstrapped under the same joint null,
+`λ = γ = 0`. The alternative — building the `t` distribution under the
+weaker null `λ = 0` alone, leaving the level terms of the regressors
+free — sounds more faithful to what the `t` test asks, and is almost
+certainly what the other implementation does. It is also wrong: over 400
+Monte Carlo samples it rejects **9.3% of the time at a nominal 5%** in
+case III, and 8.3% in case V, where the joint null gives 3.5% and 5.0%.
+
+So our bounds are not conservative by accident; they are built under the
+null that holds the size. The full experiment, including a hypothesis
+about the mechanism that the data refuted, is in
+`docs/VALIDATION_OBSERVATIONS.md`, OBS-8.
 
 Details, including a convention trap in `bootCT`'s lag argument that
 makes a naive comparison disagree by 58% while comparing two different

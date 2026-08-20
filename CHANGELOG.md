@@ -48,9 +48,13 @@ This project follows [semantic versioning](https://semver.org/).
 - Checked against the R package `bootCT`: observed statistics agree to
   4e-10 and decisions agree at all three levels. The `F` bootstrap
   bounds differ by 0.6-13%, as two bootstraps with different generators
-  do. The `t` bounds differ by 21-30%, systematically in the direction
-  that makes ours more demanding; the likely cause is documented as an
-  open question rather than settled by assertion.
+  do.
+- The `t` bounds differed by 21-30%. Rather than record that as a
+  caveat, the question was settled by a size experiment: both statistics
+  are bootstrapped under the joint null `λ = γ = 0`, and the plausible
+  alternative — a separate, weaker null for the `t` — rejects 9.3% of
+  the time at a nominal 5%. Our bounds are demanding because they are
+  built under the null that holds the size, not out of caution.
 
 ### Fixed
 
