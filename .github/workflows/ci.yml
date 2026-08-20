@@ -104,20 +104,10 @@ jobs:
           fi
           echo "OK : aucun skip pour dépendance manquante."
 
-      # La couverture n'est envoyée que depuis une seule combinaison :
-      # les neuf jobs mesurent la même chose, et neuf téléversements
-      # identiques ne feraient qu'ajouter du bruit.
-      - name: Envoyer la couverture à Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.xml
-          token: ${{ secrets.CODECOV_TOKEN }}
-          # Une panne de Codecov ne doit pas faire échouer une CI par
-          # ailleurs verte : le seuil de couverture est déjà appliqué
-          # localement par pytest-cov (fail_under = 90).
-          fail_ci_if_error: false
-
+      # Le seuil de couverture est appliqué localement par pytest-cov
+      # (fail_under = 90), qui fait échouer la suite avant cette étape.
+      # Le rapport est conservé en artefact pour pouvoir être ouvert
+      # depuis l'interface, sans dépendre d'un service tiers.
       - name: Conserver la couverture en artefact
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4

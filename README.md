@@ -7,7 +7,6 @@
 [![CI](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml/badge.svg)](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![codecov](https://codecov.io/gh/Matth-analyst/pyardl/branch/main/graph/badge.svg)](https://codecov.io/gh/Matth-analyst/pyardl)
 
 </div>
 
