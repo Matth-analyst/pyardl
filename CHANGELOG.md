@@ -5,6 +5,30 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — the three-test framework (`pyardl.bounds.classification`)
+
+- `F_indep`, the third test of Sam, McNown & Goh (2019), on the
+  regressors' levels alone (`γ = 0`). Reported by `bounds_test` and by
+  `bootstrap_bounds_test` as `f_indep_stat` / `decision_indep`.
+- `res.classification()` returns a **named** verdict and the reason for
+  it: `cointegration`, `degenerate_1`, `degenerate_2`,
+  `no_cointegration` or `inconclusive`. The two degeneracies are now
+  told apart instead of merely suspected — with two tests the
+  information to separate them does not exist.
+- The mapping from three three-state verdicts to a verdict is total: no
+  combination falls through to a default.
+- `decision_joint` (the two-test verdict, with its
+  `degenerate_suspicion` state) stays on the result object for
+  continuity, but `classification()` supersedes it.
+- Bounds for `F_indep`: simulated, cases 1-5, `k = 1..10`, at 10/5/1%.
+  The published bounds are behind an access barrier and the project does
+  not encode a critical value it has not computed. They come from the
+  same engine and the same replications as the `F` and `t` bounds, so
+  the three describe one single null world. Outside the grid the test is
+  reported as unavailable — no neighbouring value is substituted.
+- In the bootstrap, all three statistics are drawn under the **same
+  joint null**, per the size experiment recorded as OBS-8.
+
 ### Added — bootstrap bounds test (`pyardl.bootstrap`)
 
 - `bootstrap_bounds_test(y, x, case, order, n_boot, resample, seed, ...)`

@@ -38,9 +38,17 @@ from pyardl.critical_values.narayan2005 import (
 )
 from pyardl.critical_values.pss2001 import get_bounds as _pss_bounds
 from pyardl.critical_values.simulate import SimulatedBounds, simulate_bounds
+from pyardl.critical_values.smg2019 import MAX_K_FINDEP, findep_bounds
 from pyardl.exceptions import PyardlMethodologyWarning
 
-__all__ = ["get_bounds", "pvalue_bounds", "simulate_bounds", "SimulatedBounds"]
+__all__ = [
+    "MAX_K_FINDEP",
+    "SimulatedBounds",
+    "findep_bounds",
+    "get_bounds",
+    "pvalue_bounds",
+    "simulate_bounds",
+]
 
 _NARAYAN_LEVELS = {0.10: 0, 0.05: 1, 0.01: 2}
 

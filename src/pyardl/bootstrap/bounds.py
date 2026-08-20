@@ -44,7 +44,8 @@ import pandas as pd
 from pyardl.bootstrap.batch import batch_uecm_statistics
 from pyardl.bootstrap.dgp import estimate_null_dgp, simulate_paths
 from pyardl.bootstrap.resample import ResampleScheme, resample_residuals
-from pyardl.bounds.pss import bounds_test
+from pyardl.bounds.classification import Classification, classify
+from pyardl.bounds.pss import _wald_f_indep, bounds_test
 from pyardl.exceptions import PyardlMethodologyWarning
 from pyardl.utils import check_series
 
@@ -71,9 +72,9 @@ class BootstrapBoundsResults:
 
     Attributes
     ----------
-    f_stat, t_stat : float
-        The observed statistics, identical to those of the classical
-        test on the same specification.
+    f_stat, t_stat, f_indep_stat : float
+        The three observed statistics, identical to those of the
+        classical test on the same specification.
     f_critical, t_critical : dict
         Bootstrap critical values by level. The ``t`` bounds are
         lower-tail quantiles, the ``F`` bounds upper-tail.
@@ -94,10 +95,13 @@ class BootstrapBoundsResults:
 
     f_stat: float
     t_stat: float
+    f_indep_stat: float
     f_critical: dict[float, float]
     t_critical: dict[float, float]
+    f_indep_critical: dict[float, float]
     f_pvalue: float
     t_pvalue: float
+    f_indep_pvalue: float
     classical: BoundsTestResults
     n_boot: int
     n_failed: int
@@ -125,21 +129,29 @@ class BootstrapBoundsResults:
             else "no_cointegration"
         )
 
-    def decision_joint(self, alpha: float = 0.05) -> str:
-        """Joint verdict, with the same reading as the classical test.
+    def decision_indep(self, alpha: float = 0.05) -> str:
+        """Verdict of the third test: the regressors' levels."""
+        return (
+            "cointegration"
+            if self.f_indep_stat > self.f_indep_critical[alpha]
+            else "no_cointegration"
+        )
 
-        Both tests must agree. When the F rejects and the t does not, the
-        level terms are jointly significant while the dependent variable
-        shows no pull back to equilibrium: that is a degenerate case, not
-        cointegration.
+    def classification(self, alpha: float = 0.05) -> tuple[Classification, str]:
+        """Three-test verdict of Sam, McNown & Goh (2019), and its reason.
+
+        The bootstrap leaves no inconclusive zone, so only four outcomes
+        can occur here: ``cointegration``, ``degenerate_1``,
+        ``degenerate_2`` and ``no_cointegration`` — plus
+        ``inconclusive`` on the contradictory combinations, which stay
+        possible because three tests can disagree even when each is
+        decisive on its own.
         """
-        f_rej = self.decision_f(alpha) == "cointegration"
-        t_rej = self.decision_t(alpha) == "cointegration"
-        if f_rej and t_rej:
-            return "cointegration"
-        if f_rej and not t_rej:
-            return "degenerate_suspicion"
-        return "no_cointegration"
+        return classify(
+            self.decision_f(alpha),
+            self.decision_t(alpha),
+            self.decision_indep(alpha),
+        )
 
     def summary(self) -> str:
         """Readable report, with the classical bounds for comparison."""
@@ -153,14 +165,23 @@ class BootstrapBoundsResults:
             f"   decision (5%): {self.decision_f(0.05)}",
             f"t_BDM     = {self.t_stat:.4f}   bootstrap p = {self.t_pvalue:.4f}"
             f"   decision (5%): {self.decision_t(0.05)}",
-            f"joint decision (F and t): {self.decision_joint(0.05)}",
+            f"F_indep   = {self.f_indep_stat:.4f}   bootstrap p = "
+            f"{self.f_indep_pvalue:.4f}   decision (5%): "
+            f"{self.decision_indep(0.05)}",
+            "",
+        ]
+        label, reason = self.classification(0.05)
+        lines += [
+            f"  CLASSIFICATION (5%): {label}",
+            f"  {reason}",
             "",
             "  bootstrap critical values",
-            f"  {'alpha':>7}{'F':>12}{'t':>12}",
+            f"  {'alpha':>7}{'F':>12}{'t':>12}{'F_indep':>12}",
         ]
         for a in _ALPHAS:
             lines.append(
                 f"  {a:>7}{self.f_critical[a]:>12.4f}{self.t_critical[a]:>12.4f}"
+                f"{self.f_indep_critical[a]:>12.4f}"
             )
         classical = self.classical
         lines += [
@@ -282,6 +303,7 @@ def bootstrap_bounds_test(
     n_obs = y_arr.shape[0]
     f_star = np.empty(n_boot, dtype=np.float64)
     t_star = np.empty(n_boot, dtype=np.float64)
+    i_star = np.empty(n_boot, dtype=np.float64)
     kept = 0
     n_failed = 0
 
@@ -303,12 +325,13 @@ def bootstrap_bounds_test(
         y_block, x_block = simulate_paths(
             dgp, block, y0=y_arr[0], x0=x_arr[0], burn_in=burn_in
         )
-        f_block, t_block, ok = batch_uecm_statistics(
+        f_block, t_block, i_block, ok = batch_uecm_statistics(
             y_block, x_block, p_order, q_order, case
         )
         n_ok = int(ok.sum())
         f_star[kept : kept + n_ok] = f_block[ok]
         t_star[kept : kept + n_ok] = t_block[ok]
+        i_star[kept : kept + n_ok] = i_block[ok]
         kept += n_ok
         n_failed += size - n_ok
         done += size
@@ -320,6 +343,7 @@ def bootstrap_bounds_test(
         )
     f_kept = np.asarray(f_star[:kept], dtype=np.float64)
     t_kept = np.asarray(t_star[:kept], dtype=np.float64)
+    i_kept = np.asarray(i_star[:kept], dtype=np.float64)
 
     if n_failed:
         warnings.warn(
@@ -331,22 +355,30 @@ def bootstrap_bounds_test(
             stacklevel=2,
         )
 
+    f_indep_obs = _wald_f_indep(classical._fit)
     f_crit = {a: float(np.quantile(f_kept, 1.0 - a)) for a in _ALPHAS}
     t_crit = {a: float(np.quantile(t_kept, a)) for a in _ALPHAS}
+    i_crit = {a: float(np.quantile(i_kept, 1.0 - a)) for a in _ALPHAS}
     f_p = float((1 + np.sum(f_kept >= classical.f_stat)) / (kept + 1))
     t_p = float((1 + np.sum(t_kept <= classical.t_stat)) / (kept + 1))
+    i_p = float((1 + np.sum(i_kept >= f_indep_obs)) / (kept + 1))
 
     distribution = (
-        pd.DataFrame({"F": f_kept, "t": t_kept}) if store_distribution else None
+        pd.DataFrame({"F": f_kept, "t": t_kept, "F_indep": i_kept})
+        if store_distribution
+        else None
     )
 
     return BootstrapBoundsResults(
         f_stat=classical.f_stat,
         t_stat=classical.t_stat,
+        f_indep_stat=f_indep_obs,
         f_critical=f_crit,
         t_critical=t_crit,
+        f_indep_critical=i_crit,
         f_pvalue=f_p,
         t_pvalue=t_p,
+        f_indep_pvalue=i_p,
         classical=classical,
         n_boot=kept,
         n_failed=n_failed,

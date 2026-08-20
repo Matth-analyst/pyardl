@@ -188,7 +188,7 @@ class TestDecisions:
         y, x = _cointegrated(120, seed=31, lam=-0.6)
         res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=499, seed=1)
         assert res.decision_f(0.05) == "cointegration"
-        assert res.decision_joint(0.05) == "cointegration"
+        assert res.classification(0.05)[0] == "cointegration"
 
     def test_independent_walks_not_rejected(self) -> None:
         y, x = _no_cointegration(120, seed=32)
@@ -220,16 +220,15 @@ class TestDecisions:
         assert res.f_critical[0.10] < res.f_critical[0.05] < res.f_critical[0.01]
         assert res.t_critical[0.10] > res.t_critical[0.05] > res.t_critical[0.01]
 
-    def test_degenerate_suspicion_reachable(self) -> None:
-        """La logique jointe reproduit celle du test classique."""
+    def test_classification_is_a_named_outcome(self) -> None:
+        """Spec 15 §2.4 — le verdict joint sort de la table de décision."""
+        from pyardl.bounds.classification import CLASSIFICATIONS
+
         y, x = _cointegrated(100, seed=36)
         res = bootstrap_bounds_test(y, x, order=(1, 1), n_boot=299, seed=1)
-        # On force les deux verdicts par des seuils extrêmes.
-        assert res.decision_joint(0.01) in (
-            "cointegration",
-            "no_cointegration",
-            "degenerate_suspicion",
-        )
+        label, reason = res.classification(0.01)
+        assert label in CLASSIFICATIONS
+        assert reason
 
 
 class TestSizeAndPower:
@@ -340,7 +339,7 @@ class TestResultsObject:
             y, x, order=(1, 1), n_boot=199, seed=1, store_distribution=True
         )
         assert isinstance(with_dist.distribution, pd.DataFrame)
-        assert list(with_dist.distribution.columns) == ["F", "t"]
+        assert list(with_dist.distribution.columns) == ["F", "t", "F_indep"]
         assert len(with_dist.distribution) == with_dist.n_boot
 
     def test_classical_result_attached(self) -> None:
@@ -398,10 +397,10 @@ class TestValidation:
         real = mod.batch_uecm_statistics
 
         def flaky(*args, **kwargs):  # type: ignore[no-untyped-def]
-            f_val, t_val, ok = real(*args, **kwargs)
+            f_val, t_val, i_val, ok = real(*args, **kwargs)
             ok = ok.copy()
             ok[::10] = False  # une réplication sur dix devient inestimable
-            return f_val, t_val, ok
+            return f_val, t_val, i_val, ok
 
         monkeypatch.setattr(mod, "batch_uecm_statistics", flaky)
         y, x = _cointegrated(90, seed=54)
@@ -532,7 +531,7 @@ class TestBatchedEstimator:
         self, case: int, k: int, p: int, q: int
     ) -> None:
         from pyardl.bootstrap.batch import batch_uecm_statistics
-        from pyardl.bounds.pss import _estimate_uecm, _wald_f
+        from pyardl.bounds.pss import _estimate_uecm, _wald_f, _wald_f_indep
 
         rng = np.random.default_rng(100 + case + k + p + q)
         n_rep, n_obs = 8, 120
@@ -541,7 +540,9 @@ class TestBatchedEstimator:
         q_tuple = tuple([q] * k)
         names = tuple(f"x{j}" for j in range(k))
 
-        f_batch, t_batch, ok = batch_uecm_statistics(y_b, x_b, p, q_tuple, case)
+        f_batch, t_batch, i_batch, ok = batch_uecm_statistics(
+            y_b, x_b, p, q_tuple, case
+        )
         assert ok.all()
 
         for b in range(n_rep):
@@ -549,8 +550,11 @@ class TestBatchedEstimator:
             pos = fit.names.index(fit.lam_name)
             t_ref = float(fit.params[fit.lam_name]) / float(np.sqrt(fit.cov[pos][pos]))
             f_ref = _wald_f(fit)
+            i_ref = _wald_f_indep(fit)
             assert abs(f_batch[b] - f_ref) < 1e-9 * max(1.0, f_ref)
             assert abs(t_batch[b] - t_ref) < 1e-9
+            # Troisieme statistique (spec 15), sur le meme ajustement.
+            assert abs(i_batch[b] - i_ref) < 1e-9 * max(1.0, i_ref)
 
     def test_restricted_deterministic_is_tested_in_cases_2_and_4(self) -> None:
         """Sous les cas 2 et 4 le vecteur testé compte k+2 restrictions.
@@ -581,7 +585,7 @@ class TestBatchedEstimator:
         x_b = np.cumsum(rng.standard_normal((4, 100, 1)), axis=1)
         # Réplication 2 : régresseur constant -> design singulier.
         x_b[2, :, 0] = 1.0
-        _, _, ok = batch_uecm_statistics(y_b, x_b, 1, (1,), 3)
+        _, _, _, ok = batch_uecm_statistics(y_b, x_b, 1, (1,), 3)
         assert not ok[2]
         assert ok[[0, 1, 3]].all()
 

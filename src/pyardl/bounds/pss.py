@@ -54,8 +54,10 @@ import scipy.linalg
 from statsmodels.stats.diagnostic import acorr_ljungbox, het_breuschpagan
 from statsmodels.stats.stattools import jarque_bera
 
+from pyardl.bounds.classification import Classification, classify
 from pyardl.core.ardl import ARDL
 from pyardl.critical_values import get_bounds
+from pyardl.critical_values.smg2019 import findep_bounds
 from pyardl.exceptions import DegenerateCaseWarning, PyardlMethodologyWarning
 from pyardl.utils import check_series
 
@@ -185,17 +187,45 @@ def _estimate_uecm(
     )
 
 
-def _wald_f(fit: _UECMFit) -> float:
-    """Wald F statistic on the tested columns.
+def _wald_subset(fit: _UECMFit, names: list[str]) -> float:
+    """Wald F statistic on an arbitrary subset of the fitted columns.
 
     Algebraically identical to the F computed from restricted and
     unrestricted sums of squared residuals.
     """
-    idx = [fit.names.index(name) for name in fit.tested]
+    if not names:
+        raise ValueError("The tested vector is empty: there is nothing to test.")
+    idx = [fit.names.index(name) for name in names]
     r_vec = fit.params.to_numpy()[idx]
     v_sub = fit.cov[np.ix_(idx, idx)]
-    stat = float(r_vec @ np.linalg.solve(v_sub, r_vec)) / len(idx)
-    return stat
+    return float(r_vec @ np.linalg.solve(v_sub, r_vec)) / len(idx)
+
+
+def _wald_f(fit: _UECMFit) -> float:
+    """Overall F statistic: all level terms jointly zero."""
+    return _wald_subset(fit, fit.tested)
+
+
+def _indep_names(fit: _UECMFit) -> list[str]:
+    """Columns entering ``F_indep``: the tested vector minus lambda.
+
+    The null of the third test is that the levels of the *independent*
+    variables carry no long-run relationship, ``gamma = 0``, leaving the
+    adjustment coefficient free.
+
+    Under cases 2 and 4 the restricted deterministic term stays in. That
+    looks odd — a constant is not an independent variable — but it is
+    where Pesaran, Shin & Smith put it: in those cases the deterministic
+    belongs to the cointegrating vector itself, so testing that vector
+    for the absence of a long-run relationship has to include it. Drop it
+    and the restriction count no longer matches the critical values.
+    """
+    return [name for name in fit.tested if name != fit.lam_name]
+
+
+def _wald_f_indep(fit: _UECMFit) -> float:
+    """F statistic of Sam, McNown & Goh (2019): ``gamma = 0``."""
+    return _wald_subset(fit, _indep_names(fit))
 
 
 JointDecision = Literal[
@@ -230,6 +260,21 @@ def _joint_decision(
     return "inconclusive"
 
 
+def _findep_decision(stat: float, case: int, k: int, alpha: float) -> Decision | None:
+    """Verdict of F_indep, or ``None`` when no bounds cover the setting.
+
+    The bounds are simulated rather than transcribed (see
+    :mod:`pyardl.critical_values.smg2019`); outside the simulated grid no
+    neighbouring value is substituted, the test is simply reported as
+    unavailable.
+    """
+    try:
+        lo, up = findep_bounds(case, k, alpha)
+    except ValueError:
+        return None
+    return _classify(stat, lo, up, left_tail=False)
+
+
 def _classify(stat: float, lower: float, upper: float, *, left_tail: bool) -> Decision:
     """Classify a statistic against its bounds, in three states."""
     if left_tail:  # t_BDM: reject when t is below the (more negative) I(1) bound
@@ -251,15 +296,17 @@ class BoundsTestResults:
 
     Attributes
     ----------
-    f_stat, t_stat : float
-        The two test statistics.
-    decision_f, decision_t : str or None
+    f_stat, t_stat, f_indep_stat : float
+        The three test statistics of the Sam-McNown-Goh framework.
+    decision_f, decision_t, decision_indep : str or None
         Three-state verdicts, ``"cointegration"`` / ``"no_cointegration"``
         / ``"inconclusive"``. ``decision_t`` is ``None`` when no t bounds
         are available for the chosen case and critical-value source.
     decision_joint : str or None
-        Combined verdict, see the module documentation. May also be
-        ``"degenerate_suspicion"``.
+        Combined verdict of the two original tests, kept for continuity.
+        May also be ``"degenerate_suspicion"``. The three-test verdict,
+        which separates the two degeneracies instead of merely suspecting
+        one, is :meth:`classification`.
     bounds : pandas.DataFrame
         Lower and upper bounds for F and t at the 10%, 5% and 1% levels.
     p_values : pandas.Series or None
@@ -277,10 +324,12 @@ class BoundsTestResults:
     order: tuple[int, dict[str, int]]
     f_stat: float
     t_stat: float
+    f_indep_stat: float
     alpha: float
     bounds: pd.DataFrame
     decision_f: Decision
     decision_t: Decision | None
+    decision_indep: Decision | None
     decision_joint: JointDecision | None
     uecm: pd.DataFrame
     cv_source: str
@@ -418,6 +467,25 @@ class BoundsTestResults:
             ],
         )
 
+    def classification(self) -> tuple[Classification, str]:
+        """Three-test verdict of Sam, McNown & Goh (2019), and its reason.
+
+        Unlike :attr:`decision_joint`, which can only *suspect* a
+        degeneracy, this tells the two apart: ``degenerate_1`` when y
+        adjusts towards its own past while the regressors carry nothing,
+        ``degenerate_2`` when the regressors' levels matter but nothing
+        pulls y back. See :mod:`pyardl.bounds.classification`.
+
+        Returns
+        -------
+        classification : str
+            One of the keys of
+            :data:`~pyardl.bounds.classification.CLASSIFICATIONS`.
+        reason : str
+            Which test decided, in one sentence.
+        """
+        return classify(self.decision_f, self.decision_t, self.decision_indep)
+
     def summary(self) -> str:
         """Return a readable report of the test as a string.
 
@@ -448,6 +516,7 @@ class BoundsTestResults:
                 f"p_I1 = {self.p_values['t_p_I1']:.4f}"
             )
 
+        label, reason = self.classification()
         lines = [
             f"Bounds test (Pesaran, Shin & Smith 2001) - case {self.case}, "
             f"k={self.k}, ECM({p}; {q_desc}), critical values: {self.cv_source}",
@@ -461,12 +530,16 @@ class BoundsTestResults:
                 if self.decision_t is not None
                 else f"not tabulated for case {self.case}"
             ),
-            "joint decision (F and t): "
+            f"F_indep   = {self.f_indep_stat:.4f}   decision "
+            f"({self.alpha:.0%}): "
             + (
-                self.decision_joint
-                if self.decision_joint is not None
-                else f"unavailable (case {self.case}, no t bounds)"
+                self.decision_indep
+                if self.decision_indep is not None
+                else "bounds unavailable for this configuration"
             ),
+            "",
+            f"CLASSIFICATION ({self.alpha:.0%}): {label}",
+            f"  {reason}",
             "",
             self.bounds.to_string(float_format=lambda v: f"{v: .3f}"),
         ]
@@ -480,10 +553,12 @@ def _finalize_results(
     q_dict: dict[str, int],
     f_stat: float,
     t_stat: float,
+    f_indep_stat: float,
     alpha: float,
     bounds_df: pd.DataFrame,
     decision_f: Decision,
     decision_t: Decision | None,
+    decision_indep: Decision | None,
     decision_joint: JointDecision | None,
     cv_source: str,
     p_values: pd.Series | None,
@@ -507,10 +582,12 @@ def _finalize_results(
         order=(p, q_dict),
         f_stat=f_stat,
         t_stat=t_stat,
+        f_indep_stat=f_indep_stat,
         alpha=alpha,
         bounds=bounds_df,
         decision_f=decision_f,
         decision_t=decision_t,
+        decision_indep=decision_indep,
         decision_joint=decision_joint,
         uecm=uecm_table,
         cv_source=cv_source,
@@ -669,6 +746,8 @@ def bounds_test(
         np.sqrt(fit.cov[fit.names.index(fit.lam_name), fit.names.index(fit.lam_name)])
     )
     t_stat = lam_hat / se_lam
+    f_indep_stat = _wald_f_indep(fit)
+    decision_indep = _findep_decision(f_indep_stat, case, k, alpha)
 
     decision_t: Decision | None
 
@@ -728,10 +807,12 @@ def bounds_test(
             q_dict,
             f_stat,
             t_stat,
+            f_indep_stat,
             alpha,
             bounds_df,
             decision_f,
             decision_t,
+            decision_indep,
             decision_joint,
             cv_source,
             p_values_fin,
@@ -817,10 +898,12 @@ def bounds_test(
         q_dict,
         f_stat,
         t_stat,
+        f_indep_stat,
         alpha,
         bounds_df,
         decision_f,
         decision_t,
+        decision_indep,
         decision_joint,
         cv_source,
         p_values,

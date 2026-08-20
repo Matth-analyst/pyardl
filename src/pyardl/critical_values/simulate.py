@@ -54,10 +54,23 @@ class SimulatedBounds:
     t_quantiles: dict[float, float]
     f_stats: FloatArray = field(repr=False)
     t_stats: FloatArray = field(repr=False)
+    # Third statistic of Sam, McNown & Goh (2019): gamma = 0. Added after
+    # the object was first released, so it carries defaults and every
+    # earlier field keeps its position.
+    f_indep_quantiles: dict[float, float] = field(default_factory=dict)
+    f_indep_stats: FloatArray = field(default_factory=lambda: np.empty(0), repr=False)
 
     def f_cv(self, alpha: float) -> float:
         """Critical value of the F statistic at level ``alpha``."""
         return self.f_quantiles[alpha]
+
+    def f_indep_cv(self, alpha: float) -> float:
+        """Critical value of ``F_indep`` at level ``alpha``.
+
+        The third test of Sam, McNown & Goh (2019): the levels of the
+        independent variables are jointly zero.
+        """
+        return self.f_indep_quantiles[alpha]
 
     def t_cv(self, alpha: float) -> float:
         """Critical value of the t statistic at level ``alpha``.
@@ -145,8 +158,15 @@ def simulate_bounds(
     if case in _CASE_RESTRICTED:
         restr_idx = restr_idx[:-1]  # the last deterministic term is tested
 
+    # F_indep keeps y_{t-1} and drops the levels of the regressors (plus
+    # the restricted deterministic under cases 2 and 4, which belongs to
+    # the cointegrating vector). k restrictions, or k+1 in those cases.
+    n_restr_indep = k + (1 if case in _CASE_RESTRICTED else 0)
+    indep_restr_idx = [*restr_idx, lam_pos]
+
     f_stats = np.empty(n_sims)
     t_stats = np.empty(n_sims)
+    f_indep_stats = np.empty(n_sims)
 
     done = 0
     while done < n_sims:
@@ -178,8 +198,22 @@ def simulate_bounds(
         else:
             ssr_r = np.einsum("st,st->s", dy, dy)
 
+        # --- restricted regression for F_indep (gamma = 0) ---
+        if n_restr_indep > 0:
+            q_i, _ = np.linalg.qr(design[:, :, indep_restr_idx])
+            qty_i = np.einsum("stk,st->sk", q_i, dy)
+            ssr_i = np.einsum("st,st->s", dy, dy) - np.einsum("sk,sk->s", qty_i, qty_i)
+        else:
+            ssr_i = ssr_u
+
         df = n_eff - k_par
         f_stats[done : done + m] = ((ssr_r - ssr_u) / n_restr) / (ssr_u / df)
+        if n_restr_indep > 0:
+            f_indep_stats[done : done + m] = ((ssr_i - ssr_u) / n_restr_indep) / (
+                ssr_u / df
+            )
+        else:
+            f_indep_stats[done : done + m] = np.nan
 
         # --- t statistic on y_{t-1}: standard error from R^{-1} ---
         r_inv = np.linalg.solve(r_u, np.broadcast_to(np.eye(k_par), r_u.shape))
@@ -191,6 +225,11 @@ def simulate_bounds(
 
     f_q = {a: float(np.quantile(f_stats, 1 - a)) for a in alphas}
     t_q = {a: float(np.quantile(t_stats, a)) for a in alphas}
+    f_i_q = (
+        {a: float(np.quantile(f_indep_stats, 1 - a)) for a in alphas}
+        if n_restr_indep > 0
+        else {}
+    )
     return SimulatedBounds(
         case=case,
         k=k,
@@ -204,4 +243,6 @@ def simulate_bounds(
         t_quantiles=t_q,
         f_stats=f_stats,
         t_stats=t_stats,
+        f_indep_quantiles=f_i_q,
+        f_indep_stats=f_indep_stats,
     )

@@ -66,7 +66,7 @@ def _build_designs(
     design : numpy.ndarray, shape (B, n_est, k_par)
     target : numpy.ndarray, shape (B, n_est)
     tested : list of int
-        Column positions entering the F test.
+        Column positions entering the overall F test.
     lam_pos : int
         Column position of the lagged level of ``y``.
     """
@@ -129,8 +129,8 @@ def batch_uecm_statistics(
     p: int,
     q: tuple[int, ...],
     case: int,
-) -> tuple[FloatArray, FloatArray, FloatArray]:
-    r"""Wald F and t statistics for a stack of regenerated samples.
+) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray]:
+    r"""The three bounds-test statistics for a stack of regenerated samples.
 
     Parameters
     ----------
@@ -146,7 +146,15 @@ def batch_uecm_statistics(
     Returns
     -------
     f_stat : numpy.ndarray, shape (B,)
+        Overall F: all level terms jointly zero.
     t_stat : numpy.ndarray, shape (B,)
+        Left-tailed t on the adjustment coefficient.
+    f_indep : numpy.ndarray, shape (B,)
+        F of Sam, McNown & Goh (2019): the regressors' levels jointly
+        zero. Built on the **same** regenerated samples as the other
+        two — one null, three statistics. That is a measured choice, not
+        a reading of the specification; see OBS-8 in
+        ``docs/VALIDATION_OBSERVATIONS.md``.
     ok : numpy.ndarray of bool, shape (B,)
         ``False`` where the replication could not be estimated — a
         singular design, or a non-finite statistic. Those replications
@@ -216,9 +224,25 @@ def batch_uecm_statistics(
         f_stat = np.einsum("bi,bi->b", theta, solved) / idx.size
         t_stat = beta[:, lam_pos] / np.sqrt(cov[:, lam_pos, lam_pos])
 
-    ok = np.asarray(ok & np.isfinite(f_stat) & np.isfinite(t_stat), dtype=bool)
+        # F_indep: the same tested vector minus the adjustment
+        # coefficient. No new regression — it is another Wald form on the
+        # fit already obtained.
+        idx_i = np.asarray([pos for pos in tested if pos != lam_pos], dtype=np.intp)
+        theta_i = beta[:, idx_i]
+        v_i = cov[np.ix_(np.arange(n_rep), idx_i, idx_i)]
+        solved_i = np.linalg.solve(
+            np.where(ok[:, None, None], v_i, np.eye(idx_i.size)),
+            theta_i[:, :, None],
+        )[:, :, 0]
+        f_indep = np.einsum("bi,bi->b", theta_i, solved_i) / idx_i.size
+
+    ok = np.asarray(
+        ok & np.isfinite(f_stat) & np.isfinite(t_stat) & np.isfinite(f_indep),
+        dtype=bool,
+    )
     return (
         np.asarray(f_stat, dtype=np.float64),
         np.asarray(t_stat, dtype=np.float64),
+        np.asarray(f_indep, dtype=np.float64),
         np.asarray(ok, dtype=bool),
     )

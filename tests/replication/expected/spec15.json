@@ -1,0 +1,20 @@
+{
+  "provenance": {
+    "source": "R 4.6.1, bootCT 2.1.0, 2026-08-20",
+    "script": "validation/external/spec15_bootct.R",
+    "log": "validation/results/external_logs/spec15_bootct.log"
+  },
+  "tolerance": {
+    "f_indep_stat": 1e-06,
+    "note": "spec 15 \u00a73 \u2014 statistique observ\u00e9e"
+  },
+  "data": "denmark",
+  "case": 3,
+  "order": [
+    3,
+    1,
+    3,
+    2
+  ],
+  "f_indep_case3": 8.16193503296774
+}

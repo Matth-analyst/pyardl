@@ -9,6 +9,7 @@ nav:
   - API reference:
       - ARDL estimation: api/ardl.md
       - Bounds test: api/bounds.md
+      - Three-test framework: api/three-tests.md
       - Critical values: api/critical-values.md
       - ARDL/ECM algebra: api/transforms.md
       - Stability diagnostics: api/diagnostics.md

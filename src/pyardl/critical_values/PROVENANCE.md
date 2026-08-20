@@ -526,3 +526,36 @@ deux implémentations qui, en réalité, estimaient deux modèles
 différents. Diagnostic : lire les NOMS des coefficients du modèle
 ajusté (`names(coef(res$ARDL))`), qui montrent immédiatement trois
 retards de ΔLRM là où la paramétrisation PSS en compte deux.
+
+
+## Bornes de F_indep — Sam, McNown & Goh (2019), spec 15
+
+**Statut : SIMULÉES, pas transcrites.** Les bornes publiées sont dans
+*Economic Modelling* 80, 130-141, sous barrière d'accès. Le projet
+n'encode pas une valeur critique qu'il n'a pas calculée, et la spec
+prévoit elle-même le repli par le moteur `simulate_bounds`.
+
+**Générateur** : `validation/spec15_findep_cv.py`. Paramètres du DGP et
+seeds en tête de fichier, une seed distincte et déterministe par
+configuration `(cas, k, i1)`. Sortie brute :
+`validation/results/spec15_findep_table.py`, injectée dans
+`smg2019.py` par script avec vérification cellule par cellule contre le
+fichier source (règle CLAUDE.md n°9).
+
+**Nul simulé** : exactement celui de PSS — y marche aléatoire,
+régresseurs i.i.d. pour la borne I(0), marches aléatoires indépendantes
+pour la borne I(1). F_indep est calculé sur les MÊMES réplications que
+F_overall et t_BDM : les trois jeux de bornes décrivent un seul monde,
+pas trois mondes voisins.
+
+**Recoupements** (aucune seconde source n'existe, ils sont donc
+structurels — `validation/results/spec15_findep_crosscheck.txt`) :
+
+1. borne I(0) <= borne I(1) pour toute configuration ;
+2. seuil plus strict -> borne plus élevée ;
+3. décroissance en k : F_indep est un F PAR restriction, chaque
+   régresseur supplémentaire dilue la statistique.
+
+**Couverture** : cas 1 à 5, k = 1..10, niveaux 10 / 5 / 1 %. Hors de
+cette grille, `findep_bounds` lève une exception et `decision_indep`
+vaut `None` — aucune valeur voisine n'est substituée.

@@ -111,10 +111,15 @@ class TestJointDecisionIntegration:
             assert any("degenerate" in m for m in messages)
             assert any("F rejects but t does not" in m for m in messages)
 
-    def test_summary_reports_joint_decision(self) -> None:
+    def test_summary_reports_the_joint_verdict(self) -> None:
+        """Spec 15 §2.4 : le résumé porte le verdict à trois tests."""
         y, x = _dgp_cointegrated(seed=3)
         res = bounds_test(y, x, case=3, order=(2, 1))
-        assert "joint decision" in res.summary()
+        text = res.summary()
+        assert "CLASSIFICATION" in text
+        assert "F_indep" in text
+        # Le verdict à deux tests reste exposé pour la continuité.
+        assert res.decision_joint is not None
 
 
 class TestUnilaterality:
