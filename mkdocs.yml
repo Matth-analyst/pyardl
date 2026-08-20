@@ -6,6 +6,7 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Testing an economic restriction: long-run-restrictions.md
+  - Bootstrap or classical bounds?: bootstrap-or-bounds.md
   - API reference:
       - ARDL estimation: api/ardl.md
       - Bounds test: api/bounds.md

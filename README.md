@@ -391,6 +391,9 @@ four canonical systems:
 | degenerate_2 | 96.3% | 99.8% | 0.1% |
 | no cointegration | 91.5% | 71.3% | 24.8% |
 
+Full guidance on which route to believe, including what happens when they
+disagree, is in [Bootstrap or classical bounds?](docs/bootstrap-or-bounds.md).
+
 Almost all of the gain is the disappearance of the inconclusive zone, and it
 shows only where that zone is wide. Where neither route hesitates, the
 bootstrap adds nothing — and under a type 2 degeneracy it is confidently wrong
@@ -795,7 +798,7 @@ are simulated in-house because the published ones are behind an access barrier,
 so their cross-checks are structural rather than external, and that is weaker.
 None of this is hidden in a footnote: it is OBS-9, OBS-11 and OBS-12.
 
-**Test suite.** 722 tests including doctests, `mypy --strict` clean, on Linux,
+**Test suite.** 707 tests plus 38 doctests, `mypy --strict` clean, on Linux,
 Windows and macOS across Python 3.11–3.13. Monte Carlo experiments run nightly
 at full replication counts.
 

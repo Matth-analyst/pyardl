@@ -185,6 +185,9 @@ models, are in
 
 ## What the bootstrap buys, measured
 
+> For the decision itself — which route to believe on your own data —
+> see [Bootstrap or classical bounds?](../bootstrap-or-bounds.md).
+
 1000 replications, `T = 100`, `B = 299`, case III, correlated
 innovations, on the four canonical systems of `pyardl.simulate`:
 
