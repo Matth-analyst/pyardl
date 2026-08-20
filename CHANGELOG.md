@@ -5,6 +5,32 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Johansen test (`pyardl.cointegration`)
+
+- `johansen(y, det_order, k_ar_diff, alpha, method)` — a thin wrapper
+  over statsmodels' computation, plus what it leaves to the caller: the
+  **sequential rank decision** (stop at the first non-rejection, checked
+  against `select_coint_rank` at every level and both methods), a result
+  object with `.summary()`, and cointegrating vectors normalised so two
+  runs can be compared.
+- `check_no_cointegration_among_x(x, ...)` — the bounds test assumes the
+  regressors are not cointegrated among themselves and gives no sign
+  when they are. This checks it and warns, naming the number of
+  relations found.
+- Limits are refused, not approximated: more than 12 variables, an
+  untabulated `alpha`, a single series, or a `det_order` outside
+  `{-1, 0, 1}` all raise.
+- Measured and documented (OBS-10): the trace statistic **over-selects**
+  the rank (87.8% correct against maxeig's 92.5% on a rank-1 DGP) and
+  never under-selects. `trace` remains the default because it is what
+  the applied literature reports; the behaviour is documented rather
+  than hidden behind a default chosen to make a test pass.
+- The deterministic correspondence with `urca::ca.jo` was established by
+  **running both sides** across six variants: `ecdet="none"` matches
+  `det_order=0`, not `det_order=-1`, despite its name. Statistics agree
+  to 1e-9; the critical values come from different tabulations and
+  differ by under 1%, which is enough to flip a borderline decision.
+
 ### Added — the three-test framework (`pyardl.bounds.classification`)
 
 - `F_indep`, the third test of Sam, McNown & Goh (2019), on the

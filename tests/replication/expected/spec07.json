@@ -1,0 +1,36 @@
+{
+  "provenance": {
+    "source": "R 4.6.1, urca 1.3.4, 2026-08-20",
+    "script": "validation/external/spec07_urca.R",
+    "log": "validation/results/external_logs/spec07_urca.log"
+  },
+  "tolerance": {
+    "stat": 0.0001,
+    "note": "spec 07 \u00a73.2"
+  },
+  "data": "denmark",
+  "variables": [
+    "LRM",
+    "LRY",
+    "IBO",
+    "IDE"
+  ],
+  "K_levels": 2,
+  "correspondence": {
+    "statsmodels_det_order": 0,
+    "urca_ecdet": "none",
+    "note": "appariement ETABLI PAR MESURE sur les 6 variantes urca x 3 det_order ; seule cette paire coincide (1e-9). urca ecdet='none' garde une constante NON restreinte, ce n'est pas l'absence de deterministe."
+  },
+  "trace_urca_none_r_desc": [
+    0.556015761903964,
+    7.14488837692507,
+    17.2901719813951,
+    48.8037309587367
+  ],
+  "eigen_urca_none_r_desc": [
+    0.556015761903964,
+    6.58887261502111,
+    10.14528360447,
+    31.5135589773415
+  ]
+}
