@@ -115,10 +115,12 @@ had to decide.
 ## Sources
 
 The figures on this page come from
-`validation/results/spec16_montecarlo.txt` and its JSON companion, and
-are recorded as **OBS-12** in
-[`VALIDATION_OBSERVATIONS.md`](VALIDATION_OBSERVATIONS.md). The
-article's own Monte Carlo tables are behind an access barrier, so the
-specification's numeric criterion could not be checked against them;
-what is verified here is the set of qualitative claims, measured on our
-own data-generating processes.
+`validation/results/spec16_montecarlo.txt` and its JSON companion, both
+reproducible with `validation/spec16_montecarlo.py`. They are recorded
+as **OBS-12** in the project's validation register.
+
+The article's own Monte Carlo tables are behind an access barrier, so
+the specification's numeric criterion could not be checked against them.
+What is verified here is the set of qualitative claims, measured on our
+own data-generating processes — a weaker check than a direct comparison,
+and worth knowing before quoting these numbers.

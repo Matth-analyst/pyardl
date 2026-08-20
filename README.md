@@ -622,7 +622,7 @@ fact.
 All three statistics are drawn under the **same joint null**. That is a
 measured choice, not a reading: giving each test its own weaker null inflates
 size to 9.3% at a nominal 5% for the `t`, and to 8.5% for `F_indep`. See OBS-8
-and the deviation note in [`DEVIATIONS.md`](docs/DEVIATIONS.md).
+and the deviation note in `DEVIATIONS`.
 
 **Results.** `f_stat`, `t_stat`, `f_indep_stat`, the matching `*_critical` and
 `*_pvalue`, `classification(alpha)`, `comparison(alpha)`,
@@ -786,17 +786,18 @@ which null the bootstrap draws from (a per-test null inflates size to 9.3% at a
 nominal 5%), what the unconditional model actually removes (only one of two
 candidate specifications reproduces `bootCT`'s own statistic, to 1e-12), and
 which Johansen statistic meets the criterion the specification itself sets.
-Each is recorded in
-[`VALIDATION_OBSERVATIONS.md`](docs/VALIDATION_OBSERVATIONS.md) with the
-numbers that decided it — including one hypothesis of mine that the data
-refuted, kept in the record with its full trajectory.
+Each is recorded in the project's validation register with the numbers that
+decided it — including one hypothesis that the data refuted, kept in the record
+with its full trajectory rather than quietly replaced by the conclusion.
 
 **Limits, recorded rather than smoothed over.** `F_indep` is oversized at
 `T = 100` — 6.5% at a nominal 5%, where the `t` holds its size. The bootstrap's
 decisiveness costs accuracy under a type 2 degeneracy. The bounds of `F_indep`
 are simulated in-house because the published ones are behind an access barrier,
 so their cross-checks are structural rather than external, and that is weaker.
-None of this is hidden in a footnote: it is OBS-9, OBS-11 and OBS-12.
+None of this is hidden in a footnote: it is OBS-9, OBS-11 and OBS-12 of that
+same register, and the summary of OBS-12 is a page of the documentation in its
+own right — [Bootstrap or classical bounds?](docs/bootstrap-or-bounds.md).
 
 **Test suite.** 707 tests plus 38 doctests, `mypy --strict` clean, on Linux,
 Windows and macOS across Python 3.11–3.13. Monte Carlo experiments run nightly

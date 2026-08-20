@@ -44,8 +44,8 @@ keeps an unrestricted constant. Full table in ``docs/api/johansen.md``.
 
 The trace statistic over-selects the rank — measured, not assumed — and
 never under-selects it. It remains the default because it is what the
-applied literature reports; see OBS-10 in
-``docs/VALIDATION_OBSERVATIONS.md`` before trusting a borderline rank.
+applied literature reports; see OBS-10 of the project's validation
+register before trusting a borderline rank.
 
 References
 ----------

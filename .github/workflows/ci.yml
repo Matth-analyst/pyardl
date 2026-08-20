@@ -164,6 +164,16 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: pip install -e ".[docs]"
+      # Garde : les registres de travail (VALIDATION_OBSERVATIONS, DEVIATIONS,
+      # QUESTIONS) sont gitignores. Un lien vers eux passe le controle local,
+      # ou les fichiers existent, et casse ici. On le detecte explicitement
+      # plutot que de le lire dans un message de mkdocs.
+      - name: No link to an unpublished file
+        run: |
+          if grep -rnE '\]\([^)]*(VALIDATION_OBSERVATIONS|DEVIATIONS|QUESTIONS)\.md'                README.md docs/ 2>/dev/null; then
+            echo "::error::Lien vers un fichier absent du depot (voir .gitignore)."
+            exit 1
+          fi
       # --strict transforme tout lien mort ou page orpheline en erreur.
       - run: mkdocs build --strict
 

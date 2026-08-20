@@ -76,10 +76,9 @@ time against a nominal 5%, where `maxeig` gives 5.8%.
 
 The default stays `trace`, because that is what the applied literature
 reports. But a rank retained by the trace deserves a second reading by
-`maxeig` — and since both are always computed, that costs nothing. Full
-figures in
-[`VALIDATION_OBSERVATIONS.md`](https://github.com/Matth-analyst/pyardl/blob/main/docs/VALIDATION_OBSERVATIONS.md),
-OBS-10.
+`maxeig` — and since both are always computed, that costs nothing. The
+full figures are in the project's validation register (OBS-10), kept
+with the specifications rather than shipped.
 
 ## Deterministic conventions — read this before comparing with R
 

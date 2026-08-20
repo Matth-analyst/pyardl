@@ -29,7 +29,7 @@ environment, and it is not ours.
 
 That choice is a documented departure from the specification, which
 called for our own table of surface coefficients — see
-``docs/DEVIATIONS.md``. The reasoning is that a second transcription of
+``PROVENANCE.md``. The reasoning is that a second transcription of
 the same published numbers adds a failure mode (copy errors) without
 adding a source.
 

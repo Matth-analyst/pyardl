@@ -90,8 +90,7 @@ Building each test's distribution under its own weaker null sounds more
 faithful to what each test asks, and it inflates size: 9.3% at a nominal
 5% for the `t` in case III, against 3.5% for the joint null. The
 experiment, including a hypothesis about the mechanism that the data
-refuted, is recorded as OBS-8 in
-[`VALIDATION_OBSERVATIONS.md`](https://github.com/Matth-analyst/pyardl/blob/main/docs/VALIDATION_OBSERVATIONS.md).
+refuted, is recorded as OBS-8 in the project's validation register.
 
 ## The older two-test verdict
 
