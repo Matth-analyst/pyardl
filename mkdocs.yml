@@ -22,6 +22,7 @@ nav:
       - Engle-Granger test: api/cointegration.md
       - Johansen test: api/johansen.md
       - Bootstrap bounds test: api/bootstrap.md
+      - NARDL (asymmetric): api/nardl.md
 theme:
   name: material
 markdown_extensions:

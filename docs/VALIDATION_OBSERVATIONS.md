@@ -434,3 +434,80 @@ divergent pas sur les cas tranchés.
   vérifiable (source sous barrière) — affirmations qualitatives
   confirmées.
 
+
+## OBS-13 — Les tables de PSS ne décrivent pas le nul du NARDL
+
+**Spec 17.** La spec laissait ouverte la convention de comptage de `k`
+pour les valeurs critiques et demandait de documenter les deux pratiques
+de la littérature. Appliquant la règle établie par OBS-8 — une variante
+se mesure avant d'être adoptée — les deux ont été mesurées. Le résultat
+n'était pas celui attendu : **aucune des deux ne tient sa taille.**
+
+- **Source** : spec 17 §2.4, et la pratique publiée qui lit les
+  statistiques NARDL contre les tables de PSS.
+- **Preuve** : 1000 réplications, T = 150, cas III, H0 vraie (y et x
+  marches aléatoires indépendantes), seuil nominal 5 %.
+
+  | lecture | taux de rejet |
+  |---|---|
+  | `decomposed` (k = 2 par variable) | 7.3 % |
+  | `original` (k = 1 par variable) | 2.6 % |
+  | **témoin** : ARDL linéaire, 2 vrais régresseurs | 4.8 % |
+
+  Le témoin est ce qui rend la conclusion solide. Sans lui, on aurait pu
+  attribuer les 7.3 % à la sur-rejection bien connue des valeurs
+  critiques asymptotiques en petit échantillon. Un modèle à deux
+  régresseurs authentiques, même T, même nulle, est correctement
+  dimensionné : la distorsion vient donc de la décomposition elle-même.
+
+- **Mécanisme, mesuré et non supposé** — deux propriétés structurelles
+  des sommes partielles, dont aucune n'est compatible avec ce que les
+  tables de PSS supposent :
+
+  1. `x+` et `x-` sont corrélées à **−0.993** en niveau, et leurs
+     variations ne sont **jamais** toutes deux non nulles : chacune ne
+     bouge qu'une date sur deux. Ce ne sont pas deux régresseurs I(1)
+     indépendants ; ce sont deux morceaux d'une même série.
+  2. Décomposer une série **stationnaire** produit deux séries à
+     **tendance** (pente mesurée +0.56 sur 400 points). La borne I(0)
+     est censée couvrir des régresseurs stationnaires : aucun monde de
+     ce type n'est atteignable par la décomposition. Il n'y a donc pas
+     de borne inférieure qui ait un sens ici, et une paire de bornes
+     serait une fiction.
+
+- **Action** : une table de valeurs critiques propre à ce nul, simulée
+  sous le protocole déjà utilisé pour F_indep (spec 15) — y marche
+  aléatoire, régresseurs tirés comme des marches aléatoires **puis
+  décomposés**. Une seule valeur par seuil, pas une paire.
+  `pyardl.critical_values.syg2014`, 100 000 réplications par
+  configuration, cas 1-5, `k_asym` = 1 à 3.
+
+- **Effet vérifié**, 1000 réplications à T = 150 :
+
+  | cas | avant (PSS, k = 2) | après |
+  |---|---|---|
+  | III | 7.3 % | **5.7 %** |
+  | V | — | 3.5 % |
+
+  La table est asymptotique ; l'écart résiduel à T = 150 est la
+  distorsion d'échantillon fini habituelle. Le cas V devient
+  conservateur.
+
+- **Effet de bord instructif** : le recoupement structurel « la valeur
+  NARDL doit dépasser celle de PSS » échoue systématiquement dans les
+  cas 4 et 5, et seulement là. La raison est la même dérive : dans les
+  cas à tendance, elle est en partie colinéaire avec le terme de
+  tendance du modèle, qui l'absorbe. Le sens de la distorsion s'inverse.
+  Le contrôle a donc été restreint aux cas sans tendance, avec cette
+  justification — pas relâché parce qu'il échouait.
+
+- **Ce qui n'a PAS été fait** : garder la convention `decomposed` en la
+  documentant comme « approximation courante ». Elle rejette une fois
+  sur treize au lieu d'une fois sur vingt ; l'écrire en note de bas de
+  page aurait été laisser l'utilisateur porter une erreur qu'on a
+  mesurée.
+
+- **Trace** : `validation/spec17_measurements.py`,
+  `validation/spec17_nardl_cv.py`, résultats dans
+  `validation/results/spec17_*`.
+- **Statut** : mesurée et corrigée (2026-08-22).

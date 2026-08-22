@@ -1,0 +1,35 @@
+{
+  "provenance": {
+    "source": "R 4.6.1, nardl 0.1.6, 2026-08-22",
+    "script": "validation/external/spec17_nardl.R",
+    "data": "validation/external/spec17_fod.csv (jeu 'fod' livre avec le package)",
+    "call": "nardl(food ~ inf, data=fod, ic='aic', maxlag=4, case=3)"
+  },
+  "convention": "LUE dans le code source, pas deduite des noms. lxp = nlagm(xp, p) empile le NIVEAU CONTEMPORAIN de x+ puis ses retards 1..p \u2014 ce n'est pas la parametrisation UECM de PSS (niveau retarde + differences). De plus leur cumul demarre sans zero initial, d'ou un decalage d'un pas. Les deux ecarts se compensent une fois traduits.",
+  "tolerance": {
+    "coef": 1e-06,
+    "se": 1e-06,
+    "note": "spec 17 \u00a74.4"
+  },
+  "n_obs": 49,
+  "coefficients": {
+    "Const": 5.30911046084107,
+    "food_1": -0.353283620246015,
+    "inf_p": -0.0971819015401874,
+    "inf_p_1": 0.50629010660473,
+    "inf_p_2": -0.105417997060564,
+    "inf_p_3": 0.102285163780601,
+    "inf_p_4": -0.25546200122503,
+    "inf_n": 0.203418324390918
+  },
+  "standard_errors": {
+    "Const": 3.50852036215664,
+    "food_1": 0.116404668745079,
+    "inf_p": 0.15202705467461,
+    "inf_p_1": 0.217166978375296,
+    "inf_p_2": 0.203338224131796,
+    "inf_p_3": 0.195213594603126,
+    "inf_p_4": 0.144092845005177,
+    "inf_n": 0.1278274477901
+  }
+}

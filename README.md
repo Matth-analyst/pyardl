@@ -695,6 +695,45 @@ trap: `urca`'s `ecdet="none"` matches `det_order=0`, **not** `det_order=-1`.
 The correspondence was established by running both sides, not by reading either
 manual — see [`docs/api/johansen.md`](docs/api/johansen.md).
 
+### NARDL — asymmetric responses
+
+```python
+pyardl.nardl.NARDL(y, x, asym=["oil"], order=(1, 1), case=3, threshold=0.0)
+```
+
+An ARDL assumes `y` responds to a rise in `x` exactly as to a fall. The
+NARDL splits each regressor into cumulated rises and falls and lets the
+data say otherwise. The long run gets two coefficients, `θ⁺` and `θ⁻`,
+and asymmetry becomes a restriction to test rather than an assumption.
+
+The decomposition is a regrouping, and the identity `x = x₀ + x⁺ + x⁻`
+is verified to 1e-12 before anything else in the module — an error there
+would not raise, it would produce plausible wrong numbers everywhere
+downstream.
+
+**Results.** `longrun_asym`, `asymmetry_tests()` (four Wald tests),
+`suggests_symmetric_model()`, `bounds_test()`,
+`dynamic_multipliers(h, r, seed)`, `plot_multipliers()`, `uecm`,
+`summary()`.
+
+The dynamic multipliers are the signature output of this literature, and
+the first figure the library draws:
+
+![Asymmetric dynamic multipliers](docs/assets/nardl-multipliers.png)
+
+The lower panel is the one that answers the question: asymmetry shows
+when the band on the **difference** excludes zero, not when the two
+curves look far apart.
+
+**Its critical values are not PSS's.** Reading a NARDL statistic against
+the usual tables rejects 7.3% of the time at a nominal 5% counting the
+decomposed pieces, or 2.6% counting the original variable — where a
+genuine two-regressor model is correctly sized at 4.8%. Two partial sums
+of one series are not two independent I(1) regressors: they correlate at
+−0.993 and never move on the same date. `pyardl` therefore ships values
+simulated for this null, and lands at 5.7%. Full account in OBS-13 and
+[`docs/api/nardl.md`](docs/api/nardl.md).
+
 ### VECM simulator
 
 ```python
@@ -838,7 +877,7 @@ Released:
 
 Planned:
 
-- **0.4** — NARDL (asymmetric).
+- **0.4** — NARDL (asymmetric) — *implemented, awaiting release*.
 - **0.5+** — Fourier ARDL, dynamic simulations, QARDL, heterogeneous panels
   (MG, PMG, CS-ARDL).
 

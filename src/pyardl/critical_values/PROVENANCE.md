@@ -559,3 +559,72 @@ structurels — `validation/results/spec15_findep_crosscheck.txt`) :
 **Couverture** : cas 1 à 5, k = 1..10, niveaux 10 / 5 / 1 %. Hors de
 cette grille, `findep_bounds` lève une exception et `decision_indep`
 vaut `None` — aucune valeur voisine n'est substituée.
+
+## Valeurs critiques du bounds test NARDL — spec 17
+
+**Statut : SIMULÉES, et il n'existe rien à transcrire.** La littérature
+NARDL lit ses statistiques contre les tables de PSS, en comptant soit les
+deux sommes partielles, soit la variable d'origine. La mesure a écarté
+les deux : ni l'une ni l'autre ne tient sa taille.
+
+| lecture, à 5 % nominal | taux de rejet mesuré |
+|---|---|
+| `decomposed`, k = 2 par variable | 7.3 % |
+| `original`, k = 1 par variable | 2.6 % |
+| **témoin** : ARDL linéaire, 2 vrais régresseurs | 4.8 % |
+
+Le témoin est ce qui rend la conclusion solide : un modèle à deux
+régresseurs authentiques, même T, même nulle, est correctement
+dimensionné. La distorsion ne vient donc pas des valeurs critiques
+asymptotiques en petit échantillon — elle vient de la décomposition.
+
+**Mécanisme, mesuré et non supposé** :
+
+1. `x+` et `x-` sont corrélées à **−0.993** en niveau, et leurs
+   variations ne sont jamais toutes deux non nulles : chacune bouge une
+   date sur deux. Ce ne sont pas deux régresseurs I(1) indépendants, ce
+   que les tables de PSS supposent.
+2. Décomposer une série **stationnaire** produit deux séries à
+   **tendance** (pente mesurée +0.56 sur 400 points). La borne I(0),
+   censée couvrir des régresseurs stationnaires, ne décrit donc aucun
+   monde atteignable par la décomposition. Une seule valeur critique a
+   du sens, pas une paire — et c'est ce que la table livre.
+
+**Générateur** : `validation/spec17_nardl_cv.py`. 100 000 réplications
+par configuration, T = 1000, seed déterministe par `(cas, k_asym)`. Nul
+simulé : y marche aléatoire, chaque variable asymétrique tirée comme une
+marche aléatoire **puis décomposée** — la transformation exacte que subit
+la donnée réelle. Injection par `validation/spec17_inject_table.py`, 45
+cellules vérifiées une à une contre le fichier source.
+
+**Recoupements structurels**
+(`validation/results/spec17_nardl_cv_crosscheck.txt`) :
+
+1. seuil plus strict → valeur plus élevée ;
+2. décroissance en `k_asym` (le F est un F par restriction) ;
+3. dans les cas **sans tendance** (1, 2, 3), la valeur dépasse la borne
+   I(1) de PSS à k = 2·k_asym — c'est exactement ce qui rend la lecture
+   usuelle trop permissive.
+
+Le contrôle 3 s'arrête là, et la raison est mesurée : dans les cas 4 et
+5, la dérive que porte toute somme partielle est en partie colinéaire
+avec le terme de tendance du modèle, qui l'absorbe. La valeur critique
+passe alors **sous** celle de PSS — le sens de la distorsion s'inverse,
+il ne disparaît pas.
+
+**Effet vérifié à T = 150**, sur 1000 réplications sous H0 :
+
+| cas | avant (PSS, k = 2) | après (table NARDL) |
+|---|---|---|
+| 3 | 7.3 % | **5.7 %** |
+| 5 | — | 3.5 % |
+
+La table est asymptotique (T = 1000) ; l'écart résiduel à T = 150 est la
+distorsion d'échantillon fini habituelle, du même ordre que celle qui
+justifie les tables de Narayan pour l'ARDL linéaire. Le cas 5 devient
+conservateur.
+
+**Couverture** : cas 1 à 5, `k_asym` = 1 à 3, niveaux 10 / 5 / 1 %,
+modèles dont **tous** les régresseurs sont décomposés. Hors de cette
+grille, `nardl_critical_value` lève une exception et `bounds_test` refuse
+— aucune valeur voisine n'est substituée.
