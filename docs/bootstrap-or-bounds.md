@@ -96,7 +96,8 @@ had to decide.
 - **`F_indep` in small samples.** It is oversized at `T = 100` — 6.5% at
   a nominal 5%, where the `t` holds its size. A `degenerate_1` verdict
   that rests on `F_indep` narrowly failing to reject deserves suspicion
-  at that sample size. See OBS-11.
+  at that sample size. See
+  [OBS-11](VALIDATION_OBSERVATIONS.md).
 - **Cointegration among the regressors.** Neither route detects it.
   `check_no_cointegration_among_x` does.
 
@@ -117,7 +118,8 @@ had to decide.
 The figures on this page come from
 `validation/results/spec16_montecarlo.txt` and its JSON companion, both
 reproducible with `validation/spec16_montecarlo.py`. They are recorded
-as **OBS-12** in the project's validation register.
+as **OBS-12** in the
+[validation register](VALIDATION_OBSERVATIONS.md).
 
 The article's own Monte Carlo tables are behind an access barrier, so
 the specification's numeric criterion could not be checked against them.

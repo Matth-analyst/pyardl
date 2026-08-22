@@ -7,6 +7,7 @@ nav:
   - Getting started: getting-started.md
   - Testing an economic restriction: long-run-restrictions.md
   - Bootstrap or classical bounds?: bootstrap-or-bounds.md
+  - Validation register: VALIDATION_OBSERVATIONS.md
   - API reference:
       - ARDL estimation: api/ardl.md
       - Bounds test: api/bounds.md

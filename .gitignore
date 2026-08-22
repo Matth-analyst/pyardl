@@ -17,10 +17,11 @@ venv/
 site/
 
 # --- Internal working files (kept locally, not part of the public repo) ---
+# VALIDATION_OBSERVATIONS.md, lui, est PUBLIE : c'est le registre des
+# recoupements, et la doc y renvoie.
 docs/references/
 docs/QUESTIONS.md
 docs/DEVIATIONS.md
-docs/VALIDATION_OBSERVATIONS.md
 docs/ardl_references.pdf
 validation/
 

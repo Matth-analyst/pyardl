@@ -789,7 +789,8 @@ which null the bootstrap draws from (a per-test null inflates size to 9.3% at a
 nominal 5%), what the unconditional model actually removes (only one of two
 candidate specifications reproduces `bootCT`'s own statistic, to 1e-12), and
 which Johansen statistic meets the criterion the specification itself sets.
-Each is recorded in the project's validation register with the numbers that
+Each is recorded in the
+[validation register](docs/VALIDATION_OBSERVATIONS.md) with the numbers that
 decided it — including one hypothesis that the data refuted, kept in the record
 with its full trajectory rather than quietly replaced by the conclusion.
 
@@ -798,7 +799,7 @@ with its full trajectory rather than quietly replaced by the conclusion.
 decisiveness costs accuracy under a type 2 degeneracy. The bounds of `F_indep`
 are simulated in-house because the published ones are behind an access barrier,
 so their cross-checks are structural rather than external, and that is weaker.
-None of this is hidden in a footnote: it is OBS-9, OBS-11 and OBS-12 of that
+None of this is hidden in a footnote: it is OBS-9, OBS-11 and OBS-12 of the
 same register, and the summary of OBS-12 is a page of the documentation in its
 own right — [Bootstrap or classical bounds?](docs/bootstrap-or-bounds.md).
 

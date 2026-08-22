@@ -159,8 +159,8 @@ def batch_uecm_statistics(
         F of Sam, McNown & Goh (2019): the regressors' levels jointly
         zero. Built on the **same** regenerated samples as the other
         two — one null, three statistics. That is a measured choice, not
-        a reading of the specification; see OBS-8 of the project's
-        validation register.
+        a reading of the specification; see OBS-8 of
+        ``docs/VALIDATION_OBSERVATIONS.md``.
     ok : numpy.ndarray of bool, shape (B,)
         ``False`` where the replication could not be estimated — a
         singular design, or a non-finite statistic. Those replications

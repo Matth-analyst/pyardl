@@ -18,7 +18,7 @@ size experiment settles which is right: our values deliver 5.07% at the
 nominal 5% level, the response surface 4.72%. The difference is a
 fitting artefact at the edge of the surface's range, not a disagreement
 about the statistic — the statistics themselves match to 1e-15. See
-OBS-6 of the project's validation register.
+OBS-6 of ``docs/VALIDATION_OBSERVATIONS.md``.
 
 References
 ----------

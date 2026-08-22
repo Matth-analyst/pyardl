@@ -176,7 +176,7 @@ case III, and 8.3% in case V, where the joint null gives 3.5% and 5.0%.
 So our bounds are not conservative by accident; they are built under the
 null that holds the size. The full experiment, including a hypothesis
 about the mechanism that the data refuted, is recorded as OBS-8 in the
-project's validation register.
+[validation register](../VALIDATION_OBSERVATIONS.md).
 
 Details, including a convention trap in `bootCT`'s lag argument that
 makes a naive comparison disagree by 58% while comparing two different

@@ -50,7 +50,7 @@ choice, not a reading of the article: building the t distribution under
 the weaker null :math:`\lambda = 0` alone — leaving the level terms of
 the regressors free — nearly doubles the empirical size of the test,
 9.3% against a nominal 5% in case III. The joint null holds the size.
-See OBS-8 of the project's validation register.
+See OBS-8 of ``docs/VALIDATION_OBSERVATIONS.md``.
 
 Why the two residual vectors travel together
 --------------------------------------------
