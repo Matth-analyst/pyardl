@@ -17,6 +17,13 @@ This project follows [semantic versioning](https://semver.org/).
   verified to 1e-12 before anything else in the module. A non-zero
   threshold turns it into `x = x₀ + x⁺ + x⁻ + c·t` and warns, because the
   drift then moves into the deterministic part of the model.
+- `order="auto"` selects the lag orders by information criterion on the
+  transformed model. `asym_lags="paired"` (default) keeps the two sides
+  of a decomposed variable on the same order — which halves the grid and
+  keeps the strong short-run test meaningful — and `"free"` lets them
+  differ. Every candidate is estimated on the same sample, and one the
+  sample cannot support is skipped rather than scored as if it had lost
+  on merit.
 - `res.longrun_asym` — `θ⁺`, `θ⁻` and their difference, with delta-method
   standard errors taken on `(γ⁺, γ⁻, λ)` **jointly**: they come from one
   regression and are correlated at 0.93 to 0.99, so treating them as

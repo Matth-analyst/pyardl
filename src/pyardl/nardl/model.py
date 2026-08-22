@@ -43,7 +43,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -53,6 +53,8 @@ from pyardl.exceptions import PyardlMethodologyWarning
 from pyardl.nardl.decompose import Threshold, partial_sums
 
 __all__ = ["NARDL", "NARDLBoundsResults", "NARDLResults"]
+
+AsymLags = Literal["paired", "free"]
 
 
 def _wald(
@@ -705,10 +707,22 @@ class NARDL:
         which is how ``asym`` refers to them.
     asym : sequence of str, optional
         Which regressors to decompose. Defaults to **all** of them.
-    order : tuple
+    order : tuple or ``'auto'``
         ``(p, q)`` as for :class:`~pyardl.core.ardl.ARDL`. ``q`` may be a
         dict keyed by *transformed* column name (``oil_pos``,
         ``oil_neg``) when the two sides take different lag orders.
+        ``'auto'`` selects the orders by information criterion on the
+        transformed model, all candidates estimated on the same sample.
+    max_p, max_q : int
+        Grid bounds when ``order='auto'``.
+    ic : {'aic', 'bic', 'hq'}
+        Criterion used to rank the candidates.
+    asym_lags : {'paired', 'free'}
+        Whether the two sides of a decomposed variable must share a lag
+        order. ``'paired'`` is the default: it halves the grid, and it
+        keeps the strong short-run symmetry test meaningful, since that
+        test needs matching terms on both sides. ``'free'`` is the more
+        general search and the one much of the applied work uses.
     case : int, default 3
         Deterministic case, in the PSS numbering.
     threshold : float or {'mean'}, default 0.0
@@ -737,9 +751,13 @@ class NARDL:
         y: npt.ArrayLike,
         x: npt.ArrayLike,
         asym: Sequence[str] | None = None,
-        order: tuple[int, int | dict[str, int]] = (1, 1),
+        order: tuple[int, int | dict[str, int]] | Literal["auto"] = (1, 1),
         case: int = 3,
         threshold: Threshold = 0.0,
+        max_p: int = 4,
+        max_q: int = 4,
+        ic: Literal["aic", "bic", "hq"] = "aic",
+        asym_lags: AsymLags = "paired",
     ) -> None:
         from pyardl.utils import check_series
 
@@ -781,6 +799,14 @@ class NARDL:
                     columns[name] = series
         self.transformed = pd.DataFrame(columns, index=index)
 
+        self.selection: pd.DataFrame | None = None
+        if order == "auto":
+            self.p, q_map, self.selection = self._select_order(
+                max_p=max_p, max_q=max_q, ic=ic, asym_lags=asym_lags
+            )
+            self.q_map = q_map
+            return
+
         p, q = order
         if isinstance(q, dict):
             missing = [c for c in self.transformed.columns if c not in q]
@@ -794,6 +820,107 @@ class NARDL:
             q_map = {str(c): int(q) for c in self.transformed.columns}
         self.p = int(p)
         self.q_map = q_map
+
+    # ------------------------------------------------------------------
+    def _candidate_orders(
+        self, max_q: int, asym_lags: AsymLags
+    ) -> list[dict[str, int]]:
+        """Every ``q`` combination the requested mode allows.
+
+        ``'paired'`` gives the two sides of a decomposed variable the same
+        order; ``'free'`` lets them differ, at the cost of a grid that is
+        squared in the number of decomposed variables.
+        """
+        from itertools import product
+
+        columns = [str(c) for c in self.transformed.columns]
+        if asym_lags == "free":
+            groups: list[list[str]] = [[c] for c in columns]
+        else:
+            groups = []
+            for base in self.asym:
+                groups.append([f"{base}_pos", f"{base}_neg"])
+            groups += [[c] for c in columns if not c.endswith(("_pos", "_neg"))]
+
+        out = []
+        for combination in product(range(max_q + 1), repeat=len(groups)):
+            mapping: dict[str, int] = {}
+            for value, group in zip(combination, groups, strict=True):
+                for column in group:
+                    mapping[column] = value
+            out.append({c: mapping[c] for c in columns})
+        return out
+
+    def _select_order(
+        self,
+        max_p: int,
+        max_q: int,
+        ic: str,
+        asym_lags: AsymLags,
+    ) -> tuple[int, dict[str, int], pd.DataFrame]:
+        """Choose ``(p, q)`` by information criterion on the transformed model.
+
+        Every candidate is estimated on the **same** sample, the one the
+        largest order can afford. Comparing information criteria computed
+        on different numbers of observations is meaningless, and it is the
+        classic way to get lag selection wrong.
+        """
+        from pyardl.core.ardl import ARDL
+
+        if ic not in ("aic", "bic", "hq"):
+            raise ValueError(f'ic must be "aic", "bic" or "hq", got {ic!r}.')
+        if asym_lags not in ("paired", "free"):
+            raise ValueError(
+                f'asym_lags must be "paired" or "free", got {asym_lags!r}.'
+            )
+        if max_p < 1:
+            raise ValueError(f"max_p must be at least 1, got {max_p}.")
+        if max_q < 0:
+            raise ValueError(f"max_q must be non-negative, got {max_q}.")
+
+        det = {1: "none", 2: "const", 3: "const", 4: "trend", 5: "trend"}[self.case]
+        common = max(max_p, max_q)
+        key = {"aic": "aic", "bic": "bic", "hq": "hqic"}[ic]
+
+        rows = []
+        for p in range(1, max_p + 1):
+            for q_map in self._candidate_orders(max_q, asym_lags):
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        fitted = ARDL(
+                            self._y_series,
+                            self.transformed,
+                            order=(p, dict(q_map)),
+                            det=det,  # type: ignore[arg-type]
+                            hold_back=common,
+                        ).fit()
+                except (ValueError, np.linalg.LinAlgError):
+                    # A candidate the sample cannot support is skipped and
+                    # left out of the table, not scored as if it had failed
+                    # on merit.
+                    continue
+                rows.append(
+                    {
+                        "p": p,
+                        **{f"q[{c}]": v for c, v in q_map.items()},
+                        "aic": fitted.aic,
+                        "bic": fitted.bic,
+                        "hqic": fitted.hqic,
+                        "nobs": fitted.nobs,
+                        "_q_map": q_map,
+                    }
+                )
+        if not rows:
+            raise ValueError(
+                f"No candidate could be estimated with max_p={max_p}, "
+                f"max_q={max_q} on {len(self._y_series)} observations."
+            )
+
+        table = pd.DataFrame(rows).sort_values(key).reset_index(drop=True)
+        best = table.iloc[0]
+        chosen = dict(best["_q_map"])
+        return int(best["p"]), chosen, table.drop(columns="_q_map")
 
     def fit(self) -> NARDLResults:
         """Estimate the model and return the results object.

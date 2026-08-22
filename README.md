@@ -711,6 +711,10 @@ is verified to 1e-12 before anything else in the module — an error there
 would not raise, it would produce plausible wrong numbers everywhere
 downstream.
 
+`order="auto"` selects the lag orders by information criterion on the
+transformed model, with `asym_lags="paired"` (the two sides share an order)
+or `"free"`. All candidates are estimated on the same sample.
+
 **Results.** `longrun_asym`, `asymmetry_tests()` (four Wald tests),
 `suggests_symmetric_model()`, `bounds_test()`,
 `dynamic_multipliers(h, r, seed)`, `plot_multipliers()`, `uecm`,

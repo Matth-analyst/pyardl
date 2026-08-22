@@ -71,6 +71,41 @@ would produce plausible, wrong results everywhere downstream.
     `θ⁺` is then read net of a trend nobody declared. `partial_sums`
     computes any threshold you ask for and warns when it is not zero.
 
+## Choosing the lag orders
+
+```python
+model = NARDL(y, x, order="auto", max_p=3, max_q=3, ic="aic")
+model.selection.head()
+```
+
+```text
+selected: p=1, q={'oil_pos': 2, 'oil_neg': 2}
+
+ p  q[oil_pos]  q[oil_neg]        aic        bic       hqic  nobs
+ 1           2           2 421.919631 455.163221 435.228218   297
+ 1           1           1 422.390345 448.246470 432.741468   297
+ 2           2           2 423.918996 460.856317 438.706315   297
+ 2           1           1 424.046296 453.596153 435.876151   297
+ 1           3           3 425.068056 465.699110 441.334107   297
+```
+
+Every candidate is estimated on the **same** sample — the one the
+largest order can afford. Comparing information criteria computed on
+different numbers of observations is meaningless, and it is the standard
+way lag selection goes wrong.
+
+`asym_lags` decides whether the two sides of a decomposed variable must
+share an order:
+
+| mode | grid | when |
+|---|---|---|
+| `"paired"` *(default)* | `q⁺ = q⁻` | halves the search, and keeps `shortrun_strong` meaningful — that test needs matching terms on both sides |
+| `"free"` | each side independent | the more general search, and what much applied work does |
+
+A candidate the sample cannot support is **skipped**, not scored with an
+infinite criterion: leaving it in the ranking would present it as having
+lost on merit rather than never having run.
+
 ## The four symmetry tests
 
 ```python

@@ -531,3 +531,113 @@ class TestVectorisedRecursion:
         prefix = _autoregressive_prefix(names)
         path = _multiplier_path(params, names, "x_pos", 10, prefix)
         assert path.shape == (1, 11)
+
+
+class TestOrderSelection:
+    """§2.2 — selection d'ordre sur le modele TRANSFORME."""
+
+    def test_recovers_the_true_order(self) -> None:
+        """DGP d'ordre (1, 1) : la selection doit le retrouver."""
+        y, x = _asymmetric(seed=110, n=400)
+        model = NARDL(y, x, order="auto", max_p=3, max_q=3)
+        assert model.p == 1
+        assert set(model.q_map.values()) == {1}
+
+    def test_common_sample_for_every_candidate(self) -> None:
+        """Le piege classique de la selection d'ordre : comparer des
+        criteres calcules sur des nombres d'observations differents n'a
+        aucun sens. Tous les candidats partagent donc le meme
+        echantillon."""
+        y, x = _asymmetric(seed=111, n=300)
+        model = NARDL(y, x, order="auto", max_p=4, max_q=4)
+        assert model.selection is not None
+        assert model.selection["nobs"].nunique() == 1
+
+    def test_paired_mode_keeps_the_two_sides_together(self) -> None:
+        y, x = _asymmetric(seed=112, n=300)
+        model = NARDL(y, x, order="auto", max_p=2, max_q=3, asym_lags="paired")
+        assert model.selection is not None
+        assert (model.selection["q[x_pos]"] == model.selection["q[x_neg]"]).all()
+        assert model.q_map["x_pos"] == model.q_map["x_neg"]
+
+    def test_free_mode_explores_unequal_orders(self) -> None:
+        y, x = _asymmetric(seed=113, n=300)
+        model = NARDL(y, x, order="auto", max_p=2, max_q=3, asym_lags="free")
+        assert model.selection is not None
+        assert (model.selection["q[x_pos]"] != model.selection["q[x_neg]"]).any()
+
+    def test_free_grid_is_larger_than_paired(self) -> None:
+        """La liberte se paie en candidats : le carre au lieu du simple."""
+        y, x = _asymmetric(seed=114, n=300)
+        paired = NARDL(y, x, order="auto", max_p=2, max_q=3, asym_lags="paired")
+        free = NARDL(y, x, order="auto", max_p=2, max_q=3, asym_lags="free")
+        assert paired.selection is not None and free.selection is not None
+        assert len(free.selection) > len(paired.selection)
+
+    def test_table_is_sorted_by_the_chosen_criterion(self) -> None:
+        y, x = _asymmetric(seed=115, n=300)
+        for ic, column in (("aic", "aic"), ("bic", "bic"), ("hq", "hqic")):
+            model = NARDL(y, x, order="auto", max_p=2, max_q=2, ic=ic)
+            assert model.selection is not None
+            values = model.selection[column].to_numpy()
+            assert np.all(np.diff(values) >= 0)
+
+    def test_bic_never_picks_a_larger_order_than_aic(self) -> None:
+        """BIC penalise plus durement : il ne peut pas etre plus
+        genereux que l'AIC sur les memes candidats."""
+        y, x = _asymmetric(seed=116, n=300)
+        aic = NARDL(y, x, order="auto", max_p=4, max_q=4, ic="aic")
+        bic = NARDL(y, x, order="auto", max_p=4, max_q=4, ic="bic")
+        assert bic.p + sum(bic.q_map.values()) <= aic.p + sum(aic.q_map.values())
+
+    def test_selection_is_none_for_an_explicit_order(self) -> None:
+        y, x = _asymmetric(seed=117)
+        assert NARDL(y, x, order=(2, 2)).selection is None
+
+    def test_selected_model_fits(self) -> None:
+        y, x = _asymmetric(seed=118, n=400)
+        res = NARDL(y, x, order="auto", max_p=3, max_q=3).fit()
+        assert res.lam < 0
+        assert np.isfinite(res.longrun_asym.loc["x", "theta_pos"])
+
+    @pytest.mark.parametrize(
+        ("kwargs", "match"),
+        [
+            ({"ic": "mallows"}, 'ic must be "aic"'),
+            ({"asym_lags": "both"}, 'asym_lags must be "paired"'),
+            ({"max_p": 0}, "max_p must be at least 1"),
+            ({"max_q": -1}, "max_q must be non-negative"),
+        ],
+    )
+    def test_invalid_settings_refused(self, kwargs: dict, match: str) -> None:
+        y, x = _asymmetric(seed=119)
+        with pytest.raises(ValueError, match=match):
+            NARDL(y, x, order="auto", **kwargs)
+
+    def test_sample_too_short_is_refused(self) -> None:
+        """Aucun candidat estimable : on le dit, on ne rend pas un ordre
+        par defaut qui aurait l'air d'avoir ete choisi."""
+        rng = np.random.default_rng(120)
+        y = pd.Series(np.cumsum(rng.normal(size=7)), name="y")
+        x = pd.DataFrame({"x": np.cumsum(rng.normal(size=7))})
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with pytest.raises(ValueError, match="No candidate could be estimated"):
+                NARDL(y, x, order="auto", max_p=4, max_q=4)
+
+    def test_unestimable_candidates_are_skipped_not_scored(self) -> None:
+        """Un candidat que l'echantillon ne supporte pas sort de la
+        table. Le noter avec un critere infini le ferait figurer au
+        classement comme s'il avait perdu au merite."""
+        rng = np.random.default_rng(121)
+        n = 18
+        y = pd.Series(np.cumsum(rng.normal(size=n)), name="y")
+        x = pd.DataFrame({"x": np.cumsum(rng.normal(size=n))})
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model = NARDL(y, x, order="auto", max_p=4, max_q=4)
+        assert model.selection is not None
+        # La grille appariee compte 4 * 5 = 20 candidats ; certains ne
+        # tiennent pas dans 18 observations.
+        assert len(model.selection) < 20
+        assert np.isfinite(model.selection[["aic", "bic", "hqic"]].to_numpy()).all()
