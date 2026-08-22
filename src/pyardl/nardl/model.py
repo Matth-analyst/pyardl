@@ -132,31 +132,37 @@ def _multiplier_path(
     by a step that switches to one at ``t = 0`` and stays there. The
     path converges to :math:`\sum_j \beta_j / (1 - \sum_i \phi_i)` — the
     long-run coefficient — which is what the tests check.
+
+    ``params`` holds one parameter vector or a stack of them, and the
+    result carries one row per vector. The recursion is sequential in
+    ``t`` but **independent across draws**, so the loop runs over
+    horizons with every draw advanced together. That is what the
+    confidence bands need: a thousand paths, not a thousand Python loops.
     """
-    phi = np.array(
-        [params[i] for i, n in enumerate(names) if str(n).startswith(f"{y_prefix}.L")],
-        dtype=np.float64,
-    )
-    beta = np.array(
-        [params[i] for i, n in enumerate(names) if str(n).startswith(f"{column}.L")],
-        dtype=np.float64,
-    )
-    if beta.size == 0:  # pragma: no cover - guarded by the caller
+    stacked = np.atleast_2d(np.asarray(params, dtype=np.float64))
+    phi_idx = [i for i, n in enumerate(names) if str(n).startswith(f"{y_prefix}.L")]
+    beta_idx = [i for i, n in enumerate(names) if str(n).startswith(f"{column}.L")]
+    phi = stacked[:, phi_idx]
+    beta = stacked[:, beta_idx]
+    if beta.shape[1] == 0:  # pragma: no cover - guarded by the caller
         raise KeyError(f"No ARDL terms found for {column!r}.")
 
-    p = int(phi.size)
-    q = int(beta.size)
-    y = np.zeros(h + 1 + p)
+    n_draw, p = phi.shape
+    q = beta.shape[1]
+    # The step switches to one at t = 0 and stays there, so the exogenous
+    # contribution at horizon t is the sum of the first min(t+1, q) betas.
+    cumulated = np.cumsum(beta, axis=1)
+    driver = np.empty((n_draw, h + 1))
     for t in range(h + 1):
-        value = 0.0
+        driver[:, t] = cumulated[:, min(t, q - 1)]
+
+    y = np.zeros((n_draw, h + 1 + p))
+    for t in range(h + 1):
+        value = driver[:, t].copy()
         for i in range(p):
-            value += phi[i] * y[t + p - 1 - i]
-        for j in range(q):
-            # The step is one from date 0 onwards, zero before it.
-            if t - j >= 0:
-                value += beta[j]
-        y[t + p] = value
-    return y[p:]
+            value += phi[:, i] * y[:, t + p - 1 - i]
+        y[:, t + p] = value
+    return y[:, p:]
 
 
 @dataclass(frozen=True)
@@ -474,11 +480,8 @@ class NARDLResults:
             paths: dict[str, npt.NDArray[np.float64]] = {}
             for side in ("pos", "neg"):
                 column = f"{base}_{side}"
-                point[side] = _multiplier_path(params, names, column, h, y_prefix)
-                drawn = np.empty((r, h + 1))
-                for i in range(r):
-                    drawn[i] = _multiplier_path(draws[i], names, column, h, y_prefix)
-                paths[side] = drawn
+                point[side] = _multiplier_path(params, names, column, h, y_prefix)[0]
+                paths[side] = _multiplier_path(draws, names, column, h, y_prefix)
             diff_draws = paths["pos"] - paths["neg"]
             block = pd.DataFrame(
                 {

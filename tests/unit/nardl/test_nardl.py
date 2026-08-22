@@ -471,3 +471,63 @@ class TestNoShortRunTerms:
         assert tests.loc[("x", "shortrun_strong"), "decision"] == "unavailable"
         # Les tests de long terme, eux, restent parfaitement definis.
         assert np.isfinite(tests.loc[("x", "longrun_gamma"), "stat"])
+
+
+class TestVectorisedRecursion:
+    """La recursion des multiplicateurs avance tous les tirages ensemble.
+
+    L'implementation naive — une boucle Python par tirage — est la
+    reference : elle est evidemment correcte et evidemment lente. Le
+    verrou est que la version vectorisee lui soit identique, pas
+    seulement proche.
+    """
+
+    @staticmethod
+    def _scalar_path(params, names, column, h, y_prefix):  # type: ignore[no-untyped-def]
+        """Implementation naive, un tirage a la fois."""
+        phi = np.array(
+            [params[i] for i, n in enumerate(names) if n.startswith(f"{y_prefix}.L")]
+        )
+        beta = np.array(
+            [params[i] for i, n in enumerate(names) if n.startswith(f"{column}.L")]
+        )
+        p, q = phi.size, beta.size
+        out = np.zeros(h + 1 + p)
+        for t in range(h + 1):
+            value = 0.0
+            for i in range(p):
+                value += phi[i] * out[t + p - 1 - i]
+            for j in range(q):
+                if t - j >= 0:
+                    value += beta[j]
+            out[t + p] = value
+        return out[p:]
+
+    @pytest.mark.parametrize("order", [(1, 1), (2, 2), (3, 2)])
+    def test_matches_the_naive_loop(self, order: tuple[int, int]) -> None:
+        from pyardl.nardl.model import _autoregressive_prefix, _multiplier_path
+
+        y, x = _asymmetric(seed=98, n=300)
+        res = NARDL(y, x, order=order).fit()
+        names = [str(v) for v in res._ardl_res._param_names]
+        params = np.asarray(res._ardl_res._params, dtype=float)
+        cov = np.asarray(res._ardl_res._cov_params, dtype=float)
+        prefix = _autoregressive_prefix(names)
+
+        draws = np.random.default_rng(5).multivariate_normal(params, cov, size=50)
+        reference = np.array(
+            [self._scalar_path(d, names, "x_pos", 40, prefix) for d in draws]
+        )
+        vectorised = _multiplier_path(draws, names, "x_pos", 40, prefix)
+        assert np.max(np.abs(reference - vectorised)) < 1e-12
+
+    def test_single_vector_returns_one_row(self) -> None:
+        from pyardl.nardl.model import _autoregressive_prefix, _multiplier_path
+
+        y, x = _asymmetric(seed=99, n=300)
+        res = NARDL(y, x, order=(1, 1)).fit()
+        names = [str(v) for v in res._ardl_res._param_names]
+        params = np.asarray(res._ardl_res._params, dtype=float)
+        prefix = _autoregressive_prefix(names)
+        path = _multiplier_path(params, names, "x_pos", 10, prefix)
+        assert path.shape == (1, 11)
