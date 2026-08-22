@@ -32,9 +32,7 @@ import pytest
 from pyardl.nardl import partial_sums
 
 _HERE = Path(__file__).parent
-_EXPECTED = json.loads(
-    (_HERE / "expected" / "spec17.json").read_text(encoding="utf-8")
-)
+_EXPECTED = json.loads((_HERE / "expected" / "spec17.json").read_text(encoding="utf-8"))
 _DATA = _HERE.parents[1] / "validation" / "external" / "spec17_fod.csv"
 
 

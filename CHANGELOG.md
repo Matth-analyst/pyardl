@@ -3,7 +3,11 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/1.1.0/).
 This project follows [semantic versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.4.0] — 2026-08-22
+
+Fourth release. Asymmetric ARDL: responses that differ between rises and
+falls, the tests that decide whether the asymmetry is real, and the
+figure the literature reports.
 
 ### Added — NARDL, asymmetric responses (`pyardl.nardl`)
 
@@ -61,6 +65,20 @@ This project follows [semantic versioning](https://semver.org/).
   2.6% counting the variable, where a genuine two-regressor model is
   correctly sized at 4.8%. With the simulated values, case III lands at
   5.7%. Recorded as OBS-13.
+
+### Infrastructure
+
+- The version now lives in `src/pyardl/__init__.py` and nowhere else.
+  Two copies of a version number always drift eventually.
+- On a tag push, the CI checks that the tag matches the version the
+  built wheel declares. A tag placed without bumping the version
+  produces a mislabelled release that installs and imports perfectly —
+  nothing else would catch it.
+- The dependency-skip guard reads the skip reasons from the run that
+  already happened (`-rs`) instead of re-running the whole suite. It was
+  doing that on each of the nine matrix cells.
+- The package description no longer advertises QARDL, Fourier ARDL or
+  panels, which are not implemented.
 
 ### Validated
 

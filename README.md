@@ -879,10 +879,13 @@ Released:
   regressor diagnostic, conditional/unconditional models, and one VECM
   simulator for every Monte Carlo study.
 
+- **0.4.0** — NARDL: asymmetric long-run and short-run responses, the four
+  symmetry tests, dynamic multipliers with simulated bands, and critical
+  values simulated for the decomposed null.
+
 Planned:
 
-- **0.4** — NARDL (asymmetric) — *implemented, awaiting release*.
-- **0.5+** — Fourier ARDL, dynamic simulations, QARDL, heterogeneous panels
+- **0.5+** — QARDL, Fourier ARDL, dynamic simulations, heterogeneous panels
   (MG, PMG, CS-ARDL).
 
 ---

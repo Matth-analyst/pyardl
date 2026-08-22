@@ -84,11 +84,18 @@ jobs:
       - name: Install (avec extras optionnels)
         run: pip install -e ".[dev,plot,bootstrap]"
 
+      # -rs liste la RAISON de chaque test ignoré, dans cette execution :
+      # inutile de relancer toute la suite une seconde fois pour la lire,
+      # ce que faisait la version precedente sur chacune des neuf
+      # cellules de la matrice.
       - name: Pytest + doctests + couverture
-        run: >
-          pytest -m "not slow"
-          --doctest-modules src/pyardl tests
-          --cov=pyardl --cov-report=term-missing --cov-report=xml
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest -m "not slow" -rs \
+            --doctest-modules src/pyardl tests \
+            --cov=pyardl --cov-report=term-missing --cov-report=xml \
+            2>&1 | tee pytest-output.txt
 
       # Un test ignoré faute de dépendance ne doit jamais passer
       # inaperçu. Les seuls skips tolérés sont ceux qui attendent une
@@ -96,10 +103,9 @@ jobs:
       - name: Aucun test ignoré pour cause de dépendance manquante
         shell: bash
         run: |
-          out=$(pytest -m "not slow" -q -rs 2>&1 || true)
-          if echo "$out" | grep -q "could not import"; then
+          if grep -q "could not import" pytest-output.txt; then
             echo "::error::Des tests ont été ignorés faute d'une dépendance :"
-            echo "$out" | grep "could not import"
+            grep "could not import" pytest-output.txt
             exit 1
           fi
           echo "OK : aucun skip pour dépendance manquante."
@@ -132,11 +138,45 @@ jobs:
         run: python -m build
       - name: Vérifier les métadonnées (rendu PyPI compris)
         run: twine check --strict dist/*
+
+      # CITATION.cff porte une version qui ne peut pas etre dynamique :
+      # c'est un fichier de metadonnees statique. Sans ce controle elle
+      # derive en silence — elle avait deux releases de retard quand on
+      # s'en est apercu.
+      - name: CITATION.cff est a jour
+        run: |
+          python - <<'PY'
+          import re, sys
+          cff = open("CITATION.cff", encoding="utf-8").read()
+          cff_version = re.search(r'^version:\s*(\S+)', cff, re.M).group(1).strip('"')
+          ns = {}
+          exec(open("src/pyardl/__init__.py", encoding="utf-8").read(), ns)
+          if cff_version != ns["__version__"]:
+              print(f"::error::CITATION.cff annonce {cff_version}, "
+                    f"le paquet {ns['__version__']}.")
+              sys.exit(1)
+          print(f"OK : CITATION.cff et le paquet annoncent {cff_version}.")
+          PY
       - name: Installer la roue dans un env vierge et importer
         run: |
           python -m venv /tmp/fresh
           /tmp/fresh/bin/pip install dist/*.whl
           /tmp/fresh/bin/python -c "import pyardl; print('pyardl', pyardl.__version__)"
+
+      # Sur un push d'etiquette : v0.4.0 doit livrer un paquet qui se
+      # declare 0.4.0. Une etiquette posee sans avoir bumpe la version
+      # produit une release mal nommee, et rien d'autre ne le detecte —
+      # le paquet s'installe et s'importe parfaitement.
+      - name: L'etiquette correspond a la version du paquet
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(/tmp/fresh/bin/python -c "import pyardl; print(pyardl.__version__)")
+          echo "etiquette=$tag  paquet=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::L'etiquette $GITHUB_REF_NAME ne correspond pas a la version $pkg."
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: dist

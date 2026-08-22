@@ -5,15 +5,17 @@ message: >-
   (2001) for the bounds test, Kripfganz & Schneider (2020) for the
   response surfaces and p-values, and Narayan (2005) for the
   small-sample bounds. Sources for every shipped critical value are
-  documented in src/pyardl/critical_values/PROVENANCE.md.
+  documented in src/pyardl/critical_values/PROVENANCE.md, and the
+  conventions settled by measurement rather than by reading are recorded
+  in docs/VALIDATION_OBSERVATIONS.md.
 type: software
 title: "pyardl: ARDL models and bounds-test cointegration in Python"
 authors:
   - family-names: Adjoh
     given-names: Komlan Matthania
     email: komlanadjohmatthania@gmail.com
-version: 0.2.0
-date-released: "2026-08-05"
+version: 0.4.0
+date-released: "2026-08-22"
 license: MIT
 repository-code: "https://github.com/Matth-analyst/pyardl"
 keywords:
@@ -23,11 +25,16 @@ keywords:
   - cointegration
   - bounds test
   - error correction model
+  - NARDL
+  - bootstrap
 abstract: >-
   A Python time-series econometrics library for ARDL models: ARDL and
   UECM estimation, Pesaran-Shin-Smith bounds tests for cointegration
   (five deterministic cases, joint F and t decision), multi-source
   critical values with documented provenance (Pesaran, Shin & Smith
   2001 tables, Narayan 2005 small-sample bounds, Kripfganz-Schneider
-  response surfaces with p-values), and a reproducible Monte Carlo
-  simulation engine.
+  response surfaces with p-values), the three-test framework of Sam,
+  McNown & Goh (2019) that names both degeneracies, bootstrap critical
+  values with no inconclusive zone, the nonlinear ARDL of Shin, Yu &
+  Greenwood-Nimmo (2014) with its asymmetric dynamic multipliers, and a
+  reproducible Monte Carlo simulation engine.

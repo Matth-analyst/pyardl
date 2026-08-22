@@ -4,8 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyardl"
-version = "0.3.0"
-description = "Économétrie des modèles ARDL : estimation, bounds tests de cointégration, inférence bootstrap, NARDL/QARDL/Fourier, panels hétérogènes."
+# La version vit dans src/pyardl/__init__.py et NULLE PART AILLEURS.
+# Deux emplacements finissent toujours par diverger, et la CI verifie en
+# plus que l'etiquette git correspond a cette valeur.
+dynamic = ["version"]
+description = "Économétrie des modèles ARDL : estimation, bounds tests de cointégration à trois tests, valeurs critiques tracées, inférence bootstrap et NARDL asymétrique."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -36,6 +39,9 @@ docs = [
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
 ]
+
+[tool.hatch.version]
+path = "src/pyardl/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyardl"]
