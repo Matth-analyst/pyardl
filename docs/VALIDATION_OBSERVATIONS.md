@@ -511,3 +511,84 @@ n'était pas celui attendu : **aucune des deux ne tient sa taille.**
   `validation/spec17_nardl_cv.py`, résultats dans
   `validation/results/spec17_*`.
 - **Statut** : mesurée et corrigée (2026-08-22).
+
+## OBS-14 — Rééchantillonner des lignes détruit la structure intégrée
+
+**Spec 18.** Le test de constance de θ(τ) — le test signature du QARDL —
+a d'abord été livré avec une inférence par bootstrap de blocs sur les
+**lignes** du design, et une référence chi-deux. Mesuré sous une nulle
+homogène, il rejetait **0.5 %** du temps à un seuil nominal de 5 %.
+
+Un test qui ne se déclenche presque jamais n'est pas prudent : il est
+cassé dans la direction que personne ne remarque, parce que rien ne
+paraît anormal quand un test reste silencieux.
+
+- **Hypothèse initiale** : la covariance des m−1 contrastes est estimée
+  sur B tirages ; quand B n'est pas très grand devant m, elle est
+  bruitée, son inverse davantage, et la statistique de Wald devait
+  **sur**-rejeter.
+
+- **RÉFUTÉE par la mesure**, et dans le sens opposé :
+
+  | B | B/(m−1) | taux de rejet |
+  |---|---|---|
+  | 49 | 24 | 0.5 % |
+  | 199 | 100 | 1.0 % |
+
+  Quadrupler le nombre de tirages par contraste ne redresse pas la
+  taille. Si le bruit d'estimation était en cause, il l'aurait redressée.
+  Le problème n'est donc pas le **bruit** de la covariance : c'est son
+  **échelle**.
+
+- **Mesure décisive** : la dispersion des tirages bootstrap du contraste
+  vaut **1.36 fois** la vraie dispersion d'échantillonnage — 0.0437
+  contre 0.0321, cette dernière estimée sur 150 échantillons
+  indépendants. Une covariance 1.85 fois trop grande divise la
+  statistique d'autant, et le test se tait.
+
+- **Mécanisme** : rééchantillonner des lignes du design mélange des
+  blocs d'un régresseur **intégré**. Les blocs préservent la dépendance
+  locale, mais pas la tendance stochastique — et c'est elle qui fait
+  qu'un I(1) est un I(1). Le design bootstrap est plus erratique que le
+  vrai, donc les estimations plus dispersées.
+
+- **Ce qui n'a pas suffi** : recalibrer la statistique contre sa propre
+  distribution bootstrap. Cela porte la taille de 0.5 % à **1.0 %**
+  seulement. Si l'échelle était le seul problème, elle se serait
+  simplifiée entre le numérateur et le dénominateur. Elle ne se simplifie
+  pas : la forme de la loi bootstrap diffère aussi.
+
+- **Correction retenue** : tirer sous la **nulle**, à design **fixe**.
+  Le design n'est pas aléatoire — cette littérature ne le traite pas
+  comme tel — donc seules les innovations sont rééchantillonnées, par
+  blocs, autour de l'ajustement médian. Sous la nulle d'absence de
+  variation quantile, c'est exactement le processus générateur. C'est le
+  principe déjà établi par OBS-8 : simuler sous la nulle testée, pas sous
+  le modèle estimé.
+
+  | calibration | taux de rejet |
+  |---|---|
+  | `null` (retenue) | **3.0 %** |
+  | `mbb` | 1.0 % |
+  | `chi2` | 0.5 % |
+
+- **Ce que cette mesure établit, et ce qu'elle n'établit pas.** Elle
+  établit que la calibration retenue est nettement supérieure aux deux
+  autres — l'écart entre 0.5 % et 3.0 % fait plus d'une erreur type et
+  demie, et il est reproductible. Elle **n'établit pas** que la taille
+  soit correcte : à 200 réplications l'erreur type vaut 1.5 point, donc
+  l'écart entre 3.0 % et 5.0 % ne fait que 1.3 erreur type. Le test
+  reste probablement conservateur, et cela se dit dans la documentation
+  plutôt que de se lire comme une conformité.
+
+- **Conséquence pour les bandes** : celles de θ(τ) proviennent toujours
+  des tirages sur les lignes, donc elles sont **trop larges** dans le
+  même rapport. Une bande trop large sous-estime ce que disent les
+  données — c'est la moins grave des deux erreurs, mais c'en est une, et
+  elle est écrite en clair.
+
+- **Trace** : `validation/spec18_constancy_size.py`,
+  `validation/spec18_calibrations.py`, résultats dans
+  `validation/results/spec18_*`.
+- **Statut** : mesurée, corrigée partiellement, limite résiduelle
+  documentée (2026-08-23).

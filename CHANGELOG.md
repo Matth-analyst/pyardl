@@ -3,6 +3,58 @@
 Format based on [Keep a Changelog](https://keepachangelog.com/1.1.0/).
 This project follows [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added — QARDL, a relation that can differ across the distribution (`pyardl.qardl`)
+
+- `QARDL(y, x, order, taus, asym, case).fit(inference, n_boot, seed)` —
+  the framework of Cho, Kim & Shin (2015). Every parameter, the
+  adjustment speed included, becomes a function of the quantile. The
+  design comes from the same builder as the classical bounds test, so a
+  QARDL at the median and an ARDL are one specification read under two
+  losses.
+- `res.longrun()`, `res.wald_constancy()` (the signature test: is the
+  long run the same at every quantile?), `res.symmetry_test()`,
+  `res.cointegration_test(tau)` with bootstrap critical values,
+  `res.plot_coefficients()`, `res.summary()`.
+- `asym=[...]` composes with the partial-sum decomposition of
+  `pyardl.nardl` — the QNARDL, where the response may differ both
+  between rises and falls and across the distribution.
+- Two inference routes, because they answer different questions: a
+  moving-block bootstrap giving the **joint** law across quantiles
+  (required by the constancy and symmetry tests), and the per-quantile
+  kernel estimator. The joint tests refuse to run on the latter rather
+  than quietly assuming independence between quantiles.
+- `λ(τ)` indistinguishable from zero gives `NaN` and a warning, never a
+  very large number: the long run is a ratio with it in the denominator.
+
+### Measured
+
+- **statsmodels' quantile regression does not reach the optimum at its
+  default tolerance.** Quantile regression is a linear program, so the
+  optimum is exact and any estimate can be scored on the check loss.
+  Scored that way, the default `p_tol=1e-6` misses the loss by up to
+  3.4e-03 and the coefficients by up to 2.6e-02, silently. Raising
+  `max_iter` alone changes nothing; it is the tolerance. The library runs
+  at `p_tol=1e-10`, and every estimate is checked against the
+  linear-programming optimum in the test suite.
+- **Row-resampling breaks integrated regressors.** The constancy test
+  first shipped with a moving-block bootstrap over the rows of the
+  design, and rejected 0.5% of the time at a nominal 5% under a
+  homogeneous null. The expected culprit — a noisy covariance from too
+  few draws — was refuted: quadrupling the draws moved it only to 1.0%.
+  The bootstrap spread is 1.36x the true sampling spread, because
+  shuffling blocks of an I(1) regressor destroys the stochastic trend
+  that defines it. The tests now draw under the **null** with the design
+  held fixed, which brings the rate to 3.0%. That is better, not proven
+  correct: at 200 replications 3.0% sits 1.3 standard errors from 5%.
+  OBS-14 records the whole arc, hypothesis included.
+- When the solver stops on its iteration cap, the warning is earned
+  rather than assumed: the exact optimum is computed and the alert raised
+  only if the gap is real, in which case the exact solution is returned.
+  Measured on nearly collinear designs the cap fires on about one fit in
+  a hundred, with the estimate at the optimum anyway.
+
 ## [0.4.0] — 2026-08-22
 
 Fourth release. Asymmetric ARDL: responses that differ between rises and

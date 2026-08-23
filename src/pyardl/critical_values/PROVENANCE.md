@@ -628,3 +628,47 @@ conservateur.
 modèles dont **tous** les régresseurs sont décomposés. Hors de cette
 grille, `nardl_critical_value` lève une exception et `bounds_test` refuse
 — aucune valeur voisine n'est substituée.
+
+## Régression quantile — le réglage du solveur (spec 18)
+
+**Ce n'est pas une table, c'est un paramètre numérique** — mais il obéit
+à la même exigence : il a été mesuré, pas repris par défaut.
+
+La régression quantile minimise la perte de vérification, qui est un
+programme linéaire. Son optimum est donc **exact**, et n'importe quelle
+estimation peut être notée dessus. Notée ainsi, l'IRLS de `statsmodels`
+échoue à ses réglages d'usine :
+
+| réglage | excès de perte | écart des coefficients |
+|---|---|---|
+| défaut (`p_tol = 1e-6`) | jusqu'à **3.4e-03** | jusqu'à **2.6e-02** |
+| `p_tol = 1e-10` (retenu) | ~1e-6 | ~1e-6 |
+
+Rien ne prévient : l'ajustement rend la main, les nombres semblent
+raisonnables, et ils sont faux de 5 %. Augmenter `max_iter` seul n'y
+change rien — c'est la tolérance qui arrête l'itération trop tôt.
+
+**Validation externe** : `quantreg::rq` (Koenker, méthode `"br"`,
+simplexe de Barrodale-Roberts), exécuté le 2026-08-23 sur le design UECM
+de pyardl appliqué aux données danoises. Script
+`validation/external/spec18_quantreg.R`.
+
+- Notre programme linéaire (HiGHS) contre le simplexe : **1e-13**. Deux
+  solveurs exacts, deux algorithmes sans rapport, la même réponse.
+- Notre estimateur itératif contre la même référence : excès de perte
+  **1.3e-06**, donc à l'optimum à la tolérance retenue.
+
+**Deux tolérances de test, et la raison compte.** Les deux solveurs
+exacts doivent coïncider à la précision machine. L'estimateur itératif,
+lui, ne doit égaler que la **perte** : sur un design à 13 paramètres et
+52 observations, l'argmin n'est pas unique, plusieurs vecteurs
+l'atteignent. Exiger l'égalité des coefficients exigerait une propriété
+que la théorie ne donne pas.
+
+**Le plafond d'itérations** ne condamne pas une estimation. Mesuré sur
+des designs quasi colinéaires, il se déclenche pour environ un
+ajustement sur cent, et l'estimation s'y trouve quand même à l'optimum.
+L'avertissement est donc **gagné** et non présumé : l'optimum exact est
+calculé, l'écart mesuré, l'alerte levée seulement s'il est réel — et
+dans ce cas la solution exacte est renvoyée à la place. Une
+bibliothèque qui crie au loup apprend à ses utilisateurs à l'ignorer.

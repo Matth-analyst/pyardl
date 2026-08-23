@@ -137,17 +137,47 @@ class TestValidation:
 
 
 class TestIterationCap:
-    """Quand le solveur s'arrete sur le compteur et non sur la tolerance."""
+    """Quand le solveur s'arrete sur le compteur et non sur la tolerance.
 
-    def test_hitting_the_cap_warns(self) -> None:
-        """Un arret sur le nombre d'iterations ne prouve rien sur
-        l'optimalite. Le message de la dependance parle de ses internes ;
-        le notre dit ce que l'utilisateur doit en faire."""
+    Mesure prealable : sur un design quasi colineaire, le plafond est
+    atteint pour environ un ajustement sur cent, et l'estimation s'y
+    trouve QUAND MEME a l'optimum (exces de perte 1.1e-06). Avertir a
+    chaque fois serait donc crier au loup. L'avertissement est mesure :
+    l'optimum exact est calcule, compare, et l'alerte n'est levee que si
+    l'ecart est reel.
+    """
+
+    def test_a_cap_hit_at_the_optimum_stays_silent(self) -> None:
+        """Plafond atteint mais estimation correcte : rien a signaler.
+
+        Un seul pas d'IRLS depuis une solution deja optimale s'arrete sur
+        le compteur sans s'en ecarter.
+        """
+        import warnings as _w
+
+        from pyardl.exceptions import PyardlMethodologyWarning
+
+        y, x = _sample(seed=7, n=120, k=3)
+        with _w.catch_warnings(record=True) as caught:
+            _w.simplefilter("always")
+            params, _ = quantile_regression(y, x, 0.5, max_iter=1, cap_tol=1e9)
+        assert not [
+            w for w in caught if issubclass(w.category, PyardlMethodologyWarning)
+        ]
+        assert params.shape == (3,)
+
+    def test_a_cap_hit_away_from_the_optimum_warns_and_corrects(self) -> None:
+        """Plafond atteint ET estimation fausse : on le dit, avec le
+        chiffre, et on renvoie la solution exacte plutot que la mauvaise."""
         from pyardl.exceptions import PyardlMethodologyWarning
 
         y, x = _sample(seed=7, n=200, k=6)
-        with pytest.warns(PyardlMethodologyWarning, match="iteration cap"):
-            quantile_regression(y, x, 0.5, max_iter=1)
+        with pytest.warns(PyardlMethodologyWarning, match="did not reach the optimum"):
+            params, _ = quantile_regression(y, x, 0.5, max_iter=1, cap_tol=1e-9)
+        exact = quantile_regression_lp(y, x, 0.5)
+        assert check_loss(y, x, params, 0.5) == pytest.approx(
+            check_loss(y, x, exact, 0.5), abs=1e-9
+        )
 
     def test_a_normal_fit_does_not_warn(self) -> None:
         import warnings as _w

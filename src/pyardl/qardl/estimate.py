@@ -88,6 +88,7 @@ def quantile_regression(
     tau: float,
     p_tol: float = P_TOL,
     max_iter: int = MAX_ITER,
+    cap_tol: float = 1e-5,
 ) -> tuple[FloatArray, FloatArray]:
     r"""Estimate one quantile regression, at a tolerance that converges.
 
@@ -102,7 +103,13 @@ def quantile_regression(
         Convergence tolerance. The default is **not** the solver's own;
         see the module docstring.
     max_iter : int
-        Iteration cap.
+        Iteration cap. Reaching it does not condemn the estimate: when
+        it happens, the exact optimum is computed and the two compared,
+        so the warning that follows is a measurement rather than a
+        suspicion.
+    cap_tol : float
+        How much excess loss is tolerated before the estimate is
+        replaced by the exact one and the user told.
 
     Returns
     -------
@@ -158,20 +165,33 @@ def quantile_regression(
             fitted = QuantReg(y_arr, x_arr).fit(q=tau, max_iter=max_iter, p_tol=p_tol)
             caught.extend(record)
 
-    if any("Maximum number of iterations" in str(w.message) for w in caught):
-        from pyardl.exceptions import PyardlMethodologyWarning
-
-        warnings.warn(
-            f"The quantile regression at tau={tau:.3f} stopped on its "
-            f"iteration cap ({max_iter}) rather than on its tolerance. The "
-            "estimate may not sit at the optimum; compare it against "
-            "quantile_regression_lp before relying on it.",
-            PyardlMethodologyWarning,
-            stacklevel=2,
-        )
-
     params = np.asarray(fitted.params, dtype=np.float64)
     cov = np.asarray(fitted.cov_params(), dtype=np.float64)
+
+    if any("Maximum number of iterations" in str(w.message) for w in caught):
+        # Stopping on the cap does not by itself mean the estimate is
+        # wrong: measured on nearly collinear designs it happens on about
+        # one fit in a hundred, and the estimate is at the optimum
+        # anyway. So the warning is EARNED rather than assumed — the
+        # exact optimum is computed and the excess loss reported. A
+        # library that cries wolf teaches its users to ignore it.
+        from pyardl.exceptions import PyardlMethodologyWarning
+
+        exact = quantile_regression_lp(y_arr, x_arr, tau)
+        excess = check_loss(y_arr, x_arr, params, tau) - check_loss(
+            y_arr, x_arr, exact, tau
+        )
+        if excess > cap_tol:
+            warnings.warn(
+                f"The quantile regression at tau={tau:.3f} stopped on its "
+                f"iteration cap ({max_iter}) and did not reach the optimum: "
+                f"its loss exceeds the exact one by {excess:.2e}. The "
+                "estimate returned here is the exact solution instead.",
+                PyardlMethodologyWarning,
+                stacklevel=2,
+            )
+            params = exact
+
     return params, cov
 
 

@@ -1,0 +1,98 @@
+{
+  "provenance": {
+    "source": "R 4.6.1, quantreg 6.1, 2026-08-23",
+    "script": "validation/external/spec18_quantreg.R",
+    "data": "validation/external/spec18_design.csv (design UECM de pyardl sur les donnees danoises)",
+    "call": "rq(y ~ X - 1, tau, method='br')"
+  },
+  "why": "Aucun package R n'implemente le QARDL. Ce qui peut etre valide en externe, et c'est le coeur numerique, est la regression quantile elle-meme. quantreg::rq resout par le simplexe de Barrodale-Roberts, donc exactement : c'est la reference de ce calcul depuis Koenker & Bassett (1978).",
+  "tolerance": {
+    "lp_vs_rq": 1e-09,
+    "loss_vs_rq": 0.0001,
+    "note": "Deux tolerances differentes, et la raison compte. Le programme lineaire et le simplexe atteignent tous deux l'optimum exact : ils doivent coincider a la precision machine. L'estimateur iteratif, lui, ne doit egaler que la PERTE \u2014 sur un design a 13 parametres l'argmin n'est pas unique, donc exiger l'egalite des coefficients exigerait quelque chose de faux."
+  },
+  "taus": [
+    0.1,
+    0.25,
+    0.5,
+    0.75,
+    0.9
+  ],
+  "coefficients": {
+    "0.1": {
+      "const": 2.28549309177074,
+      "LRM_L1": -0.415976871817921,
+      "LRY_L1": 0.455683038104824,
+      "IBO_L1": -1.84131541269396,
+      "IDE_L1": 1.81977042559742,
+      "D_LRM_L1": -0.127941877911071,
+      "D_LRM_L2": 0.336482758450918,
+      "D_LRY_L0": 0.55918455180757,
+      "D_IBO_L0": -1.11088472749709,
+      "D_IBO_L1": 1.57009999072624,
+      "D_IBO_L2": 0.255522304629037,
+      "D_IDE_L0": -1.22642770986857,
+      "D_IDE_L1": -1.38083091128827
+    },
+    "0.25": {
+      "const": 2.55651754988865,
+      "LRM_L1": -0.456294265205868,
+      "LRY_L1": 0.503439855350595,
+      "IBO_L1": -1.88372710173519,
+      "IDE_L1": 1.13897040535185,
+      "D_LRM_L1": -0.255415648532455,
+      "D_LRM_L2": 0.169174617295847,
+      "D_LRY_L0": 0.853066544311619,
+      "D_IBO_L0": -0.901384916163722,
+      "D_IBO_L1": 0.361724057509718,
+      "D_IBO_L2": 0.828576963389915,
+      "D_IDE_L0": 0.0021253337218085,
+      "D_IDE_L1": -0.979258998952288
+    },
+    "0.5": {
+      "const": 2.58459035066082,
+      "LRM_L1": -0.453885092737669,
+      "LRY_L1": 0.494820566886605,
+      "IBO_L1": -1.9408707364762,
+      "IDE_L1": 1.24327542715935,
+      "D_LRM_L1": -0.316832723854072,
+      "D_LRM_L2": 0.163337747181817,
+      "D_LRY_L0": 0.824557217818514,
+      "D_IBO_L0": -0.803018515794331,
+      "D_IBO_L1": 0.512506020465139,
+      "D_IBO_L2": 0.707714937833316,
+      "D_IDE_L0": -0.070433734561939,
+      "D_IDE_L1": -0.783768045896664
+    },
+    "0.75": {
+      "const": 2.99316664338802,
+      "LRM_L1": -0.511440078302405,
+      "LRY_L1": 0.544853263104547,
+      "IBO_L1": -2.25156062826823,
+      "IDE_L1": 1.56507927653782,
+      "D_LRM_L1": -0.402468633280315,
+      "D_LRM_L2": 0.131527271172826,
+      "D_LRY_L0": 0.918579686305989,
+      "D_IBO_L0": -0.785526725934167,
+      "D_IBO_L1": 0.783016234752737,
+      "D_IBO_L2": 1.17295201590627,
+      "D_IDE_L0": 0.271519484641631,
+      "D_IDE_L1": -1.31892744422775
+    },
+    "0.9": {
+      "const": 4.160747406588,
+      "LRM_L1": -0.475739486955811,
+      "LRY_L1": 0.29445065556608,
+      "IBO_L1": -2.42772606920099,
+      "IDE_L1": 0.940185107082142,
+      "D_LRM_L1": -0.268265414731065,
+      "D_LRM_L2": 0.259772085899952,
+      "D_LRY_L0": 0.282861131835891,
+      "D_IBO_L0": -1.08069765590589,
+      "D_IBO_L1": 1.31574811135087,
+      "D_IBO_L2": 0.974898596753703,
+      "D_IDE_L0": -0.759776066864081,
+      "D_IDE_L1": -1.39938943977326
+    }
+  }
+}

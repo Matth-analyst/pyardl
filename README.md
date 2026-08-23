@@ -738,6 +738,39 @@ of one series are not two independent I(1) regressors: they correlate at
 simulated for this null, and lands at 5.7%. Full account in OBS-13 and
 [`docs/api/nardl.md`](docs/api/nardl.md).
 
+### QARDL — a relation that can differ across the distribution
+
+```python
+pyardl.qardl.QARDL(y, x, order=(1, 1), taus=..., asym=None, case=3).fit(
+    inference="mbb", n_boot=299, seed=42
+)
+```
+
+An ARDL describes the conditional **mean** — one number, and the wrong
+one whenever the relationship is not the same everywhere in the
+distribution. Cho, Kim & Shin (2015) estimate the same error-correction
+model at a grid of quantiles, so `λ(τ)` and `θ_j(τ)` become functions of
+`τ`, and "does the long run depend on the state of the world?" becomes a
+hypothesis to test.
+
+![QARDL coefficients across quantiles](docs/assets/qardl-coefficients.png)
+
+A flat line says a mean regression would have sufficed. A sloped one
+says it would not — and `res.wald_constancy()` decides which, from the
+**joint** law of the coefficients across quantiles.
+
+**One measurement changed the implementation.** Quantile regression is a
+linear program, so its optimum is exact and any estimate can be scored
+on the check loss. Scored that way, `statsmodels` at its default
+tolerance misses the optimum by up to 3.4e-03 in loss and 2.6e-02 in
+coefficients — silently. `pyardl` runs it at a tolerance that converges
+and checks every estimate against the linear-programming optimum in its
+test suite. Details in [`docs/api/qardl.md`](docs/api/qardl.md).
+
+`asym=[...]` composes with the NARDL decomposition, giving `θ⁺(τ)` and
+`θ⁻(τ)`: a response that may differ both between rises and falls and
+across the distribution.
+
 ### VECM simulator
 
 ```python
@@ -885,7 +918,8 @@ Released:
 
 Planned:
 
-- **0.5+** — QARDL, Fourier ARDL, dynamic simulations, heterogeneous panels
+- **0.5** — QARDL and QNARDL — *implemented, awaiting release*.
+- **0.6+** — Fourier ARDL, dynamic simulations, heterogeneous panels
   (MG, PMG, CS-ARDL).
 
 ---

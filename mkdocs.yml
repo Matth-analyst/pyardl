@@ -23,6 +23,7 @@ nav:
       - Johansen test: api/johansen.md
       - Bootstrap bounds test: api/bootstrap.md
       - NARDL (asymmetric): api/nardl.md
+      - QARDL (quantiles): api/qardl.md
 theme:
   name: material
 markdown_extensions:
