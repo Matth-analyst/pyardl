@@ -5,6 +5,34 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Fourier terms for smooth structural change (`pyardl.fourier`)
+
+- `fourier_terms`, `select_frequency`, `fourier_orthogonality` — the
+  deterministic building block of Becker, Enders & Lee (2006), plus a
+  way to see how far a fractional frequency is from orthogonal to the
+  intercept (at `f = 0.5` on 200 observations, the sine sums to 127
+  rather than 0, so the two share the same variation).
+- `fourier_f_test` — is a smooth deterministic component present at all?
+- `fourier_kpss` — stationarity *around* such a component, the pre-test
+  that tells a drifting mean apart from a unit root.
+
+### Measured
+
+- **A frequency chosen on the data multiplies the size by five.** Under
+  the null the frequency is not identified, so picking the best of a
+  grid is a search, not an estimate. Measured on 2000 replications: 4.8%
+  rejection with the frequency fixed in advance, **24.6%** with it
+  selected, against a nominal 5%. The correct 95% quantile is 5.05 where
+  the tabulated F gives 3.04. Both tests therefore simulate their own
+  critical values with the search inside the loop. OBS-15.
+- **What a Fourier component absorbs, and what it leaves.** The R² of a
+  single frequency on a logistic break tops out at 0.86, not the 0.9 the
+  literature suggests, and the unexplained remainder is persistent
+  enough that a Fourier KPSS still rejects stationarity. Against the
+  plain KPSS, though, the statistic falls by 66% to 83%. The unit test
+  checks that reduction — which is true — rather than a non-rejection
+  that is not. OBS-16.
+
 ### Added — QARDL, a relation that can differ across the distribution (`pyardl.qardl`)
 
 - `QARDL(y, x, order, taus, asym, case).fit(inference, n_boot, seed)` —

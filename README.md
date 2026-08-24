@@ -771,6 +771,32 @@ test suite. Details in [`docs/api/qardl.md`](docs/api/qardl.md).
 `θ⁻(τ)`: a response that may differ both between rises and falls and
 across the distribution.
 
+### Fourier terms — smooth structural change
+
+```python
+pyardl.fourier.fourier_terms(n_obs, freqs)
+pyardl.fourier.fourier_f_test(y, n_sims=2000, seed=42)
+pyardl.fourier.fourier_kpss(y, n_sims=2000, seed=42)
+```
+
+Instead of dating breaks and adding dummies, approximate a moving
+deterministic component by a few low-frequency sinusoids — two
+parameters per frequency, no dates to estimate. The proviso is in the
+word *smooth*: a Fourier component cannot represent a jump.
+
+**Choosing the frequency on the data multiplies the size by five.**
+Under the null the frequency is not identified, so picking the best of a
+grid is a search, not an estimate — the Davies problem. Measured on 2000
+replications: 4.8% rejection with the frequency fixed, **24.6%** with it
+selected, against a nominal 5%. Both tests therefore simulate their own
+critical values with the search inside the loop, and the result says
+which construction it used.
+
+The library also reports what the method *does not* buy: a single
+frequency captures 86% of a logistic break, not 90%, and the persistent
+remainder is enough that a Fourier KPSS still rejects stationarity —
+though at 66–83% below the plain KPSS statistic. OBS-15 and OBS-16.
+
 ### VECM simulator
 
 ```python

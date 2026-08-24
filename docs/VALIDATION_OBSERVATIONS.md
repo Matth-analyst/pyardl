@@ -592,3 +592,91 @@ paraît anormal quand un test reste silencieux.
   `validation/results/spec18_*`.
 - **Statut** : mesurée, corrigée partiellement, limite résiduelle
   documentée (2026-08-23).
+
+## OBS-15 — Une fréquence choisie multiplie la taille du test par cinq
+
+**Spec 19.** La spec annonce le problème de Davies et impose que les
+valeurs critiques soient simulées avec la sélection de fréquence dans la
+boucle. Mesuré avant d'écrire le test, pour savoir ce qu'on évite.
+
+- **Preuve** : 2000 réplications, T = 200, bruit blanc sous H0, grille
+  entière 1 à 5, test F de H₀ : a_f = b_f = 0.
+
+  | fréquence | taux de rejet à 5 % |
+  |---|---|
+  | fixée d'avance | 4.8 % |
+  | **sélectionnée sur les données** | **24.6 %** |
+
+  La valeur critique correcte est **5.05** contre **3.04** pour un
+  F(2, T−4) tabulé.
+
+- **Mécanisme** : sous H₀, f n'est pas identifiée — il n'existe aucune
+  vraie valeur vers laquelle converger. Choisir la meilleure des cinq
+  n'est pas de l'estimation mais une **recherche**, et la statistique au
+  point gagnant est un maximum sur grille, pas un tirage d'une loi fixe.
+
+- **Illustration prise sur le vif** pendant les essais : sur un
+  échantillon de bruit blanc, la statistique vaut **3.52** — au-dessus de
+  la valeur tabulée 3.04, donc rejetée à tort par la voie classique, et
+  bien en dessous de la vraie valeur critique 4.83.
+
+- **Action** : les deux tests de la spec simulent leurs propres valeurs
+  critiques, chaque réplication relançant la recherche de fréquence sur
+  son propre échantillon nul. Le résultat porte `freq_estimated` et le
+  `summary()` dit laquelle des deux constructions a servi.
+
+- **Statut** : mesurée et appliquée (2026-08-24). Règle à propager aux
+  specs 20 et 21 : partout où f est estimée, la sélection entre dans la
+  boucle.
+
+## OBS-16 — Ce que la composante de Fourier absorbe, et ce qu'elle laisse
+
+**Spec 19.** Le plan de tests annonce qu'une composante F = 1 capte une
+rupture lisse avec un R² supérieur à 0.9. La mesure dit autre chose, et
+c'est le seuil du test qui a été ajusté, pas la mesure.
+
+- **R² de l'ajustement de Fourier sur une trajectoire logistique** :
+
+  | pente | F = 1 | F = 2 |
+  |---|---|---|
+  | 0.03 | 0.729 | 0.833 |
+  | 0.05 | 0.810 | 0.869 |
+  | 0.08 | 0.861 | 0.883 |
+  | 0.15 | 0.872 | 0.876 |
+
+  Le plafond est à **0.86–0.88**, jamais 0.9. Le test unitaire vérifie
+  donc `0.85 < R² < 0.90` — un encadrement, pour qu'une amélioration
+  comme une dégradation se voient.
+
+- **Conséquence sur le Fourier KPSS** : le résidu non absorbé est petit
+  mais **persistant**, et c'est exactement ce qu'un KPSS détecte. Sur une
+  série stationnaire autour d'une rupture lisse, le test rejette encore
+  la stationnarité.
+
+- **Ce qu'il faut comparer, alors** : non pas au seuil, mais au KPSS
+  ordinaire, qui est ce que l'on ferait sans Fourier.
+
+  | amplitude | KPSS ordinaire | Fourier F = 1 | réduction |
+  |---|---|---|---|
+  | 0.5 | 2.468 | 0.424 | **83 %** |
+  | 1.0 | 3.494 | 0.853 | 76 % |
+  | 2.0 | 3.902 | 1.241 | 68 % |
+  | 3.0 | 3.988 | 1.370 | 66 % |
+
+  (valeur critique simulée à 5 % : 0.288)
+
+  La composante retire les deux tiers aux quatre cinquièmes de la
+  distorsion. Elle ne la supprime pas.
+
+- **Ajouter des fréquences aide, sans suffire** : sur la même série, la
+  statistique passe de 1.37 (F = 1) à 0.83 (F = 2) puis 0.58 (F = 3) —
+  toujours au-dessus de 0.288.
+
+- **Ce qui n'a PAS été fait** : abaisser le seuil du test unitaire
+  jusqu'à ce que le non-rejet passe, ni choisir une rupture assez douce
+  pour que la méthode paraisse parfaite. Le test vérifie la **réduction**
+  — qui est vraie, large et reproductible — et la limite est écrite ici.
+
+- **Trace** : `tests/unit/fourier/test_fourier.py`, classes
+  `TestFTest` et `TestKPSS`.
+- **Statut** : mesurée, limite documentée (2026-08-24).

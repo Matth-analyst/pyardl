@@ -24,6 +24,7 @@ nav:
       - Bootstrap bounds test: api/bootstrap.md
       - NARDL (asymmetric): api/nardl.md
       - QARDL (quantiles): api/qardl.md
+      - Fourier terms: api/fourier.md
 theme:
   name: material
 markdown_extensions:
