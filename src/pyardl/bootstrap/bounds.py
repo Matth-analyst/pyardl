@@ -441,7 +441,7 @@ def bootstrap_bounds_test(
         y_block, x_block = simulate_paths(
             dgp, block, y0=y_arr[0], x0=x_arr[0], burn_in=burn_in
         )
-        f_block, t_block, i_block, ok = batch_uecm_statistics(
+        f_block, t_block, i_block, _, ok = batch_uecm_statistics(
             y_block, x_block, p_order, q_order, case, conditional
         )
         n_ok = int(ok.sum())

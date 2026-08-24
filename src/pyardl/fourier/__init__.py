@@ -10,6 +10,7 @@ search inside the loop. Skipping that turns a 5% test into a 24.6% one,
 which is measured rather than feared: see :mod:`pyardl.fourier.tests`.
 """
 
+from pyardl.fourier.bounds import FourierBoundsResults, fourier_bounds_test
 from pyardl.fourier.terms import (
     DEFAULT_GRID,
     INTEGER_GRID,
@@ -22,7 +23,9 @@ from pyardl.fourier.tests import FourierTestResults, fourier_f_test, fourier_kps
 __all__ = [
     "DEFAULT_GRID",
     "INTEGER_GRID",
+    "FourierBoundsResults",
     "FourierTestResults",
+    "fourier_bounds_test",
     "fourier_f_test",
     "fourier_kpss",
     "fourier_orthogonality",

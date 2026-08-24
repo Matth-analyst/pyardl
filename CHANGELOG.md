@@ -15,9 +15,31 @@ This project follows [semantic versioning](https://semver.org/).
 - `fourier_f_test` — is a smooth deterministic component present at all?
 - `fourier_kpss` — stationarity *around* such a component, the pre-test
   that tells a drifting mean apart from a unit root.
+- `fourier_bounds_test` — the Fourier-ADL cointegration test of
+  Banerjee, Arčabić & Lee (2017): the UECM augmented with the sinusoids,
+  tested by the left-tailed `t` on the error-correction coefficient. All
+  five deterministic cases; critical values simulated with the frequency
+  search inside the loop; `selection` exposes the whole grid; a pre-test
+  says whether the two extra parameters are buying anything at all.
 
 ### Measured
 
+- **The Fourier-ADL does not recover the power its authors claim for
+  it.** Both tests are correctly sized first (5.0% for the plain bounds
+  test, 3.5% for the Fourier-ADL under two independent random walks, 200
+  replications), so the comparison is fair. Under true cointegration
+  with a smooth logistic break the Fourier-ADL is *behind*: 93 vs 99%
+  with no break, 77 vs 91% at amplitude 3, 59 vs 59% at amplitude 6
+  (150 replications, standard error 3.7 points). A four-configuration
+  scan found every difference within ±5 points. The library ships the
+  test and documents the measurement rather than the claim. OBS-17.
+- **A pre-test read against the wrong null answered yes every time.**
+  The Fourier relevance pre-test initially called `fourier_f_test` on
+  `y`. That test simulates its null on white noise while `y` is
+  integrated, so it declared the terms significant in 100% of
+  replications, break or no break. It now compares two fits of the same
+  model against the null simulated in the same loop: 0% significant with
+  no break, 13% at amplitude 3, 35% at amplitude 6. OBS-18.
 - **A frequency chosen on the data multiplies the size by five.** Under
   the null the frequency is not identified, so picking the best of a
   grid is a search, not an estimate. Measured on 2000 replications: 4.8%

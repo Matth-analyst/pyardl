@@ -797,6 +797,33 @@ frequency captures 86% of a logistic break, not 90%, and the persistent
 remainder is enough that a Fourier KPSS still rejects stationarity —
 though at 66–83% below the plain KPSS statistic. OBS-15 and OBS-16.
 
+### Fourier-ADL — cointegration with a smooth break
+
+```python
+pyardl.fourier.fourier_bounds_test(y, x, case=3, n_sims=2000, seed=42)
+```
+
+The UECM augmented with the sinusoids, tested by the left-tailed `t` on
+the error-correction coefficient (Banerjee, Arčabić & Lee 2017). The
+sinusoids sit in the design, never in the tested vector. Critical values
+are simulated with the frequency search inside the loop, for two reasons
+rather than one: the regressors are integrated *and* the frequency was
+chosen on the data.
+
+**Measured, it does not deliver the power its authors claim.** Both
+tests are correctly sized first — 5.0% for the plain bounds test, 3.5%
+here, under two independent random walks — so the comparison is fair.
+Under true cointegration with a smooth break the Fourier-ADL is behind:
+93 vs 99% with no break, 77 vs 91% at amplitude 3, 59 vs 59% at 6. A
+four-configuration scan found every difference inside the noise. Use it
+when you want the drifting intercept *estimated*, not for free power.
+OBS-17.
+
+A pre-test says whether the two extra parameters are buying anything.
+Its first version answered yes in 100% of replications — it read an
+integrated series against a null simulated on white noise. Corrected, it
+flags 0% with no break and 35% at amplitude 6. OBS-18.
+
 ### VECM simulator
 
 ```python

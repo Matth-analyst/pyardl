@@ -462,10 +462,10 @@ class TestValidation:
         real = mod.batch_uecm_statistics
 
         def flaky(*args, **kwargs):  # type: ignore[no-untyped-def]
-            f_val, t_val, i_val, ok = real(*args, **kwargs)
+            f_val, t_val, i_val, ssr, ok = real(*args, **kwargs)
             ok = ok.copy()
             ok[::10] = False  # une réplication sur dix devient inestimable
-            return f_val, t_val, i_val, ok
+            return f_val, t_val, i_val, ssr, ok
 
         monkeypatch.setattr(mod, "batch_uecm_statistics", flaky)
         y, x = _cointegrated(90, seed=54)
@@ -605,7 +605,7 @@ class TestBatchedEstimator:
         q_tuple = tuple([q] * k)
         names = tuple(f"x{j}" for j in range(k))
 
-        f_batch, t_batch, i_batch, ok = batch_uecm_statistics(
+        f_batch, t_batch, i_batch, _, ok = batch_uecm_statistics(
             y_b, x_b, p, q_tuple, case
         )
         assert ok.all()
@@ -650,7 +650,7 @@ class TestBatchedEstimator:
         x_b = np.cumsum(rng.standard_normal((4, 100, 1)), axis=1)
         # Réplication 2 : régresseur constant -> design singulier.
         x_b[2, :, 0] = 1.0
-        _, _, _, ok = batch_uecm_statistics(y_b, x_b, 1, (1,), 3)
+        *_, ok = batch_uecm_statistics(y_b, x_b, 1, (1,), 3)
         assert not ok[2]
         assert ok[[0, 1, 3]].all()
 

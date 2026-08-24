@@ -55,6 +55,7 @@ def _build_designs(
     q: tuple[int, ...],
     case: int,
     conditional: bool = True,
+    extra: FloatArray | None = None,
 ) -> tuple[FloatArray, FloatArray, list[int], int]:
     """Stack the design matrices of every replication.
 
@@ -119,6 +120,15 @@ def _build_designs(
             cols.append(dx[:, start - i - 1 : n_obs - i - 1, j])
             names.append(f"D.x{j}.L{i}")
 
+    if extra is not None:
+        # Deterministic columns supplied by the caller — Fourier terms,
+        # for instance. They join the design without joining the tested
+        # vector: they are part of the deterministic specification, not
+        # of the level relationship under test.
+        for j in range(extra.shape[2]):
+            cols.append(extra[:, start:, j])
+            names.append(f"det{j}")
+
     design = np.stack(cols, axis=2)
     target = dy[:, start - 1 :]
     tested = [names.index(name) for name in tested_names]
@@ -132,7 +142,8 @@ def batch_uecm_statistics(
     q: tuple[int, ...],
     case: int,
     conditional: bool = True,
-) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray]:
+    extra: FloatArray | None = None,
+) -> tuple[FloatArray, FloatArray, FloatArray, FloatArray, FloatArray]:
     r"""The three bounds-test statistics for a stack of regenerated samples.
 
     Parameters
@@ -148,6 +159,9 @@ def batch_uecm_statistics(
     conditional : bool, default True
         When ``False``, the contemporaneous differences of the
         regressors are excluded — the unconditional form.
+    extra : numpy.ndarray, shape (B, T, m), optional
+        Extra deterministic columns, one plane per replication. They
+        enter the design but never the tested vector.
 
     Returns
     -------
@@ -155,6 +169,9 @@ def batch_uecm_statistics(
         Overall F: all level terms jointly zero.
     t_stat : numpy.ndarray, shape (B,)
         Left-tailed t on the adjustment coefficient.
+    ssr : numpy.ndarray, shape (B,)
+        Residual sum of squares of each fit — what a specification
+        search over the deterministic part is scored on.
     f_indep : numpy.ndarray, shape (B,)
         F of Sam, McNown & Goh (2019): the regressors' levels jointly
         zero. Built on the **same** regenerated samples as the other
@@ -184,7 +201,9 @@ def batch_uecm_statistics(
     stopping the whole run because one regenerated sample degenerated
     would be worse than dropping it and saying so.
     """
-    design, target, tested, lam_pos = _build_designs(y, x, p, q, case, conditional)
+    design, target, tested, lam_pos = _build_designs(
+        y, x, p, q, case, conditional, extra
+    )
     n_rep, n_est, k_par = design.shape
     if n_est <= k_par:
         raise ValueError(
@@ -250,5 +269,6 @@ def batch_uecm_statistics(
         np.asarray(f_stat, dtype=np.float64),
         np.asarray(t_stat, dtype=np.float64),
         np.asarray(f_indep, dtype=np.float64),
+        np.asarray(ssr, dtype=np.float64),
         np.asarray(ok, dtype=bool),
     )

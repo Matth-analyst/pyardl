@@ -680,3 +680,108 @@ c'est le seuil du test qui a été ajusté, pas la mesure.
 - **Trace** : `tests/unit/fourier/test_fourier.py`, classes
   `TestFTest` et `TestKPSS`.
 - **Statut** : mesurée, limite documentée (2026-08-24).
+
+## OBS-17 — Le Fourier-ADL ne récupère pas la puissance annoncée
+
+**Spec 20.** La spec pose que « le test standard perd de la puissance,
+le Fourier la récupère », et demande une étude Monte Carlo comparative.
+Elle a été faite. Elle ne montre pas cela.
+
+- **DGP** : cointégration VRAIE avec une rupture lisse (logistique) dans
+  la constante de la relation de long terme — le cas canonique que la
+  spec décrit. T = 100, λ = −0.15, bruit 0.4, 150 réplications.
+
+  | amplitude de la rupture | bounds standard | Fourier-ADL |
+  |---|---|---|
+  | 0 | 99 % | 93 % |
+  | 3 | 91 % | 77 % |
+  | 6 | 59 % | 59 % |
+
+- **Le contrôle qui rend la comparaison lisible** : sous H₀ (deux
+  marches aléatoires indépendantes, mêmes seeds, T = 100, 200
+  réplications), le test standard rejette à **5.0 %** et le Fourier-ADL
+  à **3.5 %**. Les deux sont donc correctement dimensionnés, le second
+  légèrement conservateur. La comparaison de puissance est équitable :
+  ce n'est pas un test sur-dimensionné qui bat un test honnête.
+
+- **Balayage complémentaire** (80 réplications, erreur type 5.5 points),
+  pour chercher un régime favorable :
+
+  | amplitude | pente | standard | Fourier | écart |
+  |---|---|---|---|---|
+  | 10 | 0.10 | 38 % | 39 % | +1 |
+  | 20 | 0.10 | 25 % | 20 % | −5 |
+  | 10 | 0.30 | 31 % | 36 % | +5 |
+  | 10 | 0.05 | 51 % | 48 % | −4 |
+
+  Tout tient dans le bruit. Aucun régime testé ne donne au Fourier
+  l'avantage annoncé.
+
+- **Mécanisme plausible, et non vérifié** : l'UECM contient déjà une
+  constante, et le mécanisme de correction d'erreur absorbe lui-même un
+  intercept qui se déplace lentement. La lenteur qui rend la rupture
+  « lisse » est précisément ce qui la fait ressembler à la relation de
+  niveau. À cela s'ajoute le prix de l'honnêteté sur la recherche de
+  fréquence : les valeurs critiques simulées avec sélection sont plus
+  exigeantes que celles d'une fréquence fixée, ce qui coûte de la
+  puissance là où le gain est censé venir.
+
+  Cette explication n'a PAS été mesurée. Elle est proposée comme
+  hypothèse, et étiquetée comme telle.
+
+- **Ce qui n'a PAS été fait** : chercher un DGP jusqu'à ce que le gain
+  apparaisse. Le terrain a été calibré sur le test de RÉFÉRENCE — de
+  façon à ce que sa puissance ne sature pas — puis les deux tests y ont
+  été comparés. Un premier essai à λ = −0.4 donnait 100 % des deux
+  côtés ; comparer deux plafonds ne dit rien, et c'est pour cela qu'il a
+  été refait, pas pour changer la réponse.
+
+- **Conséquence livrée** : le test est fourni, correctement dimensionné,
+  avec un pré-test qui dit quand les termes de Fourier ne sont pas
+  significatifs et recommande alors le bounds test ordinaire. La
+  documentation annonce l'équivalence mesurée, pas un gain qui n'a pas
+  été observé.
+
+- **Trace** : `validation/spec20_power.py`, résultats dans
+  `validation/results/spec20_*`.
+- **Statut** : mesurée, annonce de la spec non confirmée (2026-08-24).
+
+## OBS-18 — Un pré-test appliqué à la mauvaise loi nulle
+
+**Spec 20.** Trouvé en lisant les résultats du Monte Carlo ci-dessus :
+le pré-test de pertinence des termes de Fourier se déclarait
+significatif **dans 100 % des réplications, y compris quand la rupture
+était d'amplitude nulle**.
+
+- **Cause** : la première version appelait `fourier_f_test` sur `y`
+  directement. Or la loi nulle de ce test est simulée sur du **bruit
+  blanc**, et `y` est ici **intégrée**. Une statistique F calculée sur
+  une série I(1) et lue contre une loi construite pour du I(0) est
+  toujours énorme : le test ne pouvait que rejeter.
+
+- **Ce qui l'a révélé** : pas une exception, pas un test rouge — une
+  colonne de résultats à 100 % là où on attendait 5 %. Un chiffre
+  impossible dans une sortie qu'on lisait pour autre chose.
+
+- **Correction** : le pré-test devient un F **à l'intérieur du modèle** —
+  le même UECM sans les colonnes de Fourier — et il est lu contre la loi
+  nulle simulée dans la même boucle, sur les mêmes échantillons
+  régénérés. Vérifié après correction : p = 0.58 sans rupture, p =
+  0.0017 avec une rupture d'amplitude 4.
+
+- **Leçon** : une loi nulle simulée n'est valable que pour le monde sous
+  lequel elle a été simulée. Réutiliser un test tout fait sur des
+  données d'une autre nature, c'est réutiliser une table de valeurs
+  critiques hors de sa couverture — la faute que le projet traque
+  partout ailleurs, commise ici par composition de deux briques
+  correctes.
+
+- **Après correction, la colonne mesurée** (150 réplications, T = 100) :
+  0 % de pré-tests significatifs sans rupture, 13 % à une amplitude de 3,
+  35 % à une amplitude de 6. Monotone dans la rupture, nulle quand il
+  n'y en a pas — la forme que la version fausse ne pouvait pas produire.
+  Le niveau reste bas : à T = 100 le pré-test manque une rupture de 6
+  deux fois sur trois. C'est un garde-fou contre la dépense inutile de
+  deux paramètres, pas un détecteur fiable.
+
+- **Statut** : corrigée (2026-08-24).

@@ -25,6 +25,7 @@ nav:
       - NARDL (asymmetric): api/nardl.md
       - QARDL (quantiles): api/qardl.md
       - Fourier terms: api/fourier.md
+      - Fourier-ADL cointegration: api/fourier-adl.md
 theme:
   name: material
 markdown_extensions:
