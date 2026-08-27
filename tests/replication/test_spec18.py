@@ -43,7 +43,11 @@ from pyardl.qardl.estimate import (
 
 _HERE = Path(__file__).parent
 _EXPECTED = json.loads((_HERE / "expected" / "spec18.json").read_text(encoding="utf-8"))
-_DATA = _HERE.parents[1] / "validation" / "external" / "spec18_design.csv"
+# Versionne AVEC le test, pas dans validation/ : ce dossier est
+# gitignore, et le fichier absent faisait planter la CI sur un
+# FileNotFoundError. Le design est celui de pyardl applique aux donnees
+# danoises que la bibliotheque embarque deja : rien de tiers ici.
+_DATA = _HERE / "data" / "spec18_design.csv"
 
 
 def _design() -> tuple[np.ndarray, np.ndarray, list[str]]:

@@ -33,7 +33,25 @@ from pyardl.nardl import partial_sums
 
 _HERE = Path(__file__).parent
 _EXPECTED = json.loads((_HERE / "expected" / "spec17.json").read_text(encoding="utf-8"))
+
+# Le jeu `fod` appartient au package R `nardl` (GPL-3). Il n'est PAS
+# redistribue ici : embarquer une donnee tierce sous GPL-3 dans le depot
+# est une decision de licence, et la spec 22 a refuse exactement cela
+# pour le panel Produc. Le fichier est donc regenere localement par
+# validation/external/spec17_nardl.R, et absent de la CI.
+#
+# Ce test SAUTE alors, explicitement et pour un motif nomme. C'est
+# different du saut silencieux corrige ailleurs : la ou la donnee etait
+# la notre (specs 18, 22, 23) elle a ete versionnee avec le test ; ici
+# elle ne peut pas l'etre sans trancher la licence.
 _DATA = _HERE.parents[1] / "validation" / "external" / "spec17_fod.csv"
+_NO_DATA = pytest.mark.skipif(
+    not _DATA.exists(),
+    reason=(
+        "jeu `fod` du package R nardl (GPL-3), non redistribue dans le "
+        "depot. Regenerer avec: Rscript validation/external/spec17_nardl.R"
+    ),
+)
 
 
 def _rebuild_r_design() -> tuple[np.ndarray, np.ndarray, list[str]]:
@@ -59,6 +77,7 @@ def _rebuild_r_design() -> tuple[np.ndarray, np.ndarray, list[str]]:
 
 
 @pytest.mark.external
+@_NO_DATA
 def test_coefficients_match_r_nardl() -> None:
     design, target, names = _rebuild_r_design()
     assert design.shape[0] == _EXPECTED["n_obs"]
@@ -69,6 +88,7 @@ def test_coefficients_match_r_nardl() -> None:
 
 
 @pytest.mark.external
+@_NO_DATA
 def test_standard_errors_match_r_nardl() -> None:
     design, target, names = _rebuild_r_design()
     beta, *_ = np.linalg.lstsq(design, target, rcond=None)
@@ -82,6 +102,7 @@ def test_standard_errors_match_r_nardl() -> None:
 
 
 @pytest.mark.external
+@_NO_DATA
 def test_decomposition_identity_holds_on_the_real_data() -> None:
     """Le verrou de la spec, verifie sur les donnees de la reference."""
     from pyardl.nardl import decomposition_error
