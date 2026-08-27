@@ -858,3 +858,73 @@ nominal. Il faut les deux ensemble pour sur-rejeter.
   mesure en faveur du cadre a trois tests, pas une supposition.
 
 - **Statut** : mesuree, documentee, signalee a l'utilisateur (2026-08-27).
+
+## OBS-20 — Un intervalle qui devient de plus en plus faux quand on collecte des donnees
+
+**Spec 22.** La spec signale que l'inference du Mean Group vient de la
+dispersion INTER-individus, et que c'est contre-intuitif. La mesure dit
+a quel point, et surtout dans quel SENS — qui n'etait pas celui attendu.
+
+**Couverture d'un intervalle a 95 %** (2000 replications, erreur type
+0.49 point, theta_bar = 0.75, DGP heterogene) :
+
+|      grille | erreur type inter-individus | erreur type naive |
+|-------------|-----------------------------|-------------------|
+| N=20, T=50  |                      95.2 % |            54.0 % |
+| N=20, T=100 |                      94.0 % |            27.3 % |
+| N=50, T=50  |                      94.5 % |            53.1 % |
+| N=50, T=100 |                      95.2 % |            29.2 % |
+
+La bonne construction tient le nominal partout. La naive — agreger les
+erreurs types individuelles, qui existent et sont chacune correcte pour
+son propre theta_i — donne 54 %, puis **27 %**.
+
+- **Ce qui frappe n'est pas qu'elle soit fausse, c'est qu'elle EMPIRE.**
+  Elle est divisee par deux quand T double. Un intervalle faux est une
+  chose ; un intervalle qui se degrade a mesure qu'on collecte des
+  donnees en est une autre, et cette seconde chose demandait une
+  explication mesuree plutot que devinee.
+
+- **Mesure du mecanisme** (300 replications par T, N = 20) :
+
+  |   T | se_between | se_naive | rapport |
+  |-----|------------|----------|---------|
+  |  50 |    0.04813 |  0.01845 |    2.61 |
+  | 100 |    0.04491 |  0.00859 |    5.23 |
+  | 200 |    0.04469 |  0.00415 |   10.76 |
+  | 400 |    0.04462 |  0.00200 |   22.26 |
+
+  `se_between` converge vers une constante non nulle (facteur 0.999
+  entre T = 200 et T = 400) : elle estime la dispersion VRAIE des
+  theta_i, qui est une propriete de la population et ne depend pas de la
+  longueur des series. `se_naive` est divisee par ~2 a chaque
+  doublement.
+
+- **Le rythme est plus rapide que 1/sqrt(T), et c'est le point.** Le
+  facteur observe est 0.483, pas 0.707 : c'est le taux 1/T, la
+  SUPERCONVERGENCE des coefficients de long terme quand les regresseurs
+  sont integres. Le rapport des deux erreurs types croit donc en T, sans
+  borne. La couverture naive ne tend pas vers une mauvaise valeur : elle
+  tend vers **zero**.
+
+- **Pourquoi le piege est bon.** La construction naive n'est pas
+  absurde. Chaque V_i est un estimateur correct de la variance de son
+  propre theta_i, et les agreger ressemble a ce qu'on fait partout
+  ailleurs. Ce qu'elle rate est conceptuel, pas arithmetique :
+  theta_MG n'estime pas un coefficient commun, il estime la MOYENNE
+  d'une distribution de coefficients. Sa variabilite est dominee par le
+  fait que les theta_i different reellement — un fait sur le monde, que
+  plus de donnees mesure mieux sans le faire disparaitre.
+
+**Resultat joint : la non-convergence du pooling, mesuree.** Sur le meme
+DGP, le biais des effets fixes dynamiques ne diminue PAS avec T
+(+0.0242 a T = 50, +0.0273 a T = 100, N = 20 ; erreur type Monte Carlo
+0.0014), et augmenter N ne l'aide pas non plus (+0.0300 a N = 50,
+T = 100). Celui de MG, lui, decroit (-0.0050 puis -0.0026). C'est la
+demonstration chiffree de l'argument de Pesaran-Smith : forcer une
+dynamique commune ne coute pas de l'efficacite, cela coute la
+convergence — et plus de donnees n'y change rien.
+
+- **Statut** : mesuree, documentee (2026-08-28). La bibliotheque
+  n'implemente que la construction inter-individus ; la naive n'existe
+  que dans le script de validation, comme temoin.

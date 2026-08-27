@@ -860,6 +860,36 @@ conservative in every cell (1.70–3.10%), including the one whose
 individual tests over-reject most. Requiring all three to agree
 protects — a measured argument for the framework, not an assumed one.
 
+### Heterogeneous panels — Mean Group
+
+```python
+pyardl.panel.MeanGroup(df, y="y", X=["x"], id="country", time="year",
+                       order=(1, 1)).fit()
+```
+
+The first module that leaves one country behind, and it opens on a
+negative result. Pooling a dynamic panel whose coefficients differ is
+not a bias-for-precision trade: the heterogeneity becomes serial
+correlation correlated with the lagged dependent variable, and pooled
+estimators are **inconsistent even as N and T both grow**. Measured on a
+heterogeneous DGP (2000 replications, Monte Carlo standard error
+0.0014): the dynamic-fixed-effects bias is +0.0242 at T=50 and +0.0273
+at T=100 — it does not shrink — while the Mean Group bias goes from
+−0.0050 to −0.0026.
+
+**The standard error is the counter-intuitive part.** It comes from the
+dispersion *across* individuals, never from pooling the individual
+standard errors. The naive version covers 54% at T=50 and **27%** at
+T=100 against a nominal 95%, while the correct one holds 94–95%. It gets
+worse as T grows because `se_between` converges to a non-zero constant
+while `se_naive` falls at rate 1/T — superconsistency under integrated
+regressors — so the gap grows without bound and naive coverage tends to
+zero. OBS-20.
+
+Cross-validated against `plm::pmg(model="mg")` to 5.6e-16 on the group
+coefficients and 4.9e-17 on the between-individual standard errors, on a
+panel pyardl generates itself from a fixed seed.
+
 ### VECM simulator
 
 ```python

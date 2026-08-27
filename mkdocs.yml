@@ -27,6 +27,7 @@ nav:
       - Fourier terms: api/fourier.md
       - Fourier-ADL cointegration: api/fourier-adl.md
       - Unified analysis: api/unified.md
+      - Heterogeneous panels: api/panel.md
 theme:
   name: material
 markdown_extensions:

@@ -5,6 +5,21 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Heterogeneous panels (`pyardl.panel`)
+
+- `MeanGroup` — the estimator of Pesaran & Smith (1995): one ARDL per
+  individual, then average. Common or per-individual lag orders; mean,
+  median or trimmed aggregation for small N; individual fits kept and
+  addressable; `heterogeneity()` for the spread of the estimates.
+- `panel_from_frame` / `PanelData` — the container specs 22-24 share. It
+  sorts time, refuses to bridge internal gaps or duplicate periods, and
+  records every excluded individual with its reason so the `N` in a
+  results table can always be accounted for.
+- Cross-validated against `plm::pmg(model="mg")` to **5.6e-16** on the
+  group coefficients and **4.9e-17** on the between-individual standard
+  errors, on a panel pyardl generates itself from a fixed seed. A second
+  check on the Produc panel of Munnell (1990) agreed to 4.5e-14.
+
 ### Added — Unified analysis (`pyardl.unified`)
 
 - `cointegration_analysis` — one entry point for the eight
@@ -46,6 +61,23 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Measured
 
+- **An interval that gets more wrong the more data you collect.** The
+  Mean Group standard error comes from the dispersion *across*
+  individuals, not from pooling the individual standard errors. The
+  naive construction is not absurd — each individual variance is correct
+  for its own coefficient — but it covers 54% at T=50 and **27%** at
+  T=100 against a nominal 95% (2000 replications, standard error 0.49
+  point), while the correct one holds 94-95% throughout. The mechanism
+  was measured, not guessed: `se_between` converges to a non-zero
+  constant (factor 0.999 from T=200 to T=400) while `se_naive` halves at
+  every doubling of T — the 1/T rate of superconsistency under
+  integrated regressors, not 1/sqrt(T). The gap grows like T, so the
+  naive coverage tends to zero. OBS-20.
+- **Pooling costs consistency, not efficiency — measured.** On the same
+  heterogeneous DGP the dynamic-fixed-effects bias does not shrink with
+  T (+0.0242 at T=50, +0.0273 at T=100; Monte Carlo standard error
+  0.0014) and raising N does not help (+0.0300 at N=50). The Mean Group
+  bias does shrink (−0.0050 then −0.0026).
 - **The Fourier-ADL does not recover the power its authors claim for
   it.** Both tests are correctly sized first (5.0% for the plain bounds
   test, 3.5% for the Fourier-ADL under two independent random walks, 200

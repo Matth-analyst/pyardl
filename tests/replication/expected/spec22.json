@@ -1,0 +1,50 @@
+{
+  "_provenance": {
+    "spec": "22 (Pesaran & Smith 1995, Mean Group)",
+    "source": "R plm 2.6.7, pmg(model='mg'), R 4.6.1, GPL (>= 2)",
+    "generated": "2026-08-28",
+    "script": "validation/external/spec22_mg_synthetic.R",
+    "log": "validation/results/external_logs/spec22_mg_synthetic.txt",
+    "data": "tests/replication/data/spec22_panel.csv, versionne avec le test. Genere par validation/external/spec22_make_panel.py (graine 20260828) et bit-identique a la copie lue par le script R. Synthetique a dessein : aucune donnee tierce n'est redistribuee. Il est versionne ICI et non dans validation/, qui est gitignore \u2014 un fichier absent aurait transforme ce test de non-regression en skip silencieux.",
+    "design": "ARDL(1,1) with an intercept, y ~ y_l1 + x + x_l1, N=30, T=60",
+    "tolerance": 1e-10,
+    "tolerance_note": "The spec asks for 1e-4. The measured agreement is 5.6e-16, so the contract is set at 1e-10: tight enough that any real change in the aggregation breaks it, loose enough to survive BLAS reordering across platforms.",
+    "independent_check": "Same comparison on the Produc panel (Munnell 1990, 48 US states, T=17), redistributed with plm and therefore NOT shipped here: agreement to 4.5e-14 on all four coefficients and standard errors. Run locally; see the session log."
+  },
+  "n_units": 30,
+  "coefficients": {
+    "const": {
+      "coef": 0.00208827521794022,
+      "se": 0.0121950880858426
+    },
+    "y.L1": {
+      "coef": 0.590208762716391,
+      "se": 0.0140953906915503
+    },
+    "x.L0": {
+      "coef": 0.00302133751064243,
+      "se": 0.00968216758203058
+    },
+    "x.L1": {
+      "coef": 0.2705160733928,
+      "se": 0.0154996547318168
+    }
+  },
+  "longrun": {
+    "x": {
+      "theta": 0.676414160486949,
+      "se": 0.0269062584700376
+    }
+  },
+  "adjustment": {
+    "lambda": -0.409791237283609,
+    "se": 0.0140953906915503
+  },
+  "theta_i_head": {
+    "u00": 0.50599382370081,
+    "u01": 0.768572947796401,
+    "u02": 0.734348074047701,
+    "u03": 0.814818916698124,
+    "u04": 0.749642772055233
+  }
+}
