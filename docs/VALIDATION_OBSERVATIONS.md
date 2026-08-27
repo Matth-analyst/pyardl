@@ -928,3 +928,152 @@ convergence — et plus de donnees n'y change rien.
 - **Statut** : mesuree, documentee (2026-08-28). La bibliotheque
   n'implemente que la construction inter-individus ; la naive n'existe
   que dans le script de validation, comme temoin.
+
+## OBS-21 — Deux implementations divergent : celle qui maximise le mieux a raison
+
+**Spec 23.** La concordance croisee du PMG contre `ardlverse::panel_ardl`
+(qui annonce repliquer xtpmg) a d'abord donne un ecart de **2.7e-07** sur
+theta. C'est petit. C'est le genre d'ecart qu'on met sur le compte de
+l'arithmetique flottante, ou qu'on absorbe en relachant sa propre
+tolerance pour « correspondre a la reference ».
+
+- **Ce qui a empeche cette conclusion** : la log-vraisemblance
+  concentree. Les deux implementations maximisent la MEME fonction, donc
+  elle les classe. A l'estimation de pyardl elle valait
+  -636.177651344722 ; a celle d'ardlverse, -636.177651345552. La
+  reference etait plus BASSE, donc plus loin de son propre maximum.
+
+- **Confirmation** : ardlverse relance avec `tol = 1e-8` au lieu de son
+  defaut `1e-6` converge vers 0.751988369587091, a **6.7e-10** de
+  pyardl, avec une log-vraisemblance identique aux 15 chiffres
+  significatifs. Le desaccord venait entierement de la regle d'arret par
+  defaut de la reference.
+
+- **La lecon, qui est de methode.** Face a un desaccord entre deux
+  implementations, la tentation est de couper la poire en deux, ou de
+  supposer que la reference publiee a raison. Ni l'un ni l'autre n'est
+  une inference. Quand les deux optimisent une fonction objectif
+  explicite, cette fonction tranche — et il faut la CALCULER, pas
+  seulement comparer les coefficients : ici l'ecart sur theta avait
+  l'air d'un accord, c'est la vraisemblance qui a parle.
+
+- **Consequence pratique** : le script de reference fixe explicitement
+  `tol = 1e-10`, avec le motif ecrit a cote. Un defaut de package n'est
+  pas une specification.
+
+---
+
+**Trouve dans la meme session, et plus grave.** La formule de variance du
+PMG que j'avais ecrite d'abord projetait les regresseurs de long terme
+sur les seuls termes de court terme `W_i`, en oubliant que **lambda_i est
+lui aussi estime** et que sa direction de derivee est `xi_i(theta)`. Le
+complement de Schur correct balaie les deux :
+
+    V(theta) = [ somme_i (lambda_i^2 / sigma_i^2) X_i' M_[xi_i, W_i] X_i ]^-1
+
+- **L'erreur type rendue etait ~5 % TROP PETITE.** Dans le mauvais sens :
+  des intervalles trop etroits, des t trop grands, des rejets trop
+  frequents.
+
+- **Aucun test de coherence interne ne l'aurait vue.** Le nombre etait
+  fini, positif, du bon ordre de grandeur, stable, reproductible. Elle a
+  ete attrapee en comparant a la **hessienne numerique de la
+  log-vraisemblance concentree** — c'est-a-dire a la DEFINITION de
+  l'information du profil, calculee independamment de la formule
+  analytique.
+
+- **Apres correction**, la formule reproduit ardlverse a **8e-12**, ce
+  qui confirme aussi que xtpmg utilise bien ce complement de Schur.
+
+- **Le residu de 2 %** entre la formule analytique (information ESPEREE)
+  et la hessienne numerique (information OBSERVEE) n'est pas une erreur :
+  ce sont deux estimateurs asymptotiquement equivalents de la meme
+  variance. Les deux sont exposes (`vcov='expected'` / `'observed'`) et
+  leur couverture est mesuree.
+
+- **Statut** : corrigee et verrouillee par un test qui compare a la
+  hessienne numerique (2026-08-29).
+
+## OBS-22 — Le test d'Hausman dort exactement la ou le PMG a deja echoue
+
+**Spec 23.** Le PMG est l'estimateur de panel ARDL le plus utilise en
+travail applique, et le test d'Hausman est le garde-fou standard qui
+decide s'il est legitime. Les deux ont ete mesures ensemble, sur le meme
+DGP, en faisant varier la dispersion des theta_i (2000 replications,
+N = 25, T = 60, erreur type 0.49 point).
+
+**Sous homogeneite parfaite (theta_sd = 0), le PMG tient ses promesses.**
+
+| theta_sd | biais MG | biais PMG | var MG / var PMG |
+|----------|----------|-----------|------------------|
+| 0.00     |  -0.50 % |  -0.14 %  |            2.41x |
+| 0.10     |  -0.58 % |  +2.55 %  |            0.61x |
+| 0.25     |  -0.12 % | +15.26 %  |            0.36x |
+
+Biais de 0.14 % la ou la spec demandait moins de 1 %, et un gain
+d'efficacite de **2.41x** sur le MG. C'est exactement ce que PSS 1999
+annoncent.
+
+**Puis tout s'effondre, et vite.**
+
+| theta_sd | couverture MG | couverture PMG | rejet d'Hausman |
+|----------|---------------|----------------|-----------------|
+| 0.00     |        93.2 % |         92.3 % |           8.6 % |
+| 0.10     |        93.3 % |     **36.2 %** |          18.6 % |
+| 0.25     |        93.7 % |      **7.3 %** |          59.8 % |
+
+- **A theta_sd = 0.10** — une dispersion de 13 % autour de 0.75, ce qui
+  n'a rien d'extreme pour un panel de pays — le PMG est biaise de
+  2.55 %, son intervalle a 95 % ne couvre plus que **36 %**, et son
+  avantage d'efficacite s'est inverse (0.61x : il est desormais MOINS
+  precis que le MG, en plus d'etre biaise).
+
+- **Et le garde-fou ne se declenche pas.** A cette meme dispersion, le
+  test d'Hausman ne rejette que **18.6 %** du temps. Autrement dit :
+  dans plus de quatre echantillons sur cinq ou le PMG est deja
+  materiellement faux, le diagnostic standard repond « le PMG va bien ».
+  Ce n'est pas une zone grise theorique, c'est le regime ou l'estimateur
+  est utilise.
+
+- **Le MG, lui, ne bouge pas.** Biais entre -0.58 % et -0.12 %,
+  couverture entre 93.2 % et 93.7 %, quelle que soit la dispersion.
+  C'est la difference entre un estimateur convergent et un estimateur
+  efficace-sous-condition, rendue en chiffres.
+
+- **La taille d'Hausman n'est pas exacte non plus** : 8.6 % pour un
+  nominal de 5 % sous homogeneite parfaite, soit 7 erreurs types
+  au-dessus. Le test sur-rejette quand il ne devrait pas, et sous-rejette
+  quand il devrait — les deux erreurs vont dans le sens de rendre son
+  verdict peu informatif.
+
+- **Ce qu'il faut en faire.** Ne pas lire un Hausman non significatif
+  comme un feu vert pour le PMG. La dispersion des theta_i du MG
+  (`res.heterogeneity()`, spec 22) est une information plus directe et
+  qui ne depend d'aucun test : si le coefficient de variation est
+  visible, le PMG est deja en difficulte, que le Hausman le dise ou non.
+  C'est ce que la documentation du module recommande.
+
+**Note de mesure, et elle change une lecture.** Les couvertures
+ci-dessus sont calculees avec la valeur critique NORMALE pour les trois
+estimateurs, afin qu'elles soient comparables entre elles. Mais
+l'intervalle que `MeanGroup` construit REELLEMENT utilise t(N-1), plus
+large d'environ 5 % a N = 25. Mesure separement, sur les memes graines
+et le meme DGP (`validation/spec23_mg_interval.py`) :
+
+| theta_sd | MG, normale | MG, t(N-1) reel |
+|----------|-------------|-----------------|
+| 0.00     |      93.2 % |      **94.5 %** |
+| 0.10     |      93.3 % |      **94.2 %** |
+| 0.25     |      93.7 % |      **94.8 %** |
+
+L'intervalle de la bibliotheque est donc correctement dimensionne — a
+moins de deux erreurs types du nominal partout — la ou la colonne
+normale le faisait paraitre legerement sous-couvrant. C'est exactement
+le genre d'ecart qu'on aurait pu laisser passer en supposant que
+« 93 %, c'est a peu pres 95 % » : le loger dans le protocole de mesure
+plutot que dans l'estimateur demandait de le verifier.
+
+Le PMG, lui, utilise bien la normale, donc sa colonne EST celle de la
+bibliotheque.
+
+- **Statut** : mesuree, documentee (2026-08-29).

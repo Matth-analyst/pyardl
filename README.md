@@ -890,6 +890,40 @@ Cross-validated against `plm::pmg(model="mg")` to 5.6e-16 on the group
 coefficients and 4.9e-17 on the between-individual standard errors, on a
 panel pyardl generates itself from a fixed seed.
 
+### Pooled Mean Group, DFE and Hausman
+
+```python
+pyardl.panel.PMG(df, y="y", X=["x"], id="country", time="year").fit()
+pyardl.panel.compare(df, ...)   # MG / PMG / DFE + Hausman
+```
+
+The middle term between pooling everything and pooling nothing: long-run
+coefficients constrained equal, short-run dynamics free, by concentrated
+maximum likelihood (back-fitting as in `xtpmg`, plus a quasi-Newton path
+that must agree with it).
+
+**Under exact homogeneity it delivers** — bias −0.14% where the spec
+asked for under 1%, and a **2.41x** efficiency gain over MG. **Then it
+breaks, and the guard does not fire.** At a 13% dispersion of the true
+coefficients, PMG is biased +2.55%, its 95% interval covers **36%**, and
+its efficiency advantage has inverted. At that same dispersion the
+Hausman test rejects only **18.6%** of the time: in four samples out of
+five where PMG is materially wrong, the standard diagnostic says it is
+fine. MG meanwhile does not move (coverage 94.2–94.8% throughout). Read
+`mg_res.heterogeneity()` rather than a non-significant Hausman. OBS-22.
+
+Cross-validated against `ardlverse::panel_ardl` (which replicates
+`xtpmg`): PMG `theta` to 1.9e-08, its standard error to 2.1e-10, the
+log-likelihood to 4.1e-12; DFE to 1.1e-16.
+
+That cross-check earned its keep twice. It caught a variance bug — the
+formula projected out only the short-run regressors, forgetting
+`lambda_i` is estimated too, and returned a standard error 5% too small,
+which nothing internal would have flagged. And when the two
+implementations disagreed by 2.7e-07, the concentrated log-likelihood
+ranked them instead of splitting the difference: the reference had
+stopped at its default tolerance. OBS-21.
+
 ### VECM simulator
 
 ```python

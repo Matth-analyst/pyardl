@@ -10,11 +10,27 @@ estimators here own no regression of their own — they orchestrate
 
 from pyardl.panel.container import PanelData, PanelUnit, panel_from_frame
 from pyardl.panel.mg import MeanGroup, MeanGroupResults
+from pyardl.panel.pmg import (
+    DFE,
+    PMG,
+    DFEResults,
+    HausmanResult,
+    PMGResults,
+    compare,
+    hausman,
+)
 
 __all__ = [
+    "DFE",
+    "PMG",
+    "DFEResults",
+    "HausmanResult",
     "MeanGroup",
     "MeanGroupResults",
+    "PMGResults",
     "PanelData",
     "PanelUnit",
+    "compare",
+    "hausman",
     "panel_from_frame",
 ]

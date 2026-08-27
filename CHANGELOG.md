@@ -5,6 +5,25 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Pooled Mean Group, DFE and Hausman (`pyardl.panel`)
+
+- `PMG` — the estimator of Pesaran, Shin & Smith (1999): long-run
+  coefficients pooled, short-run dynamics free, by concentrated maximum
+  likelihood. Back-fitting (as `xtpmg`) and a quasi-Newton path over the
+  same concentrated likelihood, pinned together to 1e-6; iteration log
+  kept; started from `theta_MG`.
+- `DFE` — dynamic fixed effects, for the MG/PMG/DFE table panel papers
+  report. Its `summary()` says it is there for comparison, not as a
+  recommendation.
+- `hausman` / `PMGResults.hausman_vs_mg` — the homogeneity test, with
+  the pseudo-inverse path recorded rather than hidden when the variance
+  difference is not positive definite (1.8% of replications measured).
+- `compare` — MG, PMG and DFE on one panel plus the Hausman verdict.
+- Cross-validated against `ardlverse::panel_ardl` (which replicates
+  Stata's `xtpmg`): PMG `theta` to 1.9e-08, its standard error to
+  2.1e-10, the log-likelihood to 4.1e-12; DFE to 1.1e-16. The spec asks
+  for 1e-3.
+
 ### Added — Heterogeneous panels (`pyardl.panel`)
 
 - `MeanGroup` — the estimator of Pesaran & Smith (1995): one ARDL per
@@ -61,6 +80,28 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Measured
 
+- **The Hausman test is asleep exactly where PMG has already failed.**
+  Under exact long-run homogeneity PMG delivers: bias −0.14% (the spec
+  asked for under 1%) and a **2.41x** efficiency gain over MG. But at a
+  13% dispersion of the true coefficients — unremarkable for a panel of
+  countries — PMG is biased +2.55%, its 95% interval covers **36%**, and
+  its efficiency advantage has inverted to 0.61x. At that same
+  dispersion the Hausman test rejects only **18.6%** of the time: in more
+  than four samples out of five where PMG is materially wrong, the
+  standard diagnostic says it is fine. Its size is not exact either
+  (8.6% against a nominal 5%). MG meanwhile does not move — bias between
+  −0.58% and −0.12%, coverage 94.2–94.8% throughout. 2000 replications,
+  standard error 0.49 point. OBS-22.
+- **Two implementations disagreed; the likelihood settled it.** The PMG
+  cross-check first showed a 2.7e-07 gap on `theta` — small enough to
+  absorb by loosening one's own tolerance. Instead the concentrated
+  log-likelihood was computed at both estimates: it was *lower* at the
+  reference's, which had stopped at its default `tol=1e-6`. Re-run at
+  1e-8 it agrees to 6.7e-10. Separately, the same comparison caught a
+  real bug: the PMG variance formula projected out only the short-run
+  regressors, forgetting that `lambda_i` is estimated too, and returned
+  a standard error 5% too small. Nothing internal would have flagged it;
+  the numerical Hessian of the concentrated likelihood did. OBS-21.
 - **An interval that gets more wrong the more data you collect.** The
   Mean Group standard error comes from the dispersion *across*
   individuals, not from pooling the individual standard errors. The

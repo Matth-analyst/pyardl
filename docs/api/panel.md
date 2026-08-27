@@ -1,4 +1,4 @@
-# Heterogeneous panels — Mean Group
+# Heterogeneous panels — MG, PMG, DFE
 
 `pyardl.panel`
 
@@ -134,7 +134,7 @@ Only the between-individual construction is implemented here. The naive
 one exists nowhere in the library except as a control in the validation
 script.
 
-## Cross-checked against R
+## MG cross-checked against R
 
 The individual ARDL fits were already validated against the R package
 `ARDL` in spec 05. What is new here is the aggregation, and that is
@@ -214,14 +214,229 @@ differ: coefficients from different specifications are not the same
 quantity, and averaging them would produce a number about nothing. The
 long-run `theta` remains comparable, which is why it is still reported.
 
+## Pooled Mean Group — the middle term
+
+`pyardl.panel.PMG`
+
+Pool everything and you lose consistency; pool nothing and you pay for
+it in noise. Pesaran, Shin and Smith (1999) put a third option between
+them, and it is the one applied work actually reaches for: **constrain
+the long-run coefficients to be equal, leave every short-run dynamic
+free.**
+
+```
+Dy_it = lambda_i (y_{i,t-1} - theta' x_{i,t-1})
+        + short-run terms_i + mu_i + e_it
+```
+
+The economics is that long-run relations often come from theory — a
+budget constraint, an arbitrage condition — which applies to everyone,
+while the speed at which each country returns to it plainly does not.
+
+```python
+from pyardl.panel import PMG
+
+res = PMG(df, y="y", X=["x"], id="id", time="t", order=(1, 1)).fit()
+print(res.summary())
+```
+
+```text
+Pooled Mean Group (Pesaran, Shin & Smith 1999) - 25 individuals, 1475 observations
+  method: backfitting, converged in 29 iterations
+  log-likelihood: -636.177651
+  long-run coefficients POOLED; short-run dynamics free
+
+  Long-run coefficients (common)
+                       theta          se         z         p
+    x                 0.7520      0.0065   115.652    0.0000
+
+  Mean adjustment speed: -0.4344 (se 0.0142, between-individual)
+```
+
+### How it is estimated
+
+The likelihood has `k` common parameters and `4N` individual ones, but
+it concentrates. **Given** `theta`, each individual block is an ordinary
+least-squares regression of `Dy_i` on `[xi_i(theta), DW_i]`, where
+`xi_it = y_{i,t-1} - theta'x_{i,t-1}`. **Given** the dynamics, `theta`
+solves one stacked weighted least-squares problem, each individual
+weighted by `lambda_i / sigma_i`. Alternating the two is back-fitting,
+which is what `xtpmg` does; `method='newton'` maximises the same
+concentrated likelihood directly, and a test pins the two together to
+1e-6.
+
+The iteration starts from `theta_MG`, which is consistent under both the
+null and the alternative — so it only ever has to travel the efficiency
+gap, never the whole space. `res.iterations` keeps the log.
+
+### The variance formula, and a bug worth naming
+
+The covariance of `theta` is the Schur complement of the block-arrow
+information matrix:
+
+```
+V(theta) = [ sum_i (lambda_i^2 / sigma_i^2) X_i' M_[xi_i, W_i] X_i ]^-1
+```
+
+**The projection must sweep out `xi_i` as well as `W_i`.** Both
+`lambda_i` and `gamma_i` are estimated, so both derivative directions
+have to go. The first version of this function projected on `W_i` only
+and returned a standard error about **5% too small** — narrow intervals,
+inflated `t`, over-rejection.
+
+Nothing internal would have caught it. The number was finite, positive,
+the right order of magnitude, stable and reproducible. It was caught by
+comparing against the **numerical Hessian of the concentrated
+log-likelihood** — the definition of the profile information, computed
+independently of the formula. After the fix, the formula reproduces
+`ardlverse` to **8e-12**. The test suite keeps that comparison. OBS-21.
+
+`vcov='observed'` exposes the numerical Hessian itself. The two are
+asymptotically equivalent and differ by about 2% here; the default is
+the analytic one because it is what PSS published and what `xtpmg`
+computes, which is what makes the cross-check meaningful.
+
+## What PMG buys — and where it breaks
+
+Measured on 2000 replications, N = 25, T = 60, standard error 0.49
+point, varying the dispersion of the true `theta_i`.
+
+**Under exact homogeneity it delivers what it promises:**
+
+| `theta_sd` | MG bias | PMG bias | var MG / var PMG |
+|---|---|---|---|
+| 0.00 | −0.50% | **−0.14%** | **2.41x** |
+| 0.10 | −0.58% | +2.55% | 0.61x |
+| 0.25 | −0.12% | +15.26% | 0.36x |
+
+A bias of 0.14% where the specification asked for under 1%, and a 2.41x
+efficiency gain over MG. Then it degrades, fast.
+
+**And this is the part to read twice:**
+
+| `theta_sd` | MG coverage | PMG coverage | Hausman rejects |
+|---|---|---|---|
+| 0.00 | 94.5% | 92.3% | 8.6% |
+| 0.10 | 94.2% | **36.2%** | 18.6% |
+| 0.25 | 94.8% | **7.3%** | 59.8% |
+
+At `theta_sd = 0.10` — a 13% dispersion around 0.75, nothing exotic for
+a panel of countries — PMG is biased by 2.55%, its 95% interval covers
+**36%**, and its efficiency advantage has *inverted*: at 0.61x it is now
+less precise than MG as well as biased.
+
+**And the guard does not fire.** At that same dispersion the Hausman
+test rejects only **18.6%** of the time. In more than four samples out of
+five where PMG is already materially wrong, the standard diagnostic
+answers "PMG is fine". That is not a theoretical grey zone; it is the
+regime the estimator is used in.
+
+The Hausman size is not exact either: 8.6% against a nominal 5% under
+perfect homogeneity, seven standard errors high. It over-rejects when it
+should not and under-rejects when it should — both directions make its
+verdict less informative. Recorded as OBS-22.
+
+MG, by contrast, does not move: bias between −0.58% and −0.12%, coverage
+94.2–94.8% throughout. That is the difference between a consistent
+estimator and an efficient-under-a-condition one, in numbers.
+
+**What to do with that.** Do not read a non-significant Hausman as a
+green light for PMG. The dispersion of the MG estimates —
+`mg_res.heterogeneity()` — is more direct and depends on no test at all:
+if the coefficient of variation is visible, PMG is already in trouble
+whether or not Hausman says so.
+
+## The Hausman test
+
+```python
+from pyardl.panel import hausman
+
+result = hausman(mg_res, pmg_res)
+print(result.summary())
+```
+
+```text
+Hausman test, MG versus PMG (Pesaran, Shin & Smith 1999)
+  H0: the long-run coefficients are common across individuals
+      (PMG consistent AND efficient; MG consistent but noisy)
+  H1: they are not (only MG is consistent)
+
+  chi2(1) = 0.0025   p = 0.9603
+  do not reject homogeneity: PMG is consistent and efficient
+```
+
+The variance difference `V(MG) - V(PMG)` is only guaranteed positive
+definite asymptotically, and in finite samples frequently is not — 1.8%
+of replications here. Rather than fail, or return a negative statistic
+without comment, a pseudo-inverse is used, the degrees of freedom become
+its rank, and `used_pseudo_inverse` records the fact so `summary()` can
+say the p-value is indicative.
+
+## The comparison table
+
+```python
+from pyardl.panel import compare
+
+table, hausman_result = compare(df, y="y", X=["x"], id="id", time="t")
+```
+
+```text
+                        theta        se           t
+estimator regressor
+MG        x          0.752359  0.009881   76.140136
+PMG       x          0.751988  0.006502  115.652117
+DFE       x          0.753622  0.008550   88.140645
+```
+
+`DFE` — dynamic fixed effects, everything pooled but the intercepts — is
+included because panel papers report the three side by side, and because
+seeing its bias next to the others is the clearest argument against it.
+Its `summary()` says so rather than presenting it as an option.
+
+## PMG and DFE cross-checked against R
+
+`ardlverse::panel_ardl()` states that it replicates Stata's `xtpmg`,
+which is the reference the specification names; Stata is not available
+here. On a panel pyardl generates itself from a fixed seed:
+
+| quantity | agreement |
+|---|---|
+| PMG `theta` | 1.9e-08 |
+| PMG standard error | 2.1e-10 |
+| PMG adjustment speed | 5.7e-09 |
+| PMG log-likelihood | 4.1e-12 |
+| DFE `theta`, se, `lambda` | 1.1e-16 |
+
+The specification asks for 1e-3.
+
+**One methodological note worth keeping.** The first comparison showed a
+2.7e-07 gap on `theta` — small enough to shrug at, or to absorb by
+loosening one's own tolerance to "match the reference". What prevented
+that was the **concentrated log-likelihood**: both implementations
+maximise the same function, so it ranks them, and it was *lower* at
+`ardlverse`'s estimate than at pyardl's. Re-running the reference at
+`tol=1e-8` instead of its default `1e-6` moved it to within 6.7e-10,
+with identical log-likelihoods.
+
+When two implementations disagree, splitting the difference is not an
+inference, and neither is deferring to the published one. If both
+optimise an explicit objective, compute it — the coefficients alone
+looked like agreement. A package default is not a specification. OBS-21.
+
+## One assumption is doing real work
+
+The likelihood is a product over individuals, which assumes they are
+**independent of each other**. Common shocks — a world cycle, a
+commodity price — break it, and then both MG and PMG are biased.
+Nothing in this module corrects for that, and `summary()` says so rather
+than letting the reader assume it was handled.
+
 ## What comes next
 
-Spec 23 (Pooled Mean Group) constrains the long-run coefficients to be
-equal while leaving the short-run dynamics free — the middle ground
-between this module and full pooling — and adds the Hausman test that
-decides between the two. Spec 24 drops the assumption that individuals
-are independent of each other. Both reuse this container and this
-per-individual loop.
+Spec 24 drops the assumption that individuals are independent of each
+other — the one flagged just above — by approximating the unobserved
+common factors with cross-sectional averages (CS-ARDL, CS-DL). It reuses
+this container and this per-individual loop.
 
 ## References
 
