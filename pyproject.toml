@@ -81,7 +81,12 @@ addopts = "-ra --strict-markers -p no:dash"
 markers = [
     "fast_mc: Monte Carlo rapide (CI), réplications réduites",
     "slow: Monte Carlo complet ou calculs longs (hors CI standard)",
-    "external: nécessite l'exécution d'un script R/Stata externe (valeurs non encore disponibles)",
+    # Ce marqueur ne DÉSELECTIONNE plus rien : la CI et la Definition of
+    # Done lancent `-m "not slow"`, donc ces tests s'exécutent. Il reste
+    # une étiquette de provenance — d'où viennent les valeurs de
+    # référence — et non une exclusion. Un test dont la donnée n'est pas
+    # redistribuable porte en plus un `skipif` explicite (spec 17).
+    "external: valeurs de référence produites par un script R/Stata externe",
     "needs_review: interprétation d'une spec ambiguë en attente de revue (voir docs/QUESTIONS.md)",
 ]
 
