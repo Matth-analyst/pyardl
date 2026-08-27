@@ -824,6 +824,42 @@ Its first version answered yes in 100% of replications — it read an
 integrated series against a null simulated on white noise. Corrected, it
 flags 0% with no break and 35% at amplitude 6. OBS-18.
 
+### Unified analysis — the whole matrix, one entry point
+
+```python
+pyardl.unified.cointegration_analysis(y, x, asym=["oil"], fourier={"k": 1},
+                                      inference="bootstrap")
+```
+
+Applied work in 2026 rarely runs a plain bounds test: it runs one with a
+smooth-break correction, an asymmetric decomposition and bootstrap
+critical values. Three switches, eight configurations, one call. The
+module owns no estimator — each cell delegates to the brick validated
+for it, and its one real job is giving each cell the critical values
+that cell requires. The combination with no validated non-bootstrap
+source **raises** instead of borrowing a neighbouring table.
+
+The bootstrap engine is pinned to the brick it generalises: with the
+extras switched off it reproduces `bootstrap_bounds_test` to machine
+precision on the same seed (largest difference 1.4e-14, all nine
+critical values identical).
+
+**Combining features is not free, and not in the way expected.** Size
+under a true null, 2000 replications, nominal 5%, standard error 0.49
+point: the decomposition does *not* distort (5.30 / 5.85 / 4.35), but
+the Fourier terms do — 7.10 / 7.50 with them, 7.35 / 8.50 with both. An
+arbitration on 2000 replications per arm shows neither half causes it
+alone: the search is re-run inside the bootstrap, but the null DGP was
+estimated *conditional on the frequency the search had already won*.
+Putting a selection step inside the loop is not enough if the world you
+simulate from has already been fitted to its outcome. The call warns and
+names the correctly sized alternative. OBS-19.
+
+One result worth keeping: the three-test joint classification stays
+conservative in every cell (1.70–3.10%), including the one whose
+individual tests over-reject most. Requiring all three to agree
+protects — a measured argument for the framework, not an assumed one.
+
 ### VECM simulator
 
 ```python

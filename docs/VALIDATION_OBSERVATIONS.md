@@ -785,3 +785,76 @@ significatif **dans 100 % des réplications, y compris quand la rupture
   deux paramètres, pas un détecteur fiable.
 
 - **Statut** : corrigée (2026-08-24).
+
+## OBS-19 — Recalibrer la recherche ne suffit pas si le monde simule a deja ete ajuste
+
+**Spec 21.** La couche d'unification permet enfin de poser une question
+qu'aucune spec anterieure ne pouvait poser : chaque brique a ete mesuree
+correctement dimensionnee SEULE, mais que fait leur COMBINAISON ?
+
+**La mesure** (2000 replications, T = 100, H0 vraie, erreur type 0.49
+point, bande a 2 ET = [4.03 %, 5.97 %]) :
+
+|             case | F_overall | t_BDM | F_indep | conjointe |
+|------------------|-----------|-------|---------|-----------|
+| ardl             |     6.15 %|5.45 % |  5.50 % |    1.70 % |
+| nardl            |     5.30 %|5.85 % |  4.35 % |    2.05 % |
+| ardl+fourier     |     7.10 %|7.50 % |  4.90 % |    2.10 % |
+| nardl+fourier    |     7.35 %|8.50 % |  5.05 % |    3.10 % |
+
+- **L'hypothese naturelle est fausse.** On attendait que les distorsions
+  se composent, donc que la decomposition contribue. Elle ne contribue
+  pas : la ligne `nardl` est au nominal sur les trois statistiques. Tout
+  vient des termes de Fourier.
+
+- **Et ce resultat contredit la spec 20**, qui avait mesure le
+  Fourier-ADL a 3.5 % — SOUS-rejet — avec la recherche dans la boucle.
+  Deux protocoles, deux verdicts opposes sur le meme ingredient.
+
+**L'arbitrage** (meme protocole, 2000 replications par bras) :
+
+|                                   bras | F_overall | t_BDM |
+|----------------------------------------|-----------|-------|
+| recherchee, termes dans le DGP nul     |    7.10 % |7.50 % |
+| frequence fixee f = 1                  |    5.50 % |5.35 % |
+| frequence fixee f = 2                  |    4.85 % |4.85 % |
+| recherchee, termes RETIRES du DGP nul  |    5.55 % |5.60 % |
+
+**Ni l'une ni l'autre moitie ne suffit.** Retirer la recherche ramene au
+nominal. Retirer la composante de Fourier du modele nul ramene au
+nominal. Il faut les deux ensemble pour sur-rejeter.
+
+- **Mecanisme.** Le bootstrap re-lance bien la recherche dans chaque
+  replication : la recherche, prise seule, est recalibree — c'est la
+  lecon d'OBS-15, correctement appliquee. Ce qui ne l'est pas, c'est que
+  le DGP nul a ete estime **conditionnellement a la frequence que la
+  recherche avait deja gagnee**. Ses coefficients de Fourier absorbent
+  la composante ajustee sur l'echantillon observe, bruit compris. Les
+  chemins regeneres portent donc une onde taillee pour cet echantillon,
+  et chaque replication re-cherche sur des chemins ou la bonne frequence
+  est deja presente et facile a trouver. Leurs statistiques sont
+  systematiquement moins extremes que celle observee, dont l'avantage
+  venait d'avoir ajuste du bruit que les replications heritent comme
+  signal.
+
+- **La lecon, plus large que le cas.** Mettre une etape de selection
+  dans la boucle bootstrap ne suffit pas a la calibrer. Il faut aussi
+  que le monde depuis lequel on simule n'ait pas deja ete ajuste au
+  resultat de cette selection. La spec 19 avait etabli la premiere
+  moitie de la regle ; la seconde n'apparait que quand on compose.
+
+- **Ce qui a ete fait.** La combinaison est conservee — elle est ce que
+  la litterature appliquee utilise — mais elle emet desormais un
+  `PyardlMethodologyWarning` qui donne le chiffre mesure et nomme la
+  sortie correctement dimensionnee (frequence explicite). La route a
+  valeurs critiques simulees de la spec 20 n'est PAS concernee et ne
+  porte pas l'avertissement.
+
+- **Un resultat secondaire qui compte.** La classification conjointe
+  reste conservatrice partout (1.70 % a 3.10 %), y compris dans la case
+  qui sur-rejette le plus. La conjonction des trois tests de
+  Sam-McNown-Goh absorbe la sur-rejection individuelle : exiger l'accord
+  des trois protege, au prix d'une puissance moindre. C'est un argument
+  mesure en faveur du cadre a trois tests, pas une supposition.
+
+- **Statut** : mesuree, documentee, signalee a l'utilisateur (2026-08-27).

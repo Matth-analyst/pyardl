@@ -26,6 +26,7 @@ nav:
       - QARDL (quantiles): api/qardl.md
       - Fourier terms: api/fourier.md
       - Fourier-ADL cointegration: api/fourier-adl.md
+      - Unified analysis: api/unified.md
 theme:
   name: material
 markdown_extensions:

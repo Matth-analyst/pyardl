@@ -5,6 +5,28 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Unified analysis (`pyardl.unified`)
+
+- `cointegration_analysis` — one entry point for the eight
+  configurations of the ARDL matrix: linear or asymmetric, with or
+  without Fourier terms, tabulated/simulated bounds or joint-null
+  bootstrap. The module owns no estimator of its own; each cell
+  delegates to the brick validated for it.
+- `resolve_critical_values` — the rule that justifies the module,
+  centralised and testable: which critical-value source each cell
+  requires, and a one-sentence reason quotable in a methods section.
+  The one combination with no validated non-bootstrap source
+  (asymmetric decomposition *and* Fourier terms under
+  `inference='bounds'`) **raises** rather than borrowing a neighbouring
+  table.
+- `UnifiedResults.compare()` — the robustness table applied papers
+  publish: the same relationship across sibling cells, with unavailable
+  cells reported rather than silently dropped.
+- The bootstrap route is one engine for every cell. It is pinned to the
+  brick it generalises: with the decomposition and Fourier terms off it
+  reproduces `bootstrap_bounds_test` to machine precision on the same
+  seed (largest difference 1.4e-14; all nine critical values identical).
+
 ### Added — Fourier terms for smooth structural change (`pyardl.fourier`)
 
 - `fourier_terms`, `select_frequency`, `fourier_orthogonality` — the
