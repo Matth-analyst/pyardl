@@ -49,8 +49,7 @@ jobs:
     timeout-minutes: 10
     # Le typage est une propriété statique, pas un comportement
     # d'exécution : il est vérifié une fois, sur une version fixée, et
-    # non répété sur toute la matrice. Cela évite aussi que la CI dépende
-    # de la version de stubs que chaque Python résout.
+    # non répété sur toute la matrice.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -59,6 +58,19 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: pip install -e ".[dev]"
+      # mypy et numpy sont ÉPINGLÉS ici, et c'est délibéré. Ce job avait
+      # déjà pour intention affichée de ne pas dépendre des versions de
+      # stubs résolues, mais il ne fixait que Python : le 2026-08-28 une
+      # publication de numpy (2.5, où indexer `.shape` rend `Any`) a fait
+      # échouer `main` sans le moindre changement de code.
+      #
+      # Une CI verte doit vouloir dire « ce code est correct », pas « les
+      # stubs publiés aujourd'hui sont d'accord avec lui ». Monter ces
+      # versions est donc un acte volontaire, fait dans un commit qui
+      # corrige ce que la nouvelle version signale — et reproductible en
+      # local par la même commande.
+      - run: pip install "mypy==2.3.1" "numpy==2.5.2"
+      - run: mypy --version && python -c "import numpy; print('numpy', numpy.__version__)"
       - run: mypy src/pyardl
 
   test:

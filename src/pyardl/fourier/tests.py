@@ -148,7 +148,12 @@ def _f_statistic(y: FloatArray, freq: float, trend: bool) -> float:
     resid1 = y - full @ np.linalg.lstsq(full, y, rcond=None)[0]
     ssr0 = float(resid0 @ resid0)
     ssr1 = float(resid1 @ resid1)
-    dof = n_obs - full.shape[1]
+    # int() sur l'element de shape : sous les stubs numpy >= 2.5,
+    # indexer `.shape` rend Any, ce qui contamine `dof` puis toute
+    # l'expression de retour et fait echouer mypy --strict sur un
+    # "Returning Any". Le cast fixe le type a la source plutot que
+    # d'envelopper le retour.
+    dof = n_obs - int(full.shape[1])
     if ssr1 <= 0 or dof <= 0:  # pragma: no cover - degenerate design
         return float("nan")
     return ((ssr0 - ssr1) / 2.0) / (ssr1 / dof)
