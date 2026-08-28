@@ -46,8 +46,50 @@ def _dgp_no_cointegration(
     )
 
 
+def _sm_bounds_statistic(sm_bt: object) -> float:
+    """La statistique F de statsmodels, quelle que soit sa version.
+
+    `BoundsTestResult` a ete renomme entre statsmodels 0.14 et 0.15 :
+    `stat` -> `statistic`, `crit_vals` -> `critical_values`,
+    `p_values` -> `pvalue`. Le projet declare `statsmodels>=0.14`, donc
+    les deux doivent fonctionner, et lire un seul des deux noms ferait
+    dependre la suite de la version que l'environnement resout — c'est
+    exactement ce qui a fait echouer la CI macOS le 2026-08-28 pendant
+    que Linux et Windows restaient verts sur 0.14.
+
+    Le module `statsmodels.tsa.ardl.pss_critical_values`, lui, n'a PAS
+    change (`crit_vals`, `large_p`, `small_p`, `stat_star` sont
+    intacts) : verifie sous 0.15, donc `pyardl.critical_values.ks2020`
+    et les tests qui en dependent ne sont pas concernes.
+    """
+    for name in ("statistic", "stat"):
+        if hasattr(sm_bt, name):
+            return float(getattr(sm_bt, name))
+    raise AttributeError(
+        f"BoundsTestResult n'expose ni 'statistic' ni 'stat' : "
+        f"{[a for a in dir(sm_bt) if not a.startswith('_')]}"
+    )
+
+
 class TestStatsmodelsConcordance:
     """Spec 10 §7.3 : mêmes F que statsmodels UECM.bounds_test, 5 cas."""
+
+    def test_the_accessor_finds_the_statistic(self) -> None:
+        """Le lecteur de version doit trouver la statistique ici, et
+        refuser bruyamment sur un objet qui n'en porte aucune — sans
+        quoi il pourrait masquer un renommage futur au lieu de le
+        signaler."""
+
+        class Sm014:
+            stat = 3.0
+
+        class Sm015:
+            statistic = 3.0
+
+        assert _sm_bounds_statistic(Sm014()) == 3.0
+        assert _sm_bounds_statistic(Sm015()) == 3.0
+        with pytest.raises(AttributeError, match="ni 'statistic' ni 'stat'"):
+            _sm_bounds_statistic(object())
 
     @pytest.mark.parametrize("case", [1, 2, 3, 4, 5])
     def test_f_stat_matches_statsmodels(self, case: int) -> None:
@@ -60,7 +102,7 @@ class TestStatsmodelsConcordance:
         trend = {1: "n", 2: "c", 3: "c", 4: "ct", 5: "ct"}[case]
         sm_fit = SM_UECM(y, lags=p, exog=x, order={"x0": q}, trend=trend).fit()
         sm_bt = sm_fit.bounds_test(case=case)
-        assert res.f_stat == pytest.approx(sm_bt.stat, abs=1e-8)
+        assert res.f_stat == pytest.approx(_sm_bounds_statistic(sm_bt), abs=1e-8)
 
 
 class TestThreeStateDecision:
