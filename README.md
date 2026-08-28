@@ -178,6 +178,24 @@ in-house Monte Carlo engine. See [Validation](#validation).
 
 ## The workflow
 
+The condensed version is below. The full sequence — with the *why* of
+each step, the common error, and every code block executed in CI — is
+in **[docs/workflow.md](docs/workflow.md)**, which runs end to end on
+Danish money demand in six seconds. Its companions:
+
+- **[Common mistakes](docs/common-mistakes.md)** — six errors that recur
+  in published applications, each shown running with the number it
+  produces.
+- **[Glossary](docs/glossary.md)** — the vocabulary in English and
+  French, with the notation.
+
+Every `>>>` block in those pages is executed in CI. A documentation that
+is not run drifts in silence, and its numbers look exactly like correct
+ones: writing the mistakes page I invented the table comparing the five
+deterministic cases, and the doctest rejected it within the minute. The
+real spread is wider than the invention — `F` runs from **0.71 to 6.79**
+across the cases on the same data and the same lag orders.
+
 ### Step 0 — Screen for I(2)
 
 The bounds test tolerates a mix of I(0) and I(1). It is **invalid if any series

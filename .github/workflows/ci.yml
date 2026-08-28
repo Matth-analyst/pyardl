@@ -117,12 +117,21 @@ jobs:
       # Un resume qui tait ce qui a echoue est pire qu'absent : il a
       # l'air complet. `-ra` liste toutes les issues non passantes,
       # echecs compris, avec leur raison.
+      # `docs` est dans les cibles : les blocs `>>>` des vignettes sont
+      # EXECUTES en CI (--doctest-glob=*.md, dans pyproject.toml). Une
+      # documentation non executee derive en silence, et ses chiffres ont
+      # exactement l'air de chiffres justes — c'est ce qui a fait
+      # inventer, puis rejeter dans la minute, le tableau des cinq cas
+      # deterministes de docs/common-mistakes.md.
+      #
+      # Les pages sans ligne `>>>` ne sont pas collectees : le reglage
+      # n'impose rien aux pages de prose.
       - name: Pytest + doctests + couverture
         shell: bash
         run: |
           set -o pipefail
           pytest -m "not slow" -ra \
-            --doctest-modules src/pyardl tests \
+            --doctest-modules src/pyardl tests docs \
             --cov=pyardl --cov-report=term-missing --cov-report=xml \
             2>&1 | tee pytest-output.txt
 
@@ -206,7 +215,7 @@ jobs:
       # d'echec sans rapport avec la question posee — le code
       # fonctionne-t-il sur ses planchers ?
       - name: Pytest + doctests
-        run: pytest -m "not slow" -ra --doctest-modules src/pyardl tests
+        run: pytest -m "not slow" -ra --doctest-modules src/pyardl tests docs
 
   package:
     name: Paquet (build + métadonnées)

@@ -46,6 +46,7 @@ and a one-sentence reason you can quote in a methods section:
 >>> source, reason = resolve_critical_values(False, True, "bounds")
 >>> source
 'simulated_fourier'
+
 ```
 
 **The refused cell is the point.** There is no published table for an

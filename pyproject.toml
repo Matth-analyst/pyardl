@@ -77,7 +77,16 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
-addopts = "-ra --strict-markers -p no:dash"
+# --doctest-glob="*.md" : les blocs `>>>` des vignettes de docs/ sont
+# EXECUTES, pas seulement relus. Spec 28 §3 le demande, et la raison est
+# concrete : en ecrivant docs/common-mistakes.md j'ai invente le tableau
+# comparant les cinq cas deterministes ; le doctest l'a refuse dans la
+# minute. Une doc non executee derive en silence, et ses chiffres ont
+# exactement l'air de chiffres justes.
+#
+# Les pages sans ligne `>>>` ne sont simplement pas collectees : le
+# reglage n'impose rien aux pages de prose.
+addopts = "-ra --strict-markers -p no:dash --doctest-glob=*.md"
 markers = [
     "fast_mc: Monte Carlo rapide (CI), réplications réduites",
     "slow: Monte Carlo complet ou calculs longs (hors CI standard)",

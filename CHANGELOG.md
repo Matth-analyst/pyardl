@@ -5,6 +5,30 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Documentation as tested code
+
+- **`docs/workflow.md`** — the complete methodological sequence on
+  Danish money demand: integration orders, no-cointegration-among-x,
+  order selection, the three-test bounds procedure, the long run and
+  adjustment speed, stability, and three robustness routes. Runs
+  end-to-end in 6 s (the specification allows 60).
+- **`docs/common-mistakes.md`** — six errors recurring in applied work,
+  each *shown running* with the number it produces, and what the API
+  does to make committing it deliberate rather than accidental.
+- **`docs/glossary.md`** — English/French vocabulary and notation, with
+  the two degeneracies distinguished precisely and the two terms this
+  project uses deliberately ("inconclusive", "classification").
+- Multiple-threshold asymmetries (Greenwood-Nimmo et al.) documented as
+  user code on `partial_sums`, with the deterministic-drift caveat — no
+  dedicated API in this version, deliberately.
+- **The documentation is now executed in CI.** `--doctest-glob=*.md`
+  runs every `>>>` block in `docs/`; pages without one are simply not
+  collected. This is not ceremony: writing `common-mistakes.md` I
+  invented the table comparing the five deterministic cases, and the
+  doctest rejected it within the minute. The real spread is wider than
+  what I made up — `F` runs from 0.71 to 6.79 across the cases on the
+  same data.
+
 ### Added — Cross-sectional dependence (`pyardl.panel`)
 
 - `CSARDL` / `CSDL` — the estimators of Chudik & Pesaran (2015, 2016).

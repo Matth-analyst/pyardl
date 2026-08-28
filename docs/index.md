@@ -21,6 +21,12 @@ print(res.summary())
 
 - **[Getting started](getting-started.md)** — from a dataset to a
   defensible conclusion, step by step.
+- **[The complete workflow](workflow.md)** — the whole methodological
+  sequence on Danish money demand, every code block executed in CI.
+- **[Common mistakes](common-mistakes.md)** — six errors that recur in
+  published applications, each one shown running.
+- **[Glossary](glossary.md)** — the vocabulary in English and French,
+  with the notation.
 - **[ARDL estimation](api/ardl.md)** — fitting, order selection,
   general-to-specific reduction.
 - **[Bounds test](api/bounds.md)** — the five deterministic cases, the
