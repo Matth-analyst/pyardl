@@ -8,7 +8,8 @@
 
 **ARDL models, bounds tests for cointegration, and critical values you can trace back to their source.**
 
-[![CI](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml/badge.svg)](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml)
+[![CI](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml?query=event%3Apush)
+[![Monte Carlo nightly](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml?query=event%3Aschedule)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 

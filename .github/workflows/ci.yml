@@ -13,11 +13,23 @@ on:
 permissions:
   contents: read
 
-# Une seule exécution par branche : un push qui en suit un autre annule
-# le précédent au lieu de faire la queue.
+# Une seule exécution par branche ET PAR DECLENCHEUR.
+#
+# `github.event_name` fait partie du groupe, et ce n'est pas un detail
+# de forme. Sans lui, le run nocturne (`schedule`) et un push sur main
+# partagent le groupe `CI-refs/heads/main` : avec
+# `cancel-in-progress: true`, tout push pendant les Monte Carlo complets
+# ANNULE le nightly en cours. Celui-ci dure jusqu'a 3 heures, et un run
+# annule ne produit aucun resultat — ce qui explique qu'il n'ait jamais
+# rien rapporte sur ce depot, ou les pushes sont frequents.
+#
+# `cancel-in-progress` est en outre desactive pour `schedule` : deux
+# pushes qui se suivent doivent bien s'annuler (c'est l'intention
+# d'origine), mais un run nocturne ne doit jamais l'etre, ni par un
+# autre nightly ni par quoi que ce soit d'autre.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 env:
   FORCE_COLOR: "1"
@@ -282,11 +294,29 @@ jobs:
       # --strict transforme tout lien mort ou page orpheline en erreur.
       - run: mkdocs build --strict
 
+  # Monte Carlo complets. DEUX choses l'empechaient d'aboutir, et les
+  # deux sont corrigees ici et dans le bloc `concurrency` ci-dessus.
+  #
+  # 1. Il etait ANNULE par les pushes (voir `concurrency`).
+  #
+  # 2. Il ne tenait pas dans son budget. Mesure du 2026-08-28 :
+  #    `test_full_pss_crosscheck_slow` fait a lui seul 110 appels a
+  #    simulate_bounds a n_sims=100 000 et T=1000, soit ~68 minutes sur
+  #    une machine locale — et un runner GitHub est deux a trois fois
+  #    plus lent sur ce type de calcul. Ce test seul pouvait donc
+  #    depasser les 170 minutes allouees a pytest, avant meme les seize
+  #    autres.
+  #
+  #    Le budget passe a 350 minutes (le maximum d'un runner heberge est
+  #    de 6 heures). Augmenter le temps plutot que reduire n_sims est
+  #    delibere : la taille du Monte Carlo est un choix statistique fixe
+  #    par la spec 12, pas une variable d'ajustement pour faire entrer
+  #    un job dans une fenetre.
   nightly-slow:
     name: Monte Carlo complets (nightly)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -312,7 +342,7 @@ jobs:
         run: >
           pytest -m slow -v -ra --durations=20
           --junit-xml=slow-results.xml
-        timeout-minutes: 170
+        timeout-minutes: 340
 
       - name: Mémoire après exécution
         if: always()
