@@ -24,6 +24,7 @@ nav:
       - Long-run restrictions: api/restrictions.md
       - Engle-Granger test: api/cointegration.md
       - Johansen test: api/johansen.md
+      - Efficient long-run (DOLS/FMOLS/CCR): api/efficient.md
       - Bootstrap bounds test: api/bootstrap.md
       - NARDL (asymmetric): api/nardl.md
       - QARDL (quantiles): api/qardl.md

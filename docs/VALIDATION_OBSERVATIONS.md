@@ -1138,3 +1138,89 @@ correlation absolue moyenne de 0.10.
 - **Statut** : mesuree, documentee (2026-08-30). Le module expose les
   deux estimateurs et le test, avec ces trois limites ecrites a cote
   plutot que decouvertes par l'utilisateur.
+
+## OBS-24 — Deux formules, deux conventions pour la meme matrice, et une equivalence asymptotique qui sert de detecteur
+
+**Spec 08.** La matrice de covariance de long terme UNILATERALE a deux
+ecritures en circulation qui different par une transposee :
+
+    Delta = Gamma_0 + somme_j k_j Gamma_j        (naive)
+    Delta = Gamma_0 + somme_j k_j Gamma_j'       (celle de cointReg)
+
+Les deux donnent le MEME Omega, puisque Omega = Delta + Delta' - Gamma_0
+est invariant a la transposition. **Comparer Omega ne les separe donc
+pas** — et Omega est ce qu'on verifie naturellement en premier. Chez
+moi il concordait a 5.6e-16 pendant que theta etait faux.
+
+- **FMOLS a besoin de la seconde.** Verifiee a 2.2e-16 contre
+  `getLongRunVar`, puis theta a 2.0e-11 contre `cointRegFM`.
+
+- **CCR a besoin de la PREMIERE.** Park (1992) et Phillips-Hansen (1990)
+  ecrivent la meme matrice dans deux notations, et rien dans les
+  formules ne le signale.
+
+  Comment cela a ete attrape : `cointReg` n'implemente pas CCR, donc il
+  n'y avait pas de reference externe. Mais CCR et FMOLS sont
+  **asymptotiquement equivalents**, ce qui fournit un detecteur interne.
+  Avec la mauvaise convention, CCR ne corrigeait presque rien — biais
+  +0.0370 contre +0.0384 pour l'OLS nue a T = 400 — la ou FMOLS
+  retirait l'essentiel (+0.0108). Deux estimateurs censes coincider et
+  qui divergent : c'est ce desaccord, et non un ecart a une reference,
+  qui a designe le fautif. Avec la transposee : +0.0118, aligne sur
+  FMOLS.
+
+**Un troisieme point n'etait pas une convention mais un bug.** J'avais
+ecrit la variance comme `Omega * T * (X'X)^-1` alors qu'Omega est deja
+normalise par T. Toutes les erreurs types etaient gonflees de sqrt(T),
+soit un facteur SEPT a T = 50. Le nombre restait fini, positif, du bon
+ordre de grandeur — il rendait simplement tout insignifiant. Attrape
+par la concordance avec `cointRegD`, a 2.3e-12 apres correction.
+
+---
+
+**CE QUE LES ESTIMATEURS ACHETENT, MESURE** (1000 replications, DGP
+cointegre avec endogeneite ET autocorrelation, theta = 1.5, erreur type
+d'une couverture voisine de 95 % : 0.69 point).
+
+|   T |     OLS |   DOLS |  FMOLS |    CCR |
+|-----|---------|--------|--------|--------|
+| 100 | +0.1380 |+0.0087 |+0.0565 |+0.0611 |
+| 200 | +0.0773 |+0.0013 |+0.0232 |+0.0261 |
+| 400 | +0.0397 |+0.0013 |+0.0108 |+0.0118 |
+
+Couverture d'un intervalle a 95 % :
+
+|   T | OLS naive | OLS HAC |  DOLS | FMOLS |   CCR |
+|-----|-----------|---------|-------|-------|-------|
+| 100 |    42.1 % |  71.1 % |83.7 % |80.8 % |79.0 % |
+| 200 |    38.4 % |  71.8 % |88.1 % |85.9 % |84.0 % |
+| 400 |    41.4 % |  71.8 % |90.4 % |88.7 % |87.6 % |
+
+- **L'intervalle OLS naif couvre 40 %.** Pas 90, pas 80 : quarante. Un
+  intervalle a 95 % annonce qui en couvre 42 n'est pas conservateur, il
+  est faux, et c'est le regime dans lequel se trouve toute regression
+  statique publiee sans correction.
+
+- **Corriger l'erreur type ne suffit PAS.** L'OLS avec erreur type HAC
+  monte a 71 % et s'arrete la, quelle que soit T. Le probleme n'est donc
+  pas seulement la variance : le biais de second ordre demeure, et
+  aucune correction d'erreur type ne le retire. C'est l'argument qui
+  justifie FMOLS et DOLS plutot qu'une simple OLS-HAC, et il se voit
+  ici.
+
+- **Deux criteres de la spec, un seul atteint.** La spec demandait un
+  biais Monte Carlo inferieur a 10 % de celui de l'OLS : DOLS y arrive
+  (3.3 % a T = 400), FMOLS et CCR non (27 % et 30 %). Elle demandait une
+  couverture dans [92 %, 97 %] : **aucun des trois n'y arrive** a ces
+  tailles. DOLS s'en approche (90.4 % a T = 400) et progresse
+  regulierement avec T ; les intervalles restent donc un peu trop
+  etroits en echantillon fini.
+
+  Ce n'est pas rapporte comme un echec de l'implementation — la
+  concordance externe a 1e-11 dit qu'elle calcule ce qu'elle doit —
+  mais comme une propriete des estimateurs a T modeste, que la spec
+  supposait meilleure qu'elle n'est.
+
+- **Statut** : mesuree, documentee (2026-08-31). La bande est fixee a 8
+  dans cette etude ; la faire varier pour atteindre la borne aurait ete
+  choisir le resultat.

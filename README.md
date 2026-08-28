@@ -186,6 +186,8 @@ Danish money demand in six seconds. Its companions:
 - **[Common mistakes](docs/common-mistakes.md)** — six errors that recur
   in published applications, each shown running with the number it
   produces.
+- **[Efficient long-run estimators](docs/api/efficient.md)** — DOLS,
+  FMOLS, CCR, and what static OLS inference actually costs.
 - **[Glossary](docs/glossary.md)** — the vocabulary in English and
   French, with the notation.
 
@@ -979,6 +981,33 @@ Validé contre `plm::pcce(model="mg")` à **1.1e-16** — mais cela ne
 couvre que le cas **statique**. Le volet dynamique n'a pas de référence
 externe ici : `xtdcce2` est sous Stata, un script `.do` est fourni, et
 aucune valeur n'a été inventée en attendant.
+
+### DOLS, FMOLS, CCR — l'inférence que l'OLS statique n'a pas
+
+```python
+pyardl.cointegration.dols(y, X, n_leads=2, n_lags=2)
+pyardl.cointegration.fmols(y, X)
+pyardl.cointegration.compare_longrun(y, X, ardl_results=fit)
+```
+
+L'OLS statique sur variables cointégrées est superconvergente — et son
+inférence est fausse. **Un intervalle à 95 % en couvre 42.** Pire :
+corriger l'erreur type ne suffit pas, l'OLS-HAC plafonne à 71 % quelle
+que soit T, parce que le biais de second ordre survit à toute réparation
+de la variance. C'est l'argument qui justifie ces trois estimateurs
+plutôt qu'une simple OLS-HAC.
+
+Mesuré sur 1000 réplications : DOLS atteint 90.4 % de couverture à
+T=400, FMOLS 88.7 %, CCR 87.6 %. **Aucun n'atteint les 92–97 % que la
+spec attendait** — les intervalles restent un peu trop étroits en
+échantillon fini, ce qui est une propriété des estimateurs et non de
+l'implémentation, dont les coefficients concordent avec `cointReg` à
+2.0e-11.
+
+Sur la demande de monnaie danoise, les quatre méthodes **ne s'accordent
+pas** : le taux de dépôt est significatif sous ARDL et DOLS (t = 2.9 et
+3.5) et ne l'est pas sous FMOLS et CCR (t ≈ 1.06). Le désaccord est le
+résultat — `compare_longrun` le met dans un seul tableau.
 
 ### VECM simulator
 

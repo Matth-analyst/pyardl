@@ -187,6 +187,33 @@ Every asymmetry test says symmetric. **The right conclusion is to go
 back to the linear model** — a NARDL fitted here would spend parameters
 to estimate a distinction the data do not support.
 
+### Efficient long-run estimators
+
+The fourth robustness route, and the one that most often changes the
+reading. Static OLS on cointegrated data has invalid inference; DOLS,
+FMOLS and CCR repair it three different ways, and
+[their page](api/efficient.md) has the measurements.
+
+```pycon
+>>> from pyardl.cointegration import compare_longrun
+>>> table = compare_longrun(y, x, ardl_results=fit, bandwidth=5,
+...                         n_leads=2, n_lags=2)
+>>> sorted(set(table.index.get_level_values("method")))
+['ARDL', 'CCR', 'DOLS', 'FMOLS']
+>>> [round(float(v), 4) for v in table.xs("IDE", level="regressor")["t"]]
+[2.9058, 3.4646, 1.0785, 1.0576]
+
+```
+
+Read that last line carefully. The deposit rate is **significant** under
+ARDL and DOLS (`t` = 2.91 and 3.46) and **not** under FMOLS and CCR
+(`t` ≈ 1.06). Four estimators of the same long-run coefficient, and they
+do not agree on whether one of the three regressors belongs in it.
+
+**The common error.** Reporting whichever of these four rows supports
+the story. The disagreement *is* the result here, and a paper that shows
+one row is presenting a choice of estimator as a finding.
+
 ### Smooth structural change: read the pre-test first
 
 ```pycon
@@ -216,11 +243,9 @@ apply here" is a checkable statement rather than a matter of taste.
 
 ## What this workflow does not cover
 
-pyardl does not yet implement three parts of the standard sequence, and
+pyardl does not yet implement two parts of the standard sequence, and
 saying so is more useful than a silent gap:
 
-- **FMOLS / DOLS / CCR** (efficient single-equation long-run estimators)
-  — the natural fourth robustness check.
 - **Dynamic simulations** in the sense of Jordan & Philips — the NARDL
   module has `dynamic_multipliers`, but the general simulation-based
   interpretation of an ARDL is absent.

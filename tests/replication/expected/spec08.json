@@ -1,0 +1,73 @@
+{
+  "_provenance": {
+    "spec": "08 (Phillips-Hansen FMOLS, Stock-Watson DOLS, Park CCR)",
+    "source": "R cointReg 0.2.0 (GPL-3), cointRegFM / cointRegD / getLongRunVar, R 4.6.1",
+    "generated": "2026-08-31",
+    "script": "validation/external/spec08_cointreg.R",
+    "log": "validation/results/external_logs/spec08_cointreg.txt",
+    "data": "tests/replication/data/spec08_denmark.csv \u2014 le jeu danois que pyardl embarque et redistribue deja. Rien de tiers, et versionne AVEC le test parce que validation/ est gitignore.",
+    "design": "y = LRM, x = (LRY, IBO, IDE), constante, noyau Bartlett, bande 5",
+    "tolerance": 1e-08,
+    "tolerance_note": "Accord mesure : 2.0e-11 sur theta FMOLS, 8.6e-13 sur son erreur type ; 7.2e-14 et 2.3e-12 pour DOLS ; <=5.3e-15 sur les quatre noyaux de la covariance de long terme. Contrat a 1e-8, tres au-dela du besoin mais insensible a un reordonnancement BLAS.",
+    "conventions_pinned": "DEUX conventions ont ete etablies PAR LA MESURE, pas supposees. (1) La matrice unilaterale : Delta = Gamma_0 + somme k_j Gamma_j' \u2014 la TRANSPOSEE de l'ecriture naive, qui donne le meme Omega et un lambda+ different. (2) Le terme de biais s'echelonne sur l'echantillon COMPLET (T), pas sur les T-1 lignes de la regression : le rapport entre les deux versions est ressorti exactement a 55/54 sur les trois coefficients, ce qui a identifie la convention.",
+    "no_ccr_reference": "cointReg n'implemente pas CCR. Il n'a donc PAS de reference externe ici : il est verifie par convergence vers le vrai theta a T croissant et par equivalence asymptotique avec FMOLS."
+  },
+  "nobs": 55,
+  "fmols": {
+    "kernel": "bartlett",
+    "bandwidth": 5,
+    "LRY": {
+      "theta": 1.290356730224573,
+      "se": 0.122830997067256
+    },
+    "IBO": {
+      "theta": -3.006780091828659,
+      "se": 0.428090057837984
+    },
+    "IDE": {
+      "theta": 0.970233249043304,
+      "se": 0.899591086095232
+    }
+  },
+  "dols": {
+    "kernel": "bartlett",
+    "bandwidth": 5,
+    "n_leads": 2,
+    "n_lags": 2,
+    "LRY": {
+      "theta": 1.2214233292487,
+      "se": 0.0841100954059852
+    },
+    "IBO": {
+      "theta": -3.83531178589966,
+      "se": 0.3264998064582053
+    },
+    "IDE": {
+      "theta": 2.63082362815818,
+      "se": 0.7593477469109324
+    }
+  },
+  "longrun_variance": {
+    "_note": "getLongRunVar sur une serie AR(1) bivariee, graine 7, bande 5",
+    "bartlett": {
+      "omega_00": 4.02140992946653,
+      "omega_01": 0.938055858497519,
+      "delta_01": 0.543666544503748
+    },
+    "parzen": {
+      "omega_00": 3.28609264223854,
+      "omega_01": 0.790902832748472,
+      "delta_01": 0.474131879899621
+    },
+    "quadratic-spectral": {
+      "omega_00": 4.84553048954767,
+      "omega_01": 1.04827574921172,
+      "delta_01": 0.581880426070542
+    },
+    "truncated": {
+      "omega_00": 7.36905083544355,
+      "omega_01": 1.74782738355752,
+      "delta_01": 0.957879907732914
+    }
+  }
+}

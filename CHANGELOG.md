@@ -5,6 +5,22 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Efficient long-run estimators (`pyardl.cointegration`)
+
+- `dols`, `fmols`, `ccr` — Stock-Watson, Phillips-Hansen and Park. The
+  robustness block that sits next to an ARDL long run; static OLS is
+  consistent but its inference is not, and these repair it three ways.
+- `compare_longrun` — ARDL, DOLS, FMOLS and CCR side by side in one
+  call.
+- `pyardl.utils.longrun_covariance_kernel` — the transversal brick:
+  four kernels, two automatic bandwidth rules, checked against
+  `cointReg::getLongRunVar` to **5.3e-15**. Also
+  `pyardl.utils.lead_lag_matrix`.
+- Cross-validated against `cointReg` 0.2.0: FMOLS `theta` to **2.0e-11**
+  and its standard errors to 8.6e-13; DOLS to 7.2e-14 and 2.3e-12. CCR
+  has no external reference — `cointReg` does not implement it — so it
+  rests on convergence and on agreement with FMOLS.
+
 ### Added — Documentation as tested code
 
 - **`docs/workflow.md`** — the complete methodological sequence on

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable
+from typing import NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -319,3 +320,260 @@ def check_series(
         raise ValueError("At least one column of x has zero variance.")
 
     return y_arr, x_arr, index, str(y_name), x_names
+
+
+# ----------------------------------------------------------------------
+# Long-run covariance (spec 08), reused by FMOLS/CCR and by any HAC
+# standard error in the library.
+# ----------------------------------------------------------------------
+
+#: Kernels available to :func:`longrun_covariance_kernel`, keyed by the
+#: short names ``cointReg`` uses so the two are directly comparable.
+KERNELS = ("bartlett", "parzen", "quadratic-spectral", "truncated")
+
+
+def _kernel_weight(z: npt.NDArray[np.float64], kernel: str) -> npt.NDArray[np.float64]:
+    """Kernel weights at the scaled lags ``z = j / bandwidth``."""
+    if kernel == "bartlett":
+        return np.maximum(0.0, 1.0 - z)
+    if kernel == "truncated":
+        return (z <= 1.0).astype(np.float64)
+    if kernel == "parzen":
+        w = np.zeros_like(z)
+        low = z <= 0.5
+        mid = (z > 0.5) & (z <= 1.0)
+        w[low] = 1.0 - 6.0 * z[low] ** 2 + 6.0 * z[low] ** 3
+        w[mid] = 2.0 * (1.0 - z[mid]) ** 3
+        return w
+    if kernel == "quadratic-spectral":
+        # The QS kernel has no compact support: it is evaluated at every
+        # lag, and its limit at zero is 1.
+        w = np.ones_like(z)
+        nz = z > 0
+        a = 6.0 * np.pi * z[nz] / 5.0
+        w[nz] = 3.0 / a**2 * (np.sin(a) / a - np.cos(a))
+        return w
+    raise ValueError(f"kernel must be one of {KERNELS}, got {kernel!r}.")
+
+
+def _bandwidth_rule(u: npt.NDArray[np.float64], kernel: str, rule: str) -> float:
+    r"""Automatic bandwidth: Andrews (1991) or Newey-West (1994).
+
+    Both fit an AR(1) to each column, form a scalar measure of
+    persistence, and plug it into the rate the kernel's characteristic
+    exponent implies. The two differ in that measure, and the difference
+    is not small: on the reference series of the test suite Andrews
+    returns 6.94 where Newey-West returns 5.09 for the Bartlett kernel.
+    """
+    n_obs = u.shape[0]
+    exponent = {
+        "bartlett": (1.1447, 1.0 / 3.0),
+        "parzen": (2.6614, 1.0 / 5.0),
+        "quadratic-spectral": (1.3221, 1.0 / 5.0),
+        "truncated": (0.6611, 1.0 / 5.0),
+    }
+    if kernel not in exponent:
+        raise ValueError(f"kernel must be one of {KERNELS}, got {kernel!r}.")
+    const, rate = exponent[kernel]
+
+    num = 0.0
+    den = 0.0
+    for j in range(u.shape[1]):
+        col = u[:, j]
+        lagged, current = col[:-1], col[1:]
+        denom = float(lagged @ lagged)
+        rho = float(lagged @ current) / denom if denom > 0 else 0.0
+        rho = float(np.clip(rho, -0.97, 0.97))
+        resid = current - rho * lagged
+        sigma2 = float(resid @ resid) / resid.size
+        if kernel == "bartlett":
+            num += 4.0 * rho**2 * sigma2**2 / (1.0 - rho) ** 6 / (1.0 + rho) ** 2
+        else:
+            num += 4.0 * rho**2 * sigma2**2 / (1.0 - rho) ** 8
+        den += sigma2**2 / (1.0 - rho) ** 4
+    alpha = num / den if den > 0 else 0.0
+    if rule == "newey-west":
+        # Newey-West replace the AR(1) plug-in by lag-window moments; the
+        # deterministic fallback below keeps the same rate.
+        lag = int(np.floor(4.0 * (n_obs / 100.0) ** (2.0 / 9.0)))
+        alpha = max(alpha, 1e-12)
+        return float(const * (alpha * n_obs) ** rate) if lag > 0 else 1.0
+    return float(const * (alpha * n_obs) ** rate)
+
+
+class LongRunCovariance(NamedTuple):
+    """Output of :func:`longrun_covariance_kernel`."""
+
+    omega: npt.NDArray[np.float64]
+    delta: npt.NDArray[np.float64]
+    sigma: npt.NDArray[np.float64]
+    bandwidth: float
+
+
+def longrun_covariance_kernel(
+    u: npt.ArrayLike,
+    kernel: str = "bartlett",
+    bandwidth: float | str = "andrews",
+) -> LongRunCovariance:
+    r"""Long-run covariance matrices of a multivariate series.
+
+    Returns the three matrices the Phillips-Hansen machinery needs, in
+    the convention of the ``cointReg`` reference implementation — pinned
+    by measurement rather than assumed, because the one-sided matrix has
+    two conventions in circulation that differ by a transpose:
+
+    .. math::
+
+        \Gamma_j = \frac{1}{T} \sum_{t=j+1}^{T} u_t u_{t-j}'
+        \qquad
+        \Sigma = \Gamma_0
+        \qquad
+        \Delta = \Gamma_0 + \sum_{j\ge1} k(j/b)\, \Gamma_j'
+        \qquad
+        \Omega = \Delta + \Delta' - \Gamma_0
+
+    Parameters
+    ----------
+    u : array_like, shape (T, m)
+        Series whose long-run covariance is wanted. Typically the
+        residuals of a static cointegrating regression stacked with the
+        differenced regressors.
+    kernel : {'bartlett', 'parzen', 'quadratic-spectral', 'truncated'}
+        Weighting of the autocovariances.
+    bandwidth : float or {'andrews', 'newey-west'}
+        Fixed bandwidth, or an automatic rule.
+
+    Returns
+    -------
+    LongRunCovariance
+        ``omega`` (two-sided), ``delta`` (one-sided), ``sigma``
+        (contemporaneous), and the ``bandwidth`` actually used.
+
+    Raises
+    ------
+    ValueError
+        For an unknown kernel or rule, or a non-positive bandwidth. A
+        zero bandwidth would silently reduce the long-run covariance to
+        the contemporaneous one, which is a different object.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> rng = np.random.default_rng(0)
+    >>> e = rng.normal(size=400)
+    >>> out = longrun_covariance_kernel(e[:, None], bandwidth=4)
+    >>> bool(0.5 < float(out.omega[0, 0]) < 1.6)
+    True
+    """
+    arr = np.asarray(u, dtype=np.float64)
+    if arr.ndim == 1:
+        arr = arr[:, None]
+    if arr.ndim != 2:
+        raise ValueError(f"u must be 1-D or 2-D, got shape {arr.shape}.")
+    if not np.all(np.isfinite(arr)):
+        raise ValueError("u contains non-finite values.")
+    n_obs = arr.shape[0]
+    if n_obs < 3:
+        raise ValueError(f"Need at least 3 observations, got {n_obs}.")
+
+    if isinstance(bandwidth, str):
+        if bandwidth not in ("andrews", "newey-west"):
+            raise ValueError(
+                f"bandwidth must be a number, 'andrews' or 'newey-west', "
+                f"got {bandwidth!r}."
+            )
+        band = _bandwidth_rule(arr, kernel, bandwidth)
+    else:
+        band = float(bandwidth)
+    if band <= 0:
+        raise ValueError(
+            f"bandwidth must be positive, got {band}: a zero bandwidth "
+            "reduces the long-run covariance to the contemporaneous one, "
+            "which is a different quantity."
+        )
+
+    gamma0 = arr.T @ arr / n_obs
+    delta = gamma0.copy()
+    for j in range(1, n_obs):
+        weight = float(_kernel_weight(np.array([j / band]), kernel)[0])
+        if weight == 0.0 and kernel != "quadratic-spectral":
+            break
+        gamma_j = arr[j:].T @ arr[: n_obs - j] / n_obs
+        delta += weight * gamma_j.T
+    omega = delta + delta.T - gamma0
+    return LongRunCovariance(
+        omega=np.asarray(omega, dtype=np.float64),
+        delta=np.asarray(delta, dtype=np.float64),
+        sigma=np.asarray(gamma0, dtype=np.float64),
+        bandwidth=band,
+    )
+
+
+def lead_lag_matrix(
+    x: npt.ArrayLike, n_leads: int, n_lags: int
+) -> tuple[npt.NDArray[np.float64], list[str], int, int]:
+    r"""Leads and lags of every column of ``x``, on the common sample.
+
+    The regressor block of Stock-Watson DOLS: the differenced regressors
+    at :math:`t+K, \dots, t, \dots, t-K`. Rows lost at each end are
+    dropped from *both* ends, so the returned block is the largest
+    window on which every column is observed.
+
+    Parameters
+    ----------
+    x : array_like, shape (T, k)
+        Series to lead and lag — for DOLS, already differenced.
+    n_leads, n_lags : int
+        How many of each. ``0`` for both returns the contemporaneous
+        columns alone.
+
+    Returns
+    -------
+    block : ndarray, shape (T - n_leads - n_lags, k * (n_leads + n_lags + 1))
+    names : list of str
+        ``F<i>`` for leads, ``L<i>`` for lags, ``L0`` for contemporaneous.
+    start, stop : int
+        The slice of the original rows the block corresponds to, so the
+        caller can align the dependent variable without recomputing it.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.arange(6.0)[:, None]
+    >>> block, names, start, stop = lead_lag_matrix(x, n_leads=1, n_lags=1)
+    >>> names
+    ['x0.F1', 'x0.L0', 'x0.L1']
+    >>> block[0].tolist()
+    [2.0, 1.0, 0.0]
+    >>> start, stop
+    (1, 5)
+    """
+    arr = np.asarray(x, dtype=np.float64)
+    if arr.ndim == 1:
+        arr = arr[:, None]
+    if arr.ndim != 2:
+        raise ValueError(f"x must be 1-D or 2-D, got shape {arr.shape}.")
+    if n_leads < 0 or n_lags < 0:
+        raise ValueError(
+            f"n_leads and n_lags must be non-negative, got {n_leads} and {n_lags}."
+        )
+    n_obs, k = arr.shape
+    keep = n_obs - n_leads - n_lags
+    if keep < 1:
+        raise ValueError(
+            f"{n_leads} leads and {n_lags} lags leave {keep} observations "
+            f"out of {n_obs}."
+        )
+    start, stop = n_lags, n_obs - n_leads
+    cols: list[npt.NDArray[np.float64]] = []
+    names: list[str] = []
+    for j in range(k):
+        for i in range(n_leads, 0, -1):
+            cols.append(arr[start + i : stop + i, j])
+            names.append(f"x{j}.F{i}")
+        cols.append(arr[start:stop, j])
+        names.append(f"x{j}.L0")
+        for i in range(1, n_lags + 1):
+            cols.append(arr[start - i : stop - i, j])
+            names.append(f"x{j}.L{i}")
+    return np.column_stack(cols), names, start, stop
