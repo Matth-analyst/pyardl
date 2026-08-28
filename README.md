@@ -925,6 +925,43 @@ implementations disagreed by 2.7e-07, the concentrated log-likelihood
 ranked them instead of splitting the difference: the reference had
 stopped at its default tolerance. OBS-21.
 
+### CS-ARDL / CS-DL — quand les individus ne sont pas indépendants
+
+```python
+pyardl.panel.CSARDL(df, y="y", X=["x"], id="country", time="year").fit()
+pyardl.panel.CSDL(df, ...).fit()
+pyardl.panel.cd_test(residuals)
+```
+
+MG et PMG supposent l'indépendance transversale. Un cycle mondial ou un
+prix de matière première la brise, le facteur omis corrèle avec le
+régresseur, et chaque `theta_i` est biaisé **avant** que la moyenne
+commence. Chudik et Pesaran remplacent le facteur inobservé par les
+**moyennes transversales** des variables, qui en engendrent l'espace.
+
+**Ce que ça coûte de ne pas le faire, mesuré.** Sur le panel de
+référence (facteur dans `y` et dans `x`, chargements hétérogènes, vrai
+`theta = 0.80`) : Mean Group nu → **1.1938**, soit +49 % ; CS-ARDL →
+0.8058 ; CS-DL → 0.8059. Ce n'est pas une perte d'efficacité qu'un
+échantillon plus grand réparerait.
+
+Le test CD de Pesaran encadre l'opération : il rejette avant
+augmentation (corrélation absolue moyenne 0.30) et rejette encore après
+(0.10). L'essentiel de la dépendance est absorbé, pas la totalité — et
+`summary(context='before'|'after')` dit laquelle des deux lectures
+s'applique, parce que la même p-value veut dire des choses opposées de
+part et d'autre.
+
+Les colonnes colinéaires sont retirées par une **règle déclarée**, de
+gauche à droite, moyennes en dernier, chaque retrait enregistré — et non
+par ce que le solveur préfère, ce qui donnerait des coefficients
+différents d'une machine à l'autre sur les mêmes données.
+
+Validé contre `plm::pcce(model="mg")` à **1.1e-16** — mais cela ne
+couvre que le cas **statique**. Le volet dynamique n'a pas de référence
+externe ici : `xtdcce2` est sous Stata, un script `.do` est fourni, et
+aucune valeur n'a été inventée en attendant.
+
 ### VECM simulator
 
 ```python

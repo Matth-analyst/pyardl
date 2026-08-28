@@ -1077,3 +1077,64 @@ Le PMG, lui, utilise bien la normale, donc sa colonne EST celle de la
 bibliotheque.
 
 - **Statut** : mesuree, documentee (2026-08-29).
+
+## OBS-23 — L'augmentation transversale n'est pas gratuite, et le facteur doit entrer en NIVEAUX pour couter quelque chose
+
+**Spec 24.** Trois resultats, tous contraires a ce que j'aurais ecrit
+sans mesurer (1000 replications, N = 30, T = 80, theta vrai = 0.80,
+erreur type Monte Carlo ~0.0004).
+
+|  gamma |     MG |  biais | CS-ARDL |  biais |  CS-DL |  biais |
+|--------|--------|--------|---------|--------|--------|--------|
+|    0.0 | 0.7973 |-0.0027 |  0.7917 |-0.0083 | 0.7732 |-0.0268 |
+|    0.3 | 0.7972 |-0.0028 |  0.7931 |-0.0069 | 0.7729 |-0.0271 |
+|    0.6 | 0.7966 |-0.0034 |  0.7916 |-0.0084 | 0.7705 |-0.0295 |
+
+**1. Le MG n'est PAS biaise ici, quel que soit le chargement.** Son
+biais reste a -0.003 de gamma = 0 a gamma = 0.6. C'etait l'inverse de
+l'attendu, et de ce que la spec annonce.
+
+La raison est dans le DGP, pas dans l'estimateur. Dans ce panel
+DYNAMIQUE le facteur entre dans y par sa DIFFERENCE,
+gamma*(f_t - f_{t-1}) : c'est du I(0), qui ne contamine pas la relation
+de long terme — alors que x contient gamma*f, du I(1). Le facteur est
+bien present, il est bien correle a x, et il ne biaise pourtant rien.
+
+Sur le panel de reference, ou le facteur entre dans y en NIVEAUX
+(y = theta*x + gamma*f + e), le biais apparait et il est massif : MG
+rend **1.1938** pour un vrai 0.80, soit +49 %, quand CS-ARDL rend 0.8058
+et CS-DL 0.8059.
+
+  **La lecon** : ce n'est pas la presence d'un facteur commun qui rend
+  MG non convergent, c'est le fait que sa contribution a y soit
+  PERSISTANTE. Un choc commun transitoire, meme fortement charge et
+  correle aux regresseurs, laisse le long terme intact. Ce distinguo
+  n'apparait dans aucune des deux formulations que j'aurais recopiees ;
+  il est sorti d'un DGP qui refusait de produire le biais attendu.
+
+**2. L'augmentation coute quelque chose, meme quand elle ne sert a
+rien.** A gamma = 0 — aucun facteur — CS-DL porte un biais de -0.0268,
+soit 3.4 % du coefficient, et CS-ARDL de -0.0083. Le cout ne disparait
+pas quand le probleme est absent : appliquer CS-DL par reflexe se paie.
+
+**3. Le test CD rejette a 100 % APRES augmentation, y compris a
+gamma = 0.** L'augmentation n'absorbe pas la dependance : elle en
+INDUIT une. Chaque individu est regresse sur des moyennes qui
+contiennent son propre y — a N = 30, il y pese 1/30 — ce qui cree une
+correlation mecanique NEGATIVE entre residus. La signature est visible
+sur le panel de reference : CD = -6.12, statistique negative, pour une
+correlation absolue moyenne de 0.10.
+
+  Le CD avant augmentation sur-rejette aussi a gamma = 0 : 17.9 % pour
+  un nominal de 5 %.
+
+  **Consequence pratique, et elle est genante** : un CD significatif sur
+  des residus CS-ARDL ne veut PAS dire « il reste des facteurs ». Il
+  peut n'etre que l'effet mecanique de l'auto-inclusion. Lire ce test
+  apres augmentation comme un diagnostic de facteurs residuels conduit
+  a ajouter des retards qui ne servent a rien. La documentation le dit ;
+  la litterature appliquee, souvent, non.
+
+- **Statut** : mesuree, documentee (2026-08-30). Le module expose les
+  deux estimateurs et le test, avec ces trois limites ecrites a cote
+  plutot que decouvertes par l'utilisateur.

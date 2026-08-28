@@ -5,6 +5,32 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Cross-sectional dependence (`pyardl.panel`)
+
+- `CSARDL` / `CSDL` — the estimators of Chudik & Pesaran (2015, 2016).
+  The individual regression is augmented with the cross-sectional
+  averages of the variables, which span the unobserved factor space;
+  CS-ARDL keeps the dynamics and rebuilds the long run from them, CS-DL
+  reads the long run straight off the coefficient on `x` and cannot
+  report an adjustment speed — its `summary()` says so.
+- `cross_section_averages` / `default_cs_lags` — the averages, their
+  lags, and the `floor(T**(1/3))` rule. The count of individuals
+  entering each average is returned alongside it, and a sharply varying
+  composition warns: in an unbalanced panel a mean over 40 countries and
+  a mean over 12 are not the same regressor.
+- `cd_test` — Pesaran's CD test, with `summary(context='before'|'after')`
+  because the same p-value means opposite things on either side of the
+  augmentation. Pairs are matched on the index, never by position.
+- Collinear columns are dropped by a **declared left-to-right rule**,
+  averages last, every drop recorded in `res.dropped_columns` — not by
+  whatever the solver prefers, which would give different long-run
+  coefficients on different machines from the same data.
+- Cross-validated against `plm::pcce(model="mg")` to **1.1e-16** on the
+  group coefficient and 1.5e-16 on the between-individual standard
+  error. That covers the *static* CCE case only; the dynamic half has no
+  external reference — Stata's `xtdcce2` is the one the specification
+  names, a `.do` script is provided, and no values were invented.
+
 ### Added — Pooled Mean Group, DFE and Hausman (`pyardl.panel`)
 
 - `PMG` — the estimator of Pesaran, Shin & Smith (1999): long-run
@@ -80,6 +106,36 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Measured
 
+- **It is persistence, not the factor, that breaks Mean Group.** On a
+  dynamic DGP where the common factor enters `y` through its difference
+  — I(0) — MG is unbiased at every loading strength (bias −0.003 from
+  `gamma = 0` to `0.6`, 1000 replications, Monte Carlo standard error
+  0.0004), even though the factor is present and correlated with the
+  regressor. The bias appears only when the factor's contribution to `y`
+  is persistent. That distinction is in neither formulation of the
+  result I would have copied; it came out of a DGP that refused to
+  produce the expected bias. OBS-23.
+- **The augmentation is not free, and the CD test misleads after it.**
+  At `gamma = 0` — no factor — CS-DL still carries a −0.027 bias (3.4%)
+  and CS-ARDL −0.008. And the CD test rejects 100% of the time *after*
+  augmentation even with no factor: regressing each individual on
+  averages containing its own `y` induces a mechanical negative
+  correlation between residuals (the reference panel shows `CD = −6.12`
+  with mean absolute correlation 0.10). A significant CD on CS-ARDL
+  residuals therefore does not mean factors remain. OBS-23.
+- **A common factor costs 49%, and the augmentation recovers it.** On the
+  reference panel — factor entering both `y` and `x`, heterogeneous
+  loadings, true `theta = 0.80` — a plain Mean Group returns **1.1938**.
+  CS-ARDL returns 0.8058 and CS-DL 0.8059. The CD test rejects before
+  the augmentation (mean absolute pairwise correlation 0.30) and still
+  rejects after it (0.10): most of the dependence is absorbed, not all,
+  and the test is honest about the remainder rather than being read as a
+  clean bill of health.
+- **`floor(T**(1/3))` loses a lag at every perfect cube** if written as
+  `T ** (1/3)`: measured, `64 ** (1/3) == 3.99999999999999956` and
+  `1000 ** (1/3) == 9.99999999999999822`, so the naive form returns 3
+  and 9 where the rule means 4 and 10. `numpy.cbrt` is exact. A shorter
+  lag list is a different specification, not a rounding detail.
 - **The Hausman test is asleep exactly where PMG has already failed.**
   Under exact long-run homogeneity PMG delivers: bias −0.14% (the spec
   asked for under 1%) and a **2.41x** efficiency gain over MG. But at a

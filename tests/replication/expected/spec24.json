@@ -1,0 +1,29 @@
+{
+  "_provenance": {
+    "spec": "24 (Chudik & Pesaran \u2014 CS-ARDL / CS-DL)",
+    "source": "R plm 2.6.7, pcce(model='mg'), R 4.6.1, GPL (>= 2)",
+    "generated": "2026-08-30",
+    "script": "validation/external/spec24_pcce.R",
+    "log": "validation/results/external_logs/spec24_pcce.txt",
+    "data": "tests/replication/data/spec24_panel.csv, versionne AVEC le test (validation/ est gitignore). Genere par validation/external/spec24_make_panel.py, graine 20260830. Facteur commun, chargements heterogenes, theta = 0.80. Synthetique a dessein : aucune donnee tierce redistribuee.",
+    "scope": "CE QUI EST VALIDE ICI EST LE CCE STATIQUE, ET RIEN DE PLUS. plm::pcce(model='mg') est le cas particulier de CS-DL sans differences retardees ni retards des moyennes : il verifie la construction des moyennes transversales, la regression individuelle augmentee, et l'agregation Mean Group avec sa variance inter-individus. Le volet DYNAMIQUE du CS-ARDL (retards des moyennes, long terme reconstruit depuis les coefficients de court terme) n'a PAS de reference externe ici : la spec designe Stata xtdcce2, absent de cet environnement, et aucun package R ne l'implemente. Un script .do est fourni pour le jour ou Stata sera disponible ; d'ici la ce volet repose sur les tests internes et sur l'etude Monte Carlo.",
+    "call_r": "pcce(y ~ x, model='mg'), equivalent a lm(y ~ x + cs_y + cs_x) par individu",
+    "call_python": "CSDL(..., trunc_lags=0, cs_lags=0, det='const')",
+    "tolerance": 1e-10,
+    "tolerance_note": "Accord mesure : 1.1e-16 sur theta_MG, 1.5e-16 sur l'erreur type, ~1e-15 sur les theta_i. Contrat a 1e-10 : assez serre pour que tout changement reel de l'agregation le casse, assez lache pour survivre a un reordonnancement BLAS entre plateformes.",
+    "cross_check": "Le script R re-derive en outre l'agregation a la main depuis les OLS individuelles et retrouve pcce aux memes chiffres : la reference est lisible, pas une boite noire."
+  },
+  "n_units": 30,
+  "theta_true": 0.8,
+  "cce_mg": {
+    "theta": 0.80573342199322,
+    "se": 0.0030547043715091
+  },
+  "theta_i_head": {
+    "u00": 0.807289802361925,
+    "u01": 0.809018963040258,
+    "u02": 0.850946242058819,
+    "u03": 0.810744025155072,
+    "u04": 0.796866094948052
+  }
+}

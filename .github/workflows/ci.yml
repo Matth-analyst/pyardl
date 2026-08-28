@@ -338,11 +338,41 @@ jobs:
       # -v nomme chaque test au fil de l'eau : si le processus meurt, le
       # dernier nom affiché est le test en cours. --durations montre où
       # part le temps. Le rapport JUnit survit à un arrêt brutal.
-      - name: Pytest slow
+      # DEUX etapes, et la raison est mesuree, pas supposee.
+      #
+      # Chronometrage local du 2026-08-28 (suite complete, 1 h 24) :
+      #
+      #   test_full_pss_crosscheck_slow ....... 4938.70 s  (82 min)
+      #   les seize autres, cumules ...........  ~144    s  (2.4 min)
+      #
+      # Un seul test represente 97 % du temps. Les tenir ensemble
+      # signifie n'apprendre RIEN sur les seize autres tant que le gros
+      # calcul n'a pas fini — et perdre leur verdict entier s'il expire.
+      #
+      # Ils sont donc separes. Le premier bloc rend son verdict en
+      # quelques minutes ; le second a le budget pour lui seul.
+      #
+      # Ce decoupage est purement organisationnel : il ne touche NI aux
+      # graines, NI a n_sims, NI au critere du test lourd (jusqu'a 3
+      # depassements a 3 sigma sur ses 528 cellules). Decouper ce test
+      # PAR CAS, en revanche, donnerait 3 depassements toleres a chacun
+      # des cinq shards, soit 15 au total : ce serait un affaiblissement
+      # statistique, et il n'est pas fait ici.
+      - name: Pytest slow — tout sauf le recoupement PSS complet
         run: >
           pytest -m slow -v -ra --durations=20
+          --deselect
+          tests/unit/critical_values/test_simulate.py::test_full_pss_crosscheck_slow
           --junit-xml=slow-results.xml
-        timeout-minutes: 340
+        timeout-minutes: 30
+
+      - name: Pytest slow — recoupement PSS complet (528 cellules)
+        if: always()
+        run: >
+          pytest -v -ra --durations=0
+          tests/unit/critical_values/test_simulate.py::test_full_pss_crosscheck_slow
+          --junit-xml=slow-pss-results.xml
+        timeout-minutes: 320
 
       - name: Mémoire après exécution
         if: always()
@@ -353,5 +383,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: slow-results
-          path: slow-results.xml
+          path: |
+            slow-results.xml
+            slow-pss-results.xml
           if-no-files-found: warn

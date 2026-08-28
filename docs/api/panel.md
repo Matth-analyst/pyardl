@@ -1,4 +1,4 @@
-# Heterogeneous panels — MG, PMG, DFE
+# Heterogeneous panels — MG, PMG, DFE, CS-ARDL
 
 `pyardl.panel`
 
@@ -431,15 +431,294 @@ commodity price — break it, and then both MG and PMG are biased.
 Nothing in this module corrects for that, and `summary()` says so rather
 than letting the reader assume it was handled.
 
+## When individuals are not independent — CS-ARDL and CS-DL
+
+`pyardl.panel.CSARDL`, `pyardl.panel.CSDL`
+
+Everything above assumes individuals are independent of each other. They
+usually are not. A world business cycle, a commodity price, a common
+policy shock — one thing moves everyone at once. Write it as a factor:
+
+```
+y_it = beta_i' x_it + gamma_i' f_t + e_it
+```
+
+`f_t` is unobserved and correlated with `x_it`, so omitting it biases
+every `theta_i` *before* the averaging of spec 22 even begins. MG and
+PMG are both affected, and more data does not help.
+
+Pesaran's move is to stop trying to observe the factor. Average the
+observed variables across individuals at each date: since the loadings
+average to something non-degenerate, those **cross-sectional averages
+span the same space as the factor** asymptotically. Add them as
+regressors and the factor is controlled for without ever being
+estimated.
+
+### Two estimators
+
+**CS-ARDL** keeps the dynamics and adds the averages plus `p_z` of their
+lags — the lags matter because in a dynamic panel the lagged dependent
+variable drags the factor's own history into the equation. The long run
+is rebuilt from the short-run coefficients, as in spec 03.
+
+```python
+from pyardl.panel import CSARDL
+
+res = CSARDL(df, y="y", X=["x"], id="country", time="year",
+             order=(1, 1), cs_lags="auto").fit()
+print(res.summary())
+```
+
+```text
+CS-ARDL (Chudik & Pesaran 2015) - 30 individuals
+  ARDL(1, 1) augmented with cross-sectional averages and 4 lag(s) of them
+  standard errors: BETWEEN-individual dispersion (Mean Group)
+
+  Long-run coefficients
+                       theta          se         t         p
+    x                 0.8058      0.0042   193.139    0.0000
+
+  Mean adjustment speed: -1.0451 (se 0.0203)
+```
+
+The adjustment speed of −1.05 on this particular panel is not a
+pathology: the reference DGP is *static*, so fitting an ARDL(1,1) to it
+finds an autoregressive coefficient near zero and an adjustment that
+completes within the period. On a genuinely dynamic panel it lands where
+you would expect.
+
+**CS-DL** skips the dynamics entirely: `y` on `x`, a few lagged
+*differences* of `x`, and the averages. The coefficient on `x` **is**
+the long-run coefficient — no ratio of estimated dynamics is ever
+formed, which is exactly what makes it robust to getting the lag order
+wrong.
+
+```python
+from pyardl.panel import CSDL
+
+res = CSDL(df, y="y", X=["x"], id="country", time="year").fit()
+```
+
+The price is stated rather than hidden: the truncation is innocuous only
+if adjustment is fast enough, and **CS-DL cannot report an adjustment
+speed at all**. Its `summary()` says so instead of leaving a blank where
+a number would be expected.
+
+Both aggregate the Mean Group way, so the standard error is the
+between-individual dispersion of spec 22 — not anything pooled from
+within.
+
+### `cs_lags="auto"` and a floating-point trap
+
+The default is `floor(T**(1/3))`, the rule of thumb of Chudik and
+Pesaran. Computed with `numpy.cbrt`, not `T ** (1/3)`, and the
+difference is not cosmetic: at a perfect cube the power form lands just
+*below* the integer, so the floor loses a lag.
+
+```
+64 ** (1/3)   == 3.99999999999999956   -> floor 3, should be 4
+1000 ** (1/3) == 9.99999999999999822   -> floor 9, should be 10
+```
+
+A silently shorter lag list is a different specification, not a rounding
+detail. The test suite pins both forms against each other.
+
+### Collinearity is handled by a rule, not by the solver
+
+With `k+1` averages, `p_z` lags of each and a modest `T`, the individual
+design is often rank-deficient. Dropping columns is unavoidable. Doing
+it *by whatever the linear algebra happens to prefer today* is not: a
+different BLAS on another machine would keep different columns and
+report different long-run coefficients from the same data — a result
+that looks like a result and is not reproducible.
+
+So the rule is fixed and stated. Columns are examined **left to right in
+a declared order** — deterministic terms, own lags, own regressors, then
+the cross-sectional averages from contemporaneous to most-lagged — and a
+column is dropped when it adds nothing to the rank of what precedes it.
+
+**The averages come last on purpose.** They are the approximation, so
+when something must go it should be the approximation rather than the
+model. Every drop is recorded in `res.dropped_columns` and mentioned in
+`summary()`.
+
+### The CD test, and its direction
+
+```python
+from pyardl.panel import cd_test
+
+before = cd_test(residuals_of_a_plain_MG)
+print(before.summary(context="before"))
+
+after = res.cd_test()
+print(after.summary(context="after"))
+```
+
+Pesaran's CD test has a null of *no* cross-sectional dependence, and it
+is used twice with **opposite desired answers**: before augmenting, a
+rejection is what motivates the whole exercise; after augmenting, a
+*failure* to reject is the good outcome. The same p-value means
+different things in the two, so `summary(context=...)` states which
+reading applies rather than leaving it to memory:
+
+```text
+Pesaran CD test for cross-sectional dependence
+  H0: residuals are cross-sectionally independent
+  CD = 54.9540   p = 0.0000   (30 individuals, 435 pairs)
+  mean |pairwise correlation| = 0.2968
+  reject at 5%: a common factor is present, so MG and PMG are biased and the cross-sectional augmentation is warranted.
+```
+
+Run *after* the augmentation, on the same panel, the picture changes but
+does not become clean:
+
+```text
+  CD = -6.1169   p = 0.0000   (30 individuals, 435 pairs)
+  mean |pairwise correlation| = 0.1043
+  reject at 5%: dependence SURVIVES the augmentation - more lags of the averages, or more factors than the averages can span.
+```
+
+The average absolute correlation fell from 0.30 to 0.10 — most of the
+dependence is gone — but 435 pairs give the test enough power to see
+what remains, so it still rejects. That is worth reporting rather than
+smoothing over: the augmentation is an approximation, and the CD test is
+honest about how good an approximation it was here.
+
+`mean_abs_correlation` sits next to the statistic for a reason: a CD near
+zero can mean correlations genuinely are near zero, or that positive and
+negative ones cancelled. Those call for different conclusions, so both
+numbers are reported.
+
+Pairs are matched **on the index**, never by position — two individuals
+with different sample windows must not have their residuals lined up by
+row number, which would correlate different dates.
+
+### What the augmentation is worth
+
+On the reference panel — a common factor entering both `y` and `x`,
+heterogeneous loadings, true `theta = 0.80`:
+
+| estimator | `theta` | error |
+|---|---|---|
+| Mean Group (spec 22), no augmentation | **1.1938** | **+49%** |
+| CS-ARDL | 0.8058 | +0.7% |
+| CS-DL | 0.8059 | +0.7% |
+
+A 49% error is not a loss of efficiency that a larger sample would
+repair; it is the omitted factor being correlated with the regressor.
+That single row is the reason this module exists.
+
+### And what it costs — which is not nothing
+
+A dimensioned Monte Carlo (1000 replications, N = 30, T = 80, Monte
+Carlo standard error ≈ 0.0004) over the strength of the loading, on a
+**dynamic** DGP:
+
+| `gamma` | MG | bias | CS-ARDL | bias | CS-DL | bias |
+|---|---|---|---|---|---|---|
+| 0.0 | 0.7973 | −0.0027 | 0.7917 | −0.0083 | 0.7732 | **−0.0268** |
+| 0.3 | 0.7972 | −0.0028 | 0.7931 | −0.0069 | 0.7729 | **−0.0271** |
+| 0.6 | 0.7966 | −0.0034 | 0.7916 | −0.0084 | 0.7705 | **−0.0295** |
+
+Two things here contradict what the introduction above would lead you to
+expect, and both are worth knowing.
+
+**MG is not biased in this DGP, at any loading.** Its bias sits at
+−0.003 throughout. The reason is in the data, not the estimator: here
+the factor enters `y` through its *difference*, `gamma*(f_t − f_{t−1})`,
+which is I(0) and leaves the long-run relation alone — while `x`
+contains `gamma*f`, which is I(1). The factor is present, it is
+correlated with the regressor, and it biases nothing.
+
+On the reference panel, where the factor enters `y` in **levels**, the
+bias is the 49% shown above. So it is not the presence of a common
+factor that breaks MG — it is whether that factor's contribution to `y`
+is **persistent**. A large but transitory common shock leaves the long
+run intact.
+
+**The augmentation costs something even when it is not needed.** At
+`gamma = 0` — no factor at all — CS-DL carries a bias of −0.027, 3.4% of
+the coefficient, and CS-ARDL −0.008. Reaching for CS-DL reflexively is
+not free.
+
+### A warning about reading the CD test after augmentation
+
+In the same Monte Carlo, the CD test rejects **100% of the time after
+augmentation, including at `gamma = 0`**:
+
+| `gamma` | CD rejects before | CD rejects after |
+|---|---|---|
+| 0.0 | 17.9% | **100%** |
+| 0.3 | 100% | **100%** |
+| 0.6 | 100% | **100%** |
+
+The augmentation does not merely fail to absorb the dependence — it
+*induces* some. Every individual is regressed on averages that contain
+its own `y` (at N = 30, a weight of 1/30), which creates a mechanical
+**negative** correlation between residuals. The signature is visible on
+the reference panel: `CD = −6.12`, a negative statistic, with a mean
+absolute correlation of only 0.10.
+
+**So a significant CD on CS-ARDL residuals does not mean "factors
+remain".** It may be nothing but the self-inclusion effect. Reading it
+as a diagnostic of residual factors leads to adding lags that buy
+nothing. Recorded as OBS-23.
+
+### Cross-checked against R — and the limits of that check
+
+This is the part to read before trusting the numbers.
+
+`plm::pcce(model="mg")` implements the **static** CCE of Pesaran (2006),
+which is exactly the special case of CS-DL with no lagged differences
+and no lags of the averages. On a panel pyardl generates itself:
+
+| quantity | agreement |
+|---|---|
+| group `theta` | 1.1e-16 |
+| between-individual standard error | 1.5e-16 |
+| individual `theta_i` | ~1e-15 |
+
+The R script also re-derives the aggregation by hand from the individual
+OLS and lands on the same digits, so the reference is readable rather
+than a black box.
+
+**That validates three things and no more**: the construction of the
+cross-sectional averages, the augmented per-individual regression, and
+the Mean Group aggregation with its between-individual variance.
+
+**The dynamic half has no external reference here.** Lags of the
+averages, and the long run rebuilt from short-run coefficients, are
+covered by the internal tests and the Monte Carlo only. The
+specification names Stata's `xtdcce2` as the reference; Stata is not
+available in this environment and no R package implements the full
+CS-ARDL — which is precisely why the specification calls this a blank
+area. A `.do` script is provided at
+`validation/external/spec24_xtdcce2.do` for the day it can be run, and
+no reference values have been invented in the meantime.
+
 ## What comes next
 
-Spec 24 drops the assumption that individuals are independent of each
-other — the one flagged just above — by approximating the unobserved
-common factors with cross-sectional averages (CS-ARDL, CS-DL). It reuses
-this container and this per-individual loop.
+The panel branch is complete: MG, PMG, DFE, CS-ARDL and CS-DL all share
+one container and one per-individual loop, and one aggregation rule.
+
+What is *not* here, and is flagged rather than omitted silently: the
+strong/weak dependence exponent of Bailey, Kapetanios and Pesaran, which
+the specification places outside the first version; and an external
+reference for the dynamic half of CS-ARDL, which waits on Stata.
 
 ## References
 
+- Chudik, A. & Pesaran, M. H. (2015). Common correlated effects estimation
+  of heterogeneous dynamic panel data models with weakly exogenous
+  regressors. *Journal of Econometrics*, 188(2), 393-420.
+- Chudik, A., Mohaddes, K., Pesaran, M. H. & Raissi, M. (2016). Long-run
+  effects in large heterogeneous panel data models with cross-sectionally
+  correlated errors. *Advances in Econometrics*, 36, 85-135.
+- Pesaran, M. H. (2006). Estimation and inference in large heterogeneous
+  panels with a multifactor error structure. *Econometrica*, 74(4),
+  967-1012.
+- Pesaran, M. H. (2015). Testing weak cross-sectional dependence in large
+  panels. *Econometric Reviews*, 34(6-10), 1089-1117.
 - Pesaran, M. H. & Smith, R. (1995). Estimating long-run relationships
   from dynamic heterogeneous panels. *Journal of Econometrics*, 68(1),
   79-113.
