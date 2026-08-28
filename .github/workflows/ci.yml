@@ -96,15 +96,20 @@ jobs:
       - name: Install (avec extras optionnels)
         run: pip install -e ".[dev,plot,bootstrap]"
 
-      # -rs liste la RAISON de chaque test ignoré, dans cette execution :
-      # inutile de relancer toute la suite une seconde fois pour la lire,
-      # ce que faisait la version precedente sur chacune des neuf
-      # cellules de la matrice.
+      # -ra, et non -rs. `-rs` ne resume QUE les tests ignores : quand
+      # macOS a signale 5 echecs le 2026-08-28, le resume final ne
+      # contenait que des lignes SKIPPED et pas une seule ligne FAILED.
+      # Le log etait donc inexploitable sans faire defiler des milliers
+      # de lignes de traceback, et diagnostiquer revenait a deviner.
+      #
+      # Un resume qui tait ce qui a echoue est pire qu'absent : il a
+      # l'air complet. `-ra` liste toutes les issues non passantes,
+      # echecs compris, avec leur raison.
       - name: Pytest + doctests + couverture
         shell: bash
         run: |
           set -o pipefail
-          pytest -m "not slow" -rs \
+          pytest -m "not slow" -ra \
             --doctest-modules src/pyardl tests \
             --cov=pyardl --cov-report=term-missing --cov-report=xml \
             2>&1 | tee pytest-output.txt
