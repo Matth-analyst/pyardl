@@ -124,7 +124,11 @@ class TestStructure:
         assert neg.name == "oil_neg"
 
     def test_index_is_preserved(self) -> None:
-        idx = pd.date_range("2000-01-01", periods=6, freq="QE")
+        # pd.offsets.QuarterEnd() plutot que freq="QE" : cet alias
+        # n'existe qu'a partir de pandas 2.2, alors que le projet
+        # declare pandas>=2.1. L'objet offset, lui, se comporte a
+        # l'identique de 2.1 a 3.0.
+        idx = pd.date_range("2000-01-01", periods=6, freq=pd.offsets.QuarterEnd())
         pos, neg = partial_sums(pd.Series(np.arange(6.0), index=idx, name="p"))
         assert pos.index.equals(idx)
         assert neg.index.equals(idx)

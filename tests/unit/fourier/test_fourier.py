@@ -69,7 +69,11 @@ class TestTerms:
         assert np.max(np.abs(off)) < 1e-12
 
     def test_index_is_preserved(self) -> None:
-        idx = pd.date_range("2000-01-01", periods=40, freq="QE")
+        # pd.offsets.QuarterEnd() plutot que freq="QE" : cet alias
+        # n'existe qu'a partir de pandas 2.2, alors que le projet
+        # declare pandas>=2.1. L'objet offset, lui, se comporte a
+        # l'identique de 2.1 a 3.0.
+        idx = pd.date_range("2000-01-01", periods=40, freq=pd.offsets.QuarterEnd())
         assert fourier_terms(40, 1.0, index=idx).index.equals(idx)
 
     @pytest.mark.parametrize(
