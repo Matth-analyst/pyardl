@@ -14,8 +14,8 @@ authors:
   - family-names: Adjoh
     given-names: Komlan Matthania
     email: komlanadjohmatthania@gmail.com
-version: 0.4.0
-date-released: "2026-08-22"
+version: 0.5.0
+date-released: "2026-08-29"
 license: MIT
 repository-code: "https://github.com/Matth-analyst/pyardl"
 keywords:
@@ -26,6 +26,8 @@ keywords:
   - bounds test
   - error correction model
   - NARDL
+  - QARDL
+  - panel data
   - bootstrap
 abstract: >-
   A Python time-series econometrics library for ARDL models: ARDL and
@@ -36,5 +38,11 @@ abstract: >-
   response surfaces with p-values), the three-test framework of Sam,
   McNown & Goh (2019) that names both degeneracies, bootstrap critical
   values with no inconclusive zone, the nonlinear ARDL of Shin, Yu &
-  Greenwood-Nimmo (2014) with its asymmetric dynamic multipliers, and a
-  reproducible Monte Carlo simulation engine.
+  Greenwood-Nimmo (2014) with its asymmetric dynamic multipliers, the
+  quantile ARDL of Cho, Kim & Shin (2015), Fourier ARDL for smooth
+  breaks that need not be dated, heterogeneous dynamic panels (Mean
+  Group, Pooled Mean Group, Dynamic Fixed Effects, CS-ARDL and CS-DL),
+  the efficient long-run estimators FMOLS, DOLS and CCR, stochastic
+  dynamic simulations of a fitted model, the Koyck and Almon
+  distributed-lag models the family descends from, and a reproducible
+  Monte Carlo simulation engine.

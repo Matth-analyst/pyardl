@@ -113,7 +113,7 @@ The robustness block applied papers report, in one call:
 
 ```pycon
 >>> from pyardl.cointegration import compare_longrun
->>> from pyardl.core.ardl import ARDL
+>>> from pyardl.core import ARDL
 >>> fit = ARDL(d["LRM"], d[["LRY", "IBO", "IDE"]],
 ...            order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}), det="const").fit()
 >>> table = compare_longrun(d["LRM"], d[["LRY", "IBO", "IDE"]],

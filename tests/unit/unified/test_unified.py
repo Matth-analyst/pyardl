@@ -136,7 +136,7 @@ class TestEngineEquivalence:
     def test_public_plain_cell_delegates_rather_than_recomputes(self) -> None:
         y, x = _cointegrated(seed=12)
         res = cointegration_analysis(
-            y, x, inference="bootstrap", order=(1, 1), B=299, seed=7
+            y, x, inference="bootstrap", order=(1, 1), n_boot=299, seed=7
         )
         ref = bootstrap_bounds_test(y, x, case=3, order=(1, 1), n_boot=299, seed=7)
         assert res.f_stat == pytest.approx(ref.f_stat, abs=1e-12)
@@ -185,7 +185,7 @@ class TestDecompositionInTheLoop:
     def test_nardl_cell_runs_and_classifies(self) -> None:
         y, x = _cointegrated(seed=14, lam=-0.4)
         res = cointegration_analysis(
-            y, x, asym=["x"], inference="bootstrap", B=299, seed=3
+            y, x, asym=["x"], inference="bootstrap", n_boot=299, seed=3
         )
         assert res.label == "nardl/bootstrap"
         assert res.classification is not None
@@ -232,10 +232,15 @@ class TestFourierInTheNull:
         valeur critique est PLUS negative qu'a frequence fixee."""
         y, x = _independent(seed=16)
         searched = cointegration_analysis(
-            y, x, fourier={"k": 1}, inference="bootstrap", B=600, seed=5
+            y, x, fourier={"k": 1}, inference="bootstrap", n_boot=600, seed=5
         )
         fixed = cointegration_analysis(
-            y, x, fourier={"k": 1, "freq": 1.0}, inference="bootstrap", B=600, seed=5
+            y,
+            x,
+            fourier={"k": 1, "freq": 1.0},
+            inference="bootstrap",
+            n_boot=600,
+            seed=5,
         )
         assert searched.frequency is not None
         assert searched.t_critical is not None and fixed.t_critical is not None
@@ -244,7 +249,7 @@ class TestFourierInTheNull:
     def test_selection_table_is_kept(self) -> None:
         y, x = _cointegrated(seed=17, break_size=4.0)
         res = cointegration_analysis(
-            y, x, fourier={"k": 1}, inference="bootstrap", B=299, seed=5
+            y, x, fourier={"k": 1}, inference="bootstrap", n_boot=299, seed=5
         )
         table = res.detail.selection
         assert table is not None
@@ -279,7 +284,7 @@ class TestMixedRegressors:
     def test_only_one_regressor_is_decomposed(self) -> None:
         y, x = self._two_regressors(seed=60)
         res = cointegration_analysis(
-            y, x, asym=["a"], inference="bootstrap", B=299, seed=1
+            y, x, asym=["a"], inference="bootstrap", n_boot=299, seed=1
         )
         assert set(res.order[1]) == {"a_pos", "a_neg", "b"}
         assert res.classification is not None
@@ -332,7 +337,7 @@ class TestMixedRegressors:
             asym=["a"],
             inference="bootstrap",
             order=(1, {"a_pos": 1, "a_neg": 1, "b": 2}),
-            B=199,
+            n_boot=199,
             seed=1,
         )
         assert res.order[1] == {"a_pos": 1, "a_neg": 1, "b": 2}
@@ -340,7 +345,13 @@ class TestMixedRegressors:
     def test_mixed_cell_with_fourier(self) -> None:
         y, x = self._two_regressors(seed=63)
         res = cointegration_analysis(
-            y, x, asym=["a"], fourier={"k": 1}, inference="bootstrap", B=299, seed=1
+            y,
+            x,
+            asym=["a"],
+            fourier={"k": 1},
+            inference="bootstrap",
+            n_boot=299,
+            seed=1,
         )
         assert res.frequency is not None
         assert res.classification is not None
@@ -350,7 +361,7 @@ class TestResults:
     def test_summary_reports_the_frequency_when_there_is_one(self) -> None:
         y, x = _cointegrated(seed=19, break_size=4.0)
         res = cointegration_analysis(
-            y, x, fourier={"k": 1}, inference="bootstrap", B=199, seed=1
+            y, x, fourier={"k": 1}, inference="bootstrap", n_boot=199, seed=1
         )
         assert "Fourier frequency:" in res.summary()
 
@@ -373,7 +384,7 @@ class TestResults:
 
     def test_bootstrap_route_carries_all_three(self) -> None:
         y, x = _cointegrated(seed=22, lam=-0.4)
-        res = cointegration_analysis(y, x, inference="bootstrap", B=299, seed=1)
+        res = cointegration_analysis(y, x, inference="bootstrap", n_boot=299, seed=1)
         assert res.f_stat is not None
         assert res.t_stat is not None
         assert res.f_indep_stat is not None
@@ -381,23 +392,25 @@ class TestResults:
 
     def test_reproducible_with_a_seed(self) -> None:
         y, x = _cointegrated(seed=23)
-        a = cointegration_analysis(y, x, inference="bootstrap", B=299, seed=99)
-        b = cointegration_analysis(y, x, inference="bootstrap", B=299, seed=99)
+        a = cointegration_analysis(y, x, inference="bootstrap", n_boot=299, seed=99)
+        b = cointegration_analysis(y, x, inference="bootstrap", n_boot=299, seed=99)
         assert a.f_critical == b.f_critical
         assert a.t_critical == b.t_critical
 
     def test_seed_recorded_when_omitted(self) -> None:
         y, x = _cointegrated(seed=24)
-        res = cointegration_analysis(y, x, asym=["x"], inference="bootstrap", B=199)
+        res = cointegration_analysis(
+            y, x, asym=["x"], inference="bootstrap", n_boot=199
+        )
         assert res.seed is not None
         again = cointegration_analysis(
-            y, x, asym=["x"], inference="bootstrap", B=199, seed=res.seed
+            y, x, asym=["x"], inference="bootstrap", n_boot=199, seed=res.seed
         )
         assert again.f_critical == res.f_critical
 
     def test_pvalues_are_never_exactly_zero(self) -> None:
         y, x = _cointegrated(seed=25, lam=-0.5)
-        res = cointegration_analysis(y, x, inference="bootstrap", B=199, seed=1)
+        res = cointegration_analysis(y, x, inference="bootstrap", n_boot=199, seed=1)
         assert res.f_pvalue is not None and res.n_boot is not None
         assert res.f_pvalue >= 1 / (res.n_boot + 1)
 
@@ -411,8 +424,8 @@ class TestResults:
 class TestCompare:
     def test_the_robustness_table_runs_every_cell(self) -> None:
         y, x = _cointegrated(seed=30, lam=-0.4)
-        base = cointegration_analysis(y, x, inference="bootstrap", B=199, seed=2)
-        table = base.compare(B=199)
+        base = cointegration_analysis(y, x, inference="bootstrap", n_boot=199, seed=2)
+        table = base.compare(n_boot=199)
         assert len(table) == 4
         assert "classification" in table.columns
         assert table["classification"].notna().all()
@@ -439,7 +452,7 @@ class TestGuards:
         y, x = _cointegrated(seed=43)
         with pytest.warns(PyardlMethodologyWarning, match="over-rejects"):
             cointegration_analysis(
-                y, x, fourier={"k": 1}, inference="bootstrap", B=199, seed=1
+                y, x, fourier={"k": 1}, inference="bootstrap", n_boot=199, seed=1
             )
 
     def test_a_fixed_frequency_does_not_warn(self) -> None:
@@ -453,7 +466,7 @@ class TestGuards:
                 x,
                 fourier={"k": 1, "freq": 1.0},
                 inference="bootstrap",
-                B=199,
+                n_boot=199,
                 seed=1,
             )
 
@@ -464,7 +477,7 @@ class TestGuards:
         y, x = _cointegrated(seed=45)
         with warnings.catch_warnings():
             warnings.simplefilter("error", PyardlMethodologyWarning)
-            cointegration_analysis(y, x, fourier={"k": 1}, B=199, seed=1)
+            cointegration_analysis(y, x, fourier={"k": 1}, n_boot=199, seed=1)
 
     def test_overparameterised_specification_warns(self) -> None:
         """Une decomposition, des sinusoides et des retards paraissent
@@ -480,7 +493,7 @@ class TestGuards:
                 fourier={"k": 2},
                 inference="bootstrap",
                 order=(3, 3),
-                B=199,
+                n_boot=199,
                 seed=1,
             )
 
@@ -512,7 +525,7 @@ class TestGuards:
                 asym=["x"],
                 inference="bootstrap",
                 order=(1, {"x": 1}),
-                B=199,
+                n_boot=199,
                 seed=1,
             )
 
@@ -533,7 +546,7 @@ class TestGuards:
                 asym=["a"],
                 inference="bootstrap",
                 order=(1, 1),
-                B=199,
+                n_boot=199,
                 seed=1,
             )
 
@@ -552,7 +565,7 @@ class TestDecisions:
         ):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                res = cointegration_analysis(y, x, B=399, seed=1, **kwargs)  # type: ignore[arg-type]
+                res = cointegration_analysis(y, x, n_boot=399, seed=1, **kwargs)  # type: ignore[arg-type]
             assert res.decision_t in (None, "no_cointegration")
 
     def test_a_clear_relation_is_found_in_every_bootstrap_cell(self) -> None:
@@ -564,7 +577,7 @@ class TestDecisions:
             {"asym": ["x"], "fourier": {"k": 1}},
         ):
             res = cointegration_analysis(
-                y, x, inference="bootstrap", B=399, seed=1, **kwargs
+                y, x, inference="bootstrap", n_boot=399, seed=1, **kwargs
             )  # type: ignore[arg-type]
             assert res.classification == "cointegration", kwargs
 
@@ -584,7 +597,7 @@ class TestDecisions:
                     asym=["x"],
                     fourier={"k": 1},
                     inference="bootstrap",
-                    B=299,
+                    n_boot=299,
                     seed=1,
                 )
             rejects += res.classification == "cointegration"

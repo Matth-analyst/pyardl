@@ -326,7 +326,7 @@ class UnifiedResults:
             inference route.
         **overrides
             Passed through to :func:`cointegration_analysis` (for
-            instance a smaller ``B`` to keep the table cheap).
+            instance a smaller ``n_boot`` to keep the table cheap).
 
         Returns
         -------
@@ -679,7 +679,7 @@ def cointegration_analysis(
     order: tuple[int, int | dict[str, int]] | None = None,
     conditional: bool = True,
     threshold: float = 0.0,
-    B: int = 2999,
+    n_boot: int = 2999,
     alpha: float = 0.05,
     seed: int | None = None,
     resample: ResampleScheme = "iid",
@@ -723,7 +723,7 @@ def cointegration_analysis(
         UECM.
     threshold : float, default 0.0
         Threshold of the partial-sum decomposition.
-    B : int, default 2999
+    n_boot : int, default 2999
         Bootstrap replications, or simulation draws for the Fourier
         route.
     alpha : float, default 0.05
@@ -811,7 +811,7 @@ def cointegration_analysis(
         "case": case,
         "conditional": conditional,
         "threshold": threshold,
-        "B": B,
+        "n_boot": n_boot,
         "alpha": alpha,
         "seed": seed,
         "resample": resample,
@@ -877,7 +877,7 @@ def cointegration_analysis(
             freq=fixed_freq if fixed_freq is not None else "auto",
             grid=grid,
             alpha=alpha,
-            n_sims=B,
+            n_sims=n_boot,
             seed=seed,
         )
         return UnifiedResults(
@@ -967,7 +967,7 @@ def cointegration_analysis(
             x,
             case=case,
             order=order,
-            n_boot=B,
+            n_boot=n_boot,
             resample=resample,
             seed=seed,
             var_order=var_order,
@@ -1076,7 +1076,7 @@ def cointegration_analysis(
         case,
         conditional,
         config,
-        B,
+        n_boot,
         resample,
         var_order,
         burn_in,

@@ -5,7 +5,7 @@
 Here is an estimated ARDL, printed the way applied papers print it:
 
 ```pycon
->>> from pyardl.core.ardl import ARDL
+>>> from pyardl.core import ARDL
 >>> from pyardl.datasets import load_denmark
 >>> d = load_denmark()
 >>> fit = ARDL(d["LRM"], d[["LRY", "IBO", "IDE"]],

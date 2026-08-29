@@ -5,6 +5,53 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-29
+
+Fifth release, and the one that closes the genealogy. The library now
+covers every specification the project set out to implement, from the
+distributed-lag models of the 1950s that the ARDL descends from to the
+heterogeneous panels and dynamic simulations at its frontier — each with
+its own external cross-validation against R or Stata output.
+
+### Changed — the cross-cutting review before the tag
+
+Three inconsistencies that no functional test could have caught, because
+each of them worked:
+
+- **`cointegration_analysis(B=...)` is now `n_boot=...`.** It was the
+  only public place calling the bootstrap replication count `B`, while
+  every other entry point — and the field this very object records,
+  `UnifiedResults.n_boot` — used `n_boot`. Breaking change, no alias:
+  the inconsistency is better removed now than carried. The printed
+  summaries keep `B=2999`, which is display notation from the
+  literature, not a parameter name.
+- **`ARDLResults` and `BoundsTestResults` are frozen.** They were the
+  only two mutable Results objects out of twenty-seven, and the
+  architecture had promised immutability throughout. A value rewritten
+  after the fact would be reported by `summary()` with exactly the same
+  confidence as a computed one. `dataclasses.replace` still works.
+- **`pyardl.core` now exports its own names.** It was the library's only
+  empty `__init__`, which made `ARDL` — the central class everything
+  else is built on — the sole symbol requiring a deep import path.
+  `from pyardl.core.ardl import ARDL` keeps working.
+
+### Added — a lazy top-level surface
+
+`from pyardl import ARDL, bounds_test` now works. The re-exports use
+PEP 562's module `__getattr__`, so `import pyardl` stays at about a
+millisecond instead of paying the ~3.5 s statsmodels import that eager
+binding would charge to everyone, including a caller who only wants
+`__version__`. `tests/test_public_api.py` checks that in a fresh
+interpreter, since inside a pytest session statsmodels is already
+loaded and the question no longer arises.
+
+Packaging metadata caught up at the same time: keywords, classifiers,
+project URLs, and a description that matches what the library actually
+does. Verified on the built wheel — an earlier version of that edit had
+silently moved `dependencies` under `[project.urls]`, which would have
+shipped a package declaring no requirements at all.
+
+
 ### Added — Distributed lags (`pyardl.distributed_lags`, specs 01 & 02)
 
 - `KoyckModel` — the geometric lag, with three estimators. `"ols"` is

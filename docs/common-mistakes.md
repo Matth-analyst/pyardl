@@ -69,7 +69,7 @@ is exactly why `t_BDM` needs its own tabulated bounds. So the reported
 standard error has no coverage: it is a number formatted like a result.
 
 ```pycon
->>> from pyardl.core.ardl import ARDL
+>>> from pyardl.core import ARDL
 >>> p, q = res.order
 >>> fit = ARDL(y, x, order=(p, q), det="const").fit()
 >>> round(float(fit.adjustment["lambda"]), 4)

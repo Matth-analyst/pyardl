@@ -26,7 +26,7 @@ model that results.
 ## 1. Estimate the relationship
 
 ```python
-from pyardl.core.ardl import ARDL
+from pyardl.core import ARDL
 from pyardl.datasets import load_denmark
 
 data = load_denmark()

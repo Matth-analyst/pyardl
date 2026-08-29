@@ -299,7 +299,7 @@ def _classify(stat: float, lower: float, upper: float, *, left_tail: bool) -> De
     return "inconclusive"
 
 
-@dataclass
+@dataclass(frozen=True)
 class BoundsTestResults:
     """Outcome of a bounds test.
 

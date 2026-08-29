@@ -36,7 +36,7 @@ residuals, which invalidates the inference; too many waste degrees of
 freedom.
 
 ```python
-from pyardl.core.ardl import ARDL
+from pyardl.core import ARDL
 
 sel = ARDL.select_order(y, x, max_p=4, max_q=4, ic="bic")
 print(sel.best_order)

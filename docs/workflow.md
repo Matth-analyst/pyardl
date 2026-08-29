@@ -114,7 +114,7 @@ Only now, with cointegration established, does it make sense to read the
 long-run coefficients.
 
 ```pycon
->>> from pyardl.core.ardl import ARDL
+>>> from pyardl.core import ARDL
 >>> p, q = res.order
 >>> fit = ARDL(y, x, order=(p, q), det="const").fit()
 >>> fit.longrun.round(4).to_dict()["theta"]

@@ -228,7 +228,7 @@ sample looks like. A `PyardlMethodologyWarning` fires when it happens.
 ### Step 1 — Choose lag orders
 
 ```python
-from pyardl.core.ardl import ARDL
+from pyardl.core import ARDL
 
 sel = ARDL.select_order(y, x, max_p=3, max_q=3, ic="bic")
 print(sel.top(4).round(3))
@@ -1240,18 +1240,24 @@ Released:
   framework that names both degeneracies, the Johansen system test and its
   regressor diagnostic, conditional/unconditional models, and one VECM
   simulator for every Monte Carlo study.
-
 - **0.4.0** — NARDL: asymmetric long-run and short-run responses, the four
   symmetry tests, dynamic multipliers with simulated bands, and critical
   values simulated for the decomposed null.
+- **0.5.0** — the rest of the genealogy, from its roots to its frontier:
+  QARDL and QNARDL, Fourier ARDL and Fourier-ADL cointegration, the unified
+  entry point over the eight configurations, heterogeneous panels (MG, PMG,
+  DFE, CS-ARDL, CS-DL) with the Hausman test between them, the efficient
+  long-run estimators (DOLS, FMOLS, CCR), dynamic simulations, and the
+  distributed-lag models the whole family descends from (Koyck, Almon).
 
-Planned:
+  With that, the 28 specifications the project set out to implement are
+  implemented, each with its own external cross-validation.
 
-- **0.5** — QARDL and QNARDL — *implemented, awaiting release*.
-- **0.6+** — Fourier ARDL, dynamic simulations, heterogeneous panels
-  (MG, PMG, CS-ARDL).
+Next:
 
----
+- **0.6+** — a Rust backend for the bootstrap hot paths, always doubled by
+  the NumPy path and gated on a distributional equivalence test; QARDL
+  bands by row resampling; and whatever the validation register turns up.
 
 ## Contributing
 
@@ -1261,7 +1267,7 @@ Issues and pull requests are welcome. Before opening a PR:
 pip install -e ".[dev,plot,bootstrap]"
 ruff check src tests && ruff format --check src tests
 mypy src/pyardl
-pytest -m "not slow" --doctest-modules src/pyardl tests --cov=pyardl
+pytest -m "not slow" -ra --doctest-modules src/pyardl tests docs --cov=pyardl
 ```
 
 Two expectations specific to this project. Every statistical claim needs a test

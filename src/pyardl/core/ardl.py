@@ -694,7 +694,7 @@ class GETSResults:
     general_model: ARDLResults
 
 
-@dataclass
+@dataclass(frozen=True)
 class ARDLResults:
     """Results of an ARDL fit.
 

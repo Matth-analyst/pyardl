@@ -8,11 +8,37 @@ name = "pyardl"
 # Deux emplacements finissent toujours par diverger, et la CI verifie en
 # plus que l'etiquette git correspond a cette valeur.
 dynamic = ["version"]
-description = "Économétrie des modèles ARDL : estimation, bounds tests de cointégration à trois tests, valeurs critiques tracées, inférence bootstrap et NARDL asymétrique."
+description = "Économétrie des séries temporelles ARDL : estimation et algèbre ECM exacte, bounds tests à trois tests avec classification des dégénérescences, valeurs critiques tracées jusqu'à leur source, inférence bootstrap, NARDL, QARDL, Fourier, panels hétérogènes et simulations dynamiques."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "pyardl contributors" }]
+authors = [
+    { name = "Komlan Matthania Adjoh", email = "komlanadjohmatthania@gmail.com" },
+]
+keywords = [
+    "ardl",
+    "cointegration",
+    "bounds-test",
+    "error-correction",
+    "econometrics",
+    "time-series",
+    "nardl",
+    "qardl",
+    "panel-data",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Typing :: Typed",
+]
+
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
@@ -39,6 +65,13 @@ docs = [
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Matth-analyst/pyardl"
+Documentation = "https://github.com/Matth-analyst/pyardl/tree/main/docs"
+Repository = "https://github.com/Matth-analyst/pyardl"
+Changelog = "https://github.com/Matth-analyst/pyardl/blob/main/CHANGELOG.md"
+Issues = "https://github.com/Matth-analyst/pyardl/issues"
 
 [tool.hatch.version]
 path = "src/pyardl/__init__.py"
