@@ -50,9 +50,9 @@ DOLS long-run estimates - 50 observations
   t statistics are asymptotically standard normal
 <BLANKLINE>
                      theta          se         z         p
-    LRY             1.2214      0.0841    14.522    0.0000
-    IBO            -3.8353      0.3265   -11.747    0.0000
-    IDE             2.6308      0.7593     3.465    0.0005
+    LRY             1.2214      0.0878    13.919    0.0000
+    IBO            -3.8353      0.3406   -11.259    0.0000
+    IDE             2.6308      0.7922     3.321    0.0009
 
 ```
 
@@ -65,7 +65,7 @@ subtracted.
 >>> from pyardl.cointegration import fmols
 >>> res = fmols(d["LRM"], d[["LRY", "IBO", "IDE"]], bandwidth=5)
 >>> round(float(res.longrun.loc["LRY", "theta"]), 6)
-1.290357
+1.26569
 
 ```
 
@@ -80,35 +80,31 @@ Same 1000 replications, `theta = 1.5`:
 
 | T | OLS | DOLS | FMOLS | CCR |
 |---|---|---|---|---|
-| 100 | +0.1380 | **+0.0087** | +0.0565 | +0.0611 |
-| 200 | +0.0773 | **+0.0013** | +0.0232 | +0.0261 |
-| 400 | +0.0397 | **+0.0013** | +0.0108 | +0.0118 |
+| 100 | +0.1380 | **+0.0087** | +0.0358 | +0.0532 |
+| 200 | +0.0773 | **+0.0013** | +0.0094 | +0.0176 |
+| 400 | +0.0397 | **+0.0013** | +0.0038 | +0.0064 |
 
 And coverage of a nominal 95% interval:
 
 | T | DOLS | FMOLS | CCR |
 |---|---|---|---|
-| 100 | 83.7% | 80.8% | 79.0% |
-| 200 | 88.1% | 85.9% | 84.0% |
-| 400 | **90.4%** | 88.7% | 87.6% |
+| 100 | 88.8% | 88.9% | 82.9% |
+| 200 | 91.5% | **92.2%** | 89.7% |
+| 400 | **93.4%** | **94.5%** | **92.8%** |
 
-Two things to take from this, and the second is a caveat the
-specification did not anticipate.
+At T = 400 all three sit inside the 92–97% band, and DOLS and FMOLS meet
+the under-10% bias criterion (3.3% and 9.6%; CCR is at 16%). DOLS is the
+most reliable across the range — its bias is essentially gone by T = 200.
 
-**DOLS dominates on this DGP.** Its bias is 3.3% of the OLS bias at
-T = 400, where FMOLS and CCR sit around 27–30%. The specification asked
-for under 10%; only DOLS delivers it.
-
-**None of the three reaches nominal coverage at these sample sizes.**
-The specification expected 92–97%; the best is 90.4%, and the shortfall
-shrinks steadily with `T`. The intervals are still a little too narrow
-in finite samples. That is a property of the estimators, not of this
-implementation — the coefficients agree with the `cointReg` reference to
-1e-11 — and reporting it is more useful than the reassurance the
-specification assumed. Recorded as OBS-24.
+**Prewhitening is why those numbers look like that, and it is on by
+default.** Without it the same study gave 90.4% / 88.7% / 87.6%
+coverage and missed both criteria. The first version of this page
+reported that shortfall as a property of the estimators at modest `T`.
+It was not: it was a missing component. See below.
 
 The bandwidth was fixed at 8 throughout. Tuning it until the coverage
-band was reached would have been choosing the result.
+band was reached would have been choosing the result — the prewhitening
+was found by asking what was *absent*, not by tuning what was present.
 
 ## The comparison table
 
@@ -133,26 +129,33 @@ method regressor
 ARDL   LRY        0.9965  0.1239   8.0405
        IBO       -4.5381  0.5203  -8.7222
        IDE        2.8915  0.9951   2.9058
-DOLS   LRY        1.2214  0.0841  14.5217
-       IBO       -3.8353  0.3265 -11.7468
-       IDE        2.6308  0.7593   3.4646
-FMOLS  LRY        1.2904  0.1228  10.5051
-       IBO       -3.0068  0.4281  -7.0237
-       IDE        0.9702  0.8996   1.0785
-CCR    LRY        1.2877  0.1260  10.2204
-       IBO       -3.0210  0.4441  -6.8029
-       IDE        1.0150  0.9597   1.0576
+DOLS   LRY        1.2214  0.0878  13.9187
+       IBO       -3.8353  0.3406 -11.2590
+       IDE        2.6308  0.7922   3.3207
+FMOLS  LRY        1.2657  0.1326   9.5474
+       IBO       -3.8893  0.4620  -8.4179
+       IDE        4.0343  0.9709   4.1552
+CCR    LRY        1.2952  0.1179  10.9829
+       IBO       -3.5583  0.3657  -9.7311
+       IDE        3.2797  0.8628   3.8012
 ```
 
-On Danish money demand the four do **not** agree, and the disagreement
-is the result. The income elasticity runs from 1.00 (ARDL) to 1.29
-(FMOLS); the bond-rate semi-elasticity from −3.01 to −4.54. Most
-strikingly, the deposit rate is significant under ARDL and DOLS
-(`t` = 2.9 and 3.5) and **not** under FMOLS and CCR (`t` ≈ 1.06).
+The four agree on every **sign** and on every **verdict** — all three
+regressors are significant under all four estimators — and they disagree
+substantially on **magnitude**. The income elasticity runs from 1.00
+(ARDL) to 1.30 (CCR); the deposit-rate coefficient from 2.63 to 4.03, a
+factor of 1.5.
 
-A paper reporting only one of these rows would be reporting a choice of
-estimator as though it were a finding. That is the case for printing the
-table.
+A paper reporting one of these rows as *the* long-run relation is
+reporting a choice of estimator as though it were a finding. Printing
+the table is what makes the choice visible.
+
+**This table is itself an argument for prewhitening.** Computed without
+it, FMOLS and CCR put the deposit-rate `t` at 1.08 and 1.06 — *not*
+significant — flatly contradicting ARDL and DOLS. The disagreement was
+not economics; it was an underestimated long-run covariance feeding the
+bias correction. Turn prewhitening off with `prewhiten=False` and the
+old table comes back.
 
 ## The long-run covariance, and a transpose that matters
 
@@ -173,6 +176,33 @@ residuals stacked with the differenced regressors.
 Four kernels (Bartlett, Parzen, quadratic-spectral, truncated) and two
 automatic bandwidth rules (Andrews, Newey-West), all checked against
 `cointReg::getLongRunVar` to 5.3e-15.
+
+## Prewhitening, and why it is the default
+
+A kernel estimate of the long-run covariance is biased downward when the
+series is persistent — the kernel weights down exactly the
+autocovariances that carry the persistence. Andrews and Monahan's remedy
+is to strip a VAR(1) first, run the kernel on what is left, and put the
+persistence back.
+
+The size of the effect, measured directly on the brick: for an AR(1)
+with coefficient 0.8 the true `Omega` is 25.0. The plain kernel estimate
+at bandwidth 6 returns **11.68 — 53% too low**. With prewhitening,
+26.82.
+
+A long-run variance halved gives standard errors divided by 1.4, and
+that is precisely the coverage gap. `prewhiten=True` is therefore the
+default on `dols`, `fmols` and `ccr`; `longrun_covariance_kernel` keeps
+`False` so the plain estimate stays available and the two can be
+compared.
+
+A detail that cost a second bug. Prewhitening recolours the **long-run**
+matrices, `Omega` and `Delta`, through `(I-A)^-1 . (I-A')^-1`. It does
+**not** apply to `Sigma`, the contemporaneous covariance — that identity
+is about the spectrum at frequency zero. Recolouring `Sigma` too made
+CCR *worse than plain OLS* while DOLS and FMOLS improved, and CCR is the
+only one of the three that reads `Sigma`. One estimator degrading while
+the others improve points straight at the quantity it alone uses.
 
 **The one-sided matrix has two conventions in circulation** that differ
 by a transpose:

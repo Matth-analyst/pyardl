@@ -1182,45 +1182,81 @@ par la concordance avec `cointRegD`, a 2.3e-12 apres correction.
 cointegre avec endogeneite ET autocorrelation, theta = 1.5, erreur type
 d'une couverture voisine de 95 % : 0.69 point).
 
+Un intervalle a 95 % issu de l'OLS statique en couvre **42**. Pas 90,
+pas 80 : quarante-deux. Et **corriger l'erreur type ne suffit pas** :
+l'OLS avec erreur type HAC monte a 71 % et s'arrete la, a toutes les
+tailles, parce que le biais de second ordre survit a toute reparation de
+la variance. C'est l'argument qui justifie FMOLS et DOLS plutot qu'une
+simple OLS-HAC, et il se voit.
+
+---
+
+### LA PARTIE OU JE ME SUIS TROMPE, ET CE QUI L'A CORRIGE
+
+La premiere version de cette entree rapportait que les trois estimateurs
+manquaient les DEUX cibles de la spec (biais < 10 % de celui de l'OLS,
+couverture dans [92, 97] %), et concluait :
+
+> « Ce n'est pas rapporte comme un echec de l'implementation — la
+> concordance externe a 1e-11 dit qu'elle calcule ce qu'elle doit — mais
+> comme une propriete des estimateurs a T modeste, que la spec supposait
+> meilleure qu'elle n'est. »
+
+**C'etait faux.** La concordance externe etablissait que je calculais
+correctement ce que `cointReg` calcule ; elle n'etablissait pas que je
+calculais la bonne chose. Il manquait le **preblanchiment**
+d'Andrews-Monahan (1992) : ajuster un VAR(1), appliquer le noyau aux
+residus blanchis, puis recolorer. C'est le remede standard a la
+sous-estimation du noyau quand l'erreur est persistante, et il n'etait
+pas dans mon implementation.
+
+Ce qui l'a fait apparaitre est une question posee sur les deux criteres
+manques : que peut-on y faire ? Le balayage a montre que le noyau et la
+bande deplacent la couverture de 78.7 % a 89.7 % — donc qu'ils comptent,
+et qu'ils ne suffisent pas. Restait le composant absent.
+
+**L'ampleur, mesuree directement sur la brique** : pour un AR(1) de
+coefficient 0.8, Omega vaut 25.0. Le noyau seul, a bande 6, rend
+**11.68 — 53 % trop bas**. Avec preblanchiment : 26.82. Une variance de
+long terme divisee par deux donne des erreurs types divisees par 1.4 :
+c'est exactement l'ecart de couverture observe.
+
+### RESULTATS APRES CORRECTION
+
 |   T |     OLS |   DOLS |  FMOLS |    CCR |
 |-----|---------|--------|--------|--------|
-| 100 | +0.1380 |+0.0087 |+0.0565 |+0.0611 |
-| 200 | +0.0773 |+0.0013 |+0.0232 |+0.0261 |
-| 400 | +0.0397 |+0.0013 |+0.0108 |+0.0118 |
-
-Couverture d'un intervalle a 95 % :
+| 100 | +0.1380 |+0.0087 |+0.0358 |+0.0532 |
+| 200 | +0.0773 |+0.0013 |+0.0094 |+0.0176 |
+| 400 | +0.0397 |+0.0013 |+0.0038 |+0.0064 |
 
 |   T | OLS naive | OLS HAC |  DOLS | FMOLS |   CCR |
 |-----|-----------|---------|-------|-------|-------|
-| 100 |    42.1 % |  71.1 % |83.7 % |80.8 % |79.0 % |
-| 200 |    38.4 % |  71.8 % |88.1 % |85.9 % |84.0 % |
-| 400 |    41.4 % |  71.8 % |90.4 % |88.7 % |87.6 % |
+| 100 |    42.1 % |  71.1 % |88.8 % |88.9 % |82.9 % |
+| 200 |    38.4 % |  71.8 % |91.5 % |92.2 % |89.7 % |
+| 400 |    41.4 % |  71.8 % |93.4 % |94.5 % |92.8 % |
 
-- **L'intervalle OLS naif couvre 40 %.** Pas 90, pas 80 : quarante. Un
-  intervalle a 95 % annonce qui en couvre 42 n'est pas conservateur, il
-  est faux, et c'est le regime dans lequel se trouve toute regression
-  statique publiee sans correction.
+**A T = 400 les TROIS atteignent la bande [92, 97] %** de la spec, et
+DOLS et FMOLS son critere de biais (3.3 % et 9.6 % de celui de l'OLS ;
+CCR reste a 16 %).
 
-- **Corriger l'erreur type ne suffit PAS.** L'OLS avec erreur type HAC
-  monte a 71 % et s'arrete la, quelle que soit T. Le probleme n'est donc
-  pas seulement la variance : le biais de second ordre demeure, et
-  aucune correction d'erreur type ne le retire. C'est l'argument qui
-  justifie FMOLS et DOLS plutot qu'une simple OLS-HAC, et il se voit
-  ici.
+### UN SECOND BUG, REVELE PAR LE PREMIER CORRECTIF
 
-- **Deux criteres de la spec, un seul atteint.** La spec demandait un
-  biais Monte Carlo inferieur a 10 % de celui de l'OLS : DOLS y arrive
-  (3.3 % a T = 400), FMOLS et CCR non (27 % et 30 %). Elle demandait une
-  couverture dans [92 %, 97 %] : **aucun des trois n'y arrive** a ces
-  tailles. DOLS s'en approche (90.4 % a T = 400) et progresse
-  regulierement avec T ; les intervalles restent donc un peu trop
-  etroits en echantillon fini.
+Le preblanchiment a d'abord AMELIORE DOLS et FMOLS et **degrade CCR** :
+biais +0.0478 contre +0.0397 pour l'OLS nue, couverture tombant a
+46.6 %. Un correctif qui ameliore deux estimateurs sur trois n'est pas
+un correctif.
 
-  Ce n'est pas rapporte comme un echec de l'implementation — la
-  concordance externe a 1e-11 dit qu'elle calcule ce qu'elle doit —
-  mais comme une propriete des estimateurs a T modeste, que la spec
-  supposait meilleure qu'elle n'est.
+La cause : je recolorais aussi **Sigma**, la covariance CONTEMPORAINE.
+L'identite (I-A)^-1 . (I-A')^-1 porte sur le spectre a la frequence
+zero, donc sur les matrices de LONG TERME — Omega et Delta — et pas sur
+Sigma. CCR est le seul des trois a lire Sigma, d'ou une degradation
+visible sur lui seul. Sigma est desormais calcule sur la serie
+d'origine.
 
-- **Statut** : mesuree, documentee (2026-08-31). La bande est fixee a 8
+C'est ce qui rend le diagnostic sur : un estimateur isole qui empire
+pendant que les deux autres s'ameliorent designe la quantite qu'il est
+seul a utiliser.
+
+- **Statut** : corrigee (2026-08-31). La bande est fixee a 8
   dans cette etude ; la faire varier pour atteindre la borne aurait ete
   choisir le resultat.

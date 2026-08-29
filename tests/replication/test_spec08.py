@@ -22,6 +22,15 @@ plausible.
    55/54 sur les TROIS coefficients — c'est cette constance qui a
    identifie la convention plutot qu'un tatonnement.
 
+PREBLANCHIMENT : POURQUOI CES TESTS LE DESACTIVENT
+---------------------------------------------------
+Les estimateurs de pyardl preblanchissent PAR DEFAUT (Andrews-Monahan),
+parce que sans cela leur couverture reste sous le nominal. Les appels de
+`cointReg` compares ici ne preblanchissent pas. Ces tests passent donc
+`prewhiten=False` : ils verifient que les deux implementations calculent
+la MEME chose quand on leur demande la meme chose, ce qui est le seul
+sens qu'une concordance puisse avoir.
+
 Un troisieme point n'etait pas une convention mais un bug : j'avais
 multiplie la variance par T alors qu'Omega est deja normalise par T.
 Toutes les erreurs types etaient gonflees de sqrt(T), soit un facteur
@@ -96,7 +105,12 @@ def test_fmols_theta_matches_cointreg(denmark: pd.DataFrame, name: str) -> None:
     ref = _EXPECTED["fmols"][name]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = fmols(denmark["LRM"], denmark[["LRY", "IBO", "IDE"]], bandwidth=5)
+        res = fmols(
+            denmark["LRM"],
+            denmark[["LRY", "IBO", "IDE"]],
+            bandwidth=5,
+            prewhiten=False,
+        )
     assert res.longrun.loc[name, "theta"] == pytest.approx(ref["theta"], abs=_TOL)
 
 
@@ -107,7 +121,12 @@ def test_fmols_standard_errors_match_cointreg(denmark: pd.DataFrame, name: str) 
     ref = _EXPECTED["fmols"][name]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = fmols(denmark["LRM"], denmark[["LRY", "IBO", "IDE"]], bandwidth=5)
+        res = fmols(
+            denmark["LRM"],
+            denmark[["LRY", "IBO", "IDE"]],
+            bandwidth=5,
+            prewhiten=False,
+        )
     assert res.longrun.loc[name, "se"] == pytest.approx(ref["se"], abs=_TOL)
 
 
@@ -122,6 +141,7 @@ def test_dols_matches_cointreg(denmark: pd.DataFrame, name: str) -> None:
             n_leads=2,
             n_lags=2,
             bandwidth=5,
+            prewhiten=False,
         )
     assert res.longrun.loc[name, "theta"] == pytest.approx(ref["theta"], abs=_TOL)
     assert res.longrun.loc[name, "se"] == pytest.approx(ref["se"], abs=_TOL)
@@ -155,3 +175,25 @@ def test_the_bias_term_uses_the_full_sample(denmark: pd.DataFrame) -> None:
 
     assert with_full == pytest.approx(ref, abs=_TOL)
     assert np.abs(with_short - ref).max() > 1e-3
+
+
+def test_prewhitening_changes_the_answer(denmark: pd.DataFrame) -> None:
+    """Le preblanchiment n'est pas un reglage cosmetique.
+
+    S'il ne changeait rien, l'activer par defaut n'aurait aucun effet sur
+    la couverture — or il la fait passer de 89.6 % a 94.4 % a T = 400
+    (voir validation/spec08_montecarlo.py). Ce test verifie qu'il mord
+    bien sur ces donnees, sans quoi les deux resultats ci-dessus
+    seraient la meme mesure repetee."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plain = fmols(
+            denmark["LRM"],
+            denmark[["LRY", "IBO", "IDE"]],
+            bandwidth=5,
+            prewhiten=False,
+        )
+        white = fmols(denmark["LRM"], denmark[["LRY", "IBO", "IDE"]], bandwidth=5)
+    assert white.prewhitened
+    assert not plain.prewhitened
+    assert abs(white.longrun.loc["LRY", "se"] - plain.longrun.loc["LRY", "se"]) > 1e-4

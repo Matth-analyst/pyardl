@@ -997,17 +997,22 @@ que soit T, parce que le biais de second ordre survit à toute réparation
 de la variance. C'est l'argument qui justifie ces trois estimateurs
 plutôt qu'une simple OLS-HAC.
 
-Mesuré sur 1000 réplications : DOLS atteint 90.4 % de couverture à
-T=400, FMOLS 88.7 %, CCR 87.6 %. **Aucun n'atteint les 92–97 % que la
-spec attendait** — les intervalles restent un peu trop étroits en
-échantillon fini, ce qui est une propriété des estimateurs et non de
-l'implémentation, dont les coefficients concordent avec `cointReg` à
-2.0e-11.
+Mesuré sur 1000 réplications : DOLS atteint **93.4 %** de couverture à
+T=400, FMOLS **94.5 %**, CCR **92.8 %** — les trois dans la bande
+[92, 97] % que la spec demandait, et DOLS et FMOLS sous le critère de
+biais (3.3 % et 9.6 % de celui de l'OLS).
 
-Sur la demande de monnaie danoise, les quatre méthodes **ne s'accordent
-pas** : le taux de dépôt est significatif sous ARDL et DOLS (t = 2.9 et
-3.5) et ne l'est pas sous FMOLS et CCR (t ≈ 1.06). Le désaccord est le
-résultat — `compare_longrun` le met dans un seul tableau.
+Ces chiffres tiennent au **préblanchiment** d'Andrews-Monahan, actif par
+défaut. Sans lui la même étude donnait 90.4 / 88.7 / 87.6 % et manquait
+les deux critères — un écart que j'avais d'abord attribué aux
+estimateurs eux-mêmes avant de mesurer. Sur un AR(1) de coefficient 0.8,
+le noyau seul sous-estime Ω de **53 %**. OBS-24.
+
+Sur la demande de monnaie danoise les quatre méthodes s'accordent sur
+tous les signes et toutes les significativités, et divergent d'un
+facteur 1.5 sur les magnitudes. `compare_longrun` les met dans un seul
+tableau, parce que publier une seule ligne revient à présenter un choix
+d'estimateur comme un résultat.
 
 ### VECM simulator
 

@@ -200,19 +200,18 @@ FMOLS and CCR repair it three different ways, and
 ...                         n_leads=2, n_lags=2)
 >>> sorted(set(table.index.get_level_values("method")))
 ['ARDL', 'CCR', 'DOLS', 'FMOLS']
->>> [round(float(v), 4) for v in table.xs("IDE", level="regressor")["t"]]
-[2.9058, 3.4646, 1.0785, 1.0576]
+>>> [round(float(v), 4) for v in table.xs("IDE", level="regressor")["theta"]]
+[2.8915, 2.6308, 4.0343, 3.2797]
 
 ```
 
-Read that last line carefully. The deposit rate is **significant** under
-ARDL and DOLS (`t` = 2.91 and 3.46) and **not** under FMOLS and CCR
-(`t` ≈ 1.06). Four estimators of the same long-run coefficient, and they
-do not agree on whether one of the three regressors belongs in it.
+The four agree on the sign and on significance, and disagree on
+magnitude by a factor of 1.5 — the deposit-rate coefficient runs from
+2.63 to 4.03.
 
 **The common error.** Reporting whichever of these four rows supports
-the story. The disagreement *is* the result here, and a paper that shows
-one row is presenting a choice of estimator as a finding.
+the story. A paper that shows one row is presenting a choice of
+estimator as a finding; the spread is part of the result.
 
 ### Smooth structural change: read the pre-test first
 

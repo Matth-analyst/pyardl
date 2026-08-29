@@ -130,6 +130,75 @@ class TestLongRunCovariance:
             longrun_covariance_kernel(bad, bandwidth=2)
 
 
+class TestPrewhitening:
+    """Le composant qui manquait, et le bug que son ajout a revele."""
+
+    def test_it_recovers_a_persistent_long_run_variance(self) -> None:
+        """Pour un AR(1) de coefficient phi, Omega = sigma2/(1-phi)^2.
+        Le noyau seul, a bande courte, sous-estime lourdement ; c'est
+        exactement ce qui privait les intervalles de leur couverture."""
+        rng = np.random.default_rng(50)
+        n, phi = 4000, 0.8
+        e = rng.normal(size=n)
+        u = np.zeros(n)
+        for t in range(1, n):
+            u[t] = phi * u[t - 1] + e[t]
+        true_omega = 1.0 / (1 - phi) ** 2
+        plain = longrun_covariance_kernel(u[:, None], bandwidth=6).omega[0, 0]
+        white = longrun_covariance_kernel(
+            u[:, None], bandwidth=6, prewhiten=True
+        ).omega[0, 0]
+        assert plain < 0.6 * true_omega
+        assert abs(white - true_omega) / true_omega < 0.20
+        assert abs(white - true_omega) < abs(plain - true_omega)
+
+    def test_sigma_is_not_recoloured(self) -> None:
+        """Sigma est la covariance CONTEMPORAINE : l'identite
+        (I-A)^-1 . (I-A')^-1 porte sur le spectre a la frequence zero,
+        donc sur Omega et Delta, pas sur elle.
+
+        La recolorer a rendu CCR pire que l'OLS nue pendant que DOLS et
+        FMOLS s'amelioraient. Ce test verifie que Sigma reste celle de la
+        serie d'origine, blanchiment ou non."""
+        rng = np.random.default_rng(51)
+        n = 800
+        u = np.zeros(n)
+        e = rng.normal(size=n)
+        for t in range(1, n):
+            u[t] = 0.7 * u[t - 1] + e[t]
+        plain = longrun_covariance_kernel(u[:, None], bandwidth=6)
+        white = longrun_covariance_kernel(u[:, None], bandwidth=6, prewhiten=True)
+        assert white.sigma == pytest.approx(plain.sigma, rel=1e-12)
+        assert white.omega[0, 0] != pytest.approx(plain.omega[0, 0], rel=1e-6)
+
+    @pytest.mark.parametrize("estimator", [dols, fmols, ccr])
+    def test_the_estimators_prewhiten_by_default(self, estimator) -> None:  # type: ignore[no-untyped-def]
+        """Le defaut est le comportement mesure comme correct. S'il
+        changeait sans qu'on s'en apercoive, la couverture retomberait
+        sous le nominal sans qu'aucun autre test ne bronche."""
+        y, x = endogenous_dgp(n_obs=300, seed=52)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = estimator(y, x, bandwidth=6)
+            off = estimator(y, x, bandwidth=6, prewhiten=False)
+        assert res.prewhitened
+        assert not off.prewhitened
+        assert res.longrun.loc["x", "se"] != pytest.approx(
+            off.longrun.loc["x", "se"], rel=1e-8
+        )
+
+    def test_a_near_unit_root_does_not_explode(self) -> None:
+        """La recolorisation divise par (I-A) : sans bridage des valeurs
+        propres, une racine proche de l'unite rendrait une variance
+        arbitrairement grande plutot qu'une erreur."""
+        rng = np.random.default_rng(53)
+        n = 500
+        u = np.cumsum(rng.normal(size=n))
+        out = longrun_covariance_kernel(u[:, None], bandwidth=6, prewhiten=True)
+        assert np.isfinite(out.omega).all()
+        assert out.omega[0, 0] > 0
+
+
 class TestLeadLagMatrix:
     def test_columns_are_ordered_leads_then_contemporaneous_then_lags(self) -> None:
         x = np.arange(6.0)[:, None]

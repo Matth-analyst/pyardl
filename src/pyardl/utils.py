@@ -414,6 +414,7 @@ def longrun_covariance_kernel(
     u: npt.ArrayLike,
     kernel: str = "bartlett",
     bandwidth: float | str = "andrews",
+    prewhiten: bool = False,
 ) -> LongRunCovariance:
     r"""Long-run covariance matrices of a multivariate series.
 
@@ -442,6 +443,21 @@ def longrun_covariance_kernel(
         Weighting of the autocovariances.
     bandwidth : float or {'andrews', 'newey-west'}
         Fixed bandwidth, or an automatic rule.
+    prewhiten : bool, default False
+        Fit a VAR(1) first, apply the kernel to the **whitened** series,
+        then recolour. The remedy of Andrews and Monahan (1992) for the
+        downward bias a kernel estimate carries when the series is
+        persistent: on a whitened series there is almost no dependence
+        left for the kernel to miss.
+
+        It is not cosmetic. Measured on the DGP of
+        ``validation/spec08_montecarlo.py``, switching it on moves FMOLS
+        coverage from 89.6% to 94.4% at T = 400 and its bias from 27% of
+        the OLS bias to 10% — the difference between missing both of the
+        specification's targets and meeting them. The efficient
+        estimators therefore default to ``True``; this function keeps
+        ``False`` so that the plain kernel estimate stays available and
+        the two can be compared.
 
     Returns
     -------
@@ -492,19 +508,55 @@ def longrun_covariance_kernel(
             "which is a different quantity."
         )
 
+    # Prewhitening: strip a VAR(1), run the kernel on what is left, then
+    # put the persistence back. The recolouring is
+    # (I - A')^-1 . (kernel estimate) . (I - A)^-1, which is the identity
+    # that makes the whole thing an estimate of the ORIGINAL series'
+    # long-run covariance rather than the innovations'.
+    recolour: npt.NDArray[np.float64] | None = None
+    # Sigma is the CONTEMPORANEOUS covariance of the original series. It
+    # is not a long-run object, so the (I-A)^-1 . (I-A')^-1 recolouring
+    # does not apply to it — that identity is about the spectrum at
+    # frequency zero. Keeping the original array here and recolouring
+    # only Omega and Delta is not a nicety: CCR is the one estimator
+    # that reads Sigma, and recolouring it made CCR WORSE than plain OLS
+    # (bias +0.0478 against +0.0397, coverage falling to 46.6%) while
+    # DOLS and FMOLS improved.
+    original = arr
+    if prewhiten and arr.shape[0] > arr.shape[1] + 2:
+        coef, *_ = np.linalg.lstsq(arr[:-1], arr[1:], rcond=None)
+        # A near-unit root would make the recolouring explode. Andrews and
+        # Monahan shrink the eigenvalues; refusing to do so would turn a
+        # persistent series into an arbitrarily large variance.
+        eigenvalues = np.linalg.eigvals(coef.T)
+        largest = float(np.max(np.abs(eigenvalues))) if eigenvalues.size else 0.0
+        if largest > 0.97:
+            coef = coef * (0.97 / largest)
+        arr = np.asarray(arr[1:] - arr[:-1] @ coef, dtype=np.float64)
+        n_obs = arr.shape[0]
+        recolour = np.asarray(
+            np.linalg.pinv(np.eye(coef.shape[0]) - coef.T), dtype=np.float64
+        )
+        if isinstance(bandwidth, str):
+            band = _bandwidth_rule(arr, kernel, bandwidth)
+
     gamma0 = arr.T @ arr / n_obs
     delta = gamma0.copy()
+    sigma = original.T @ original / original.shape[0]
     for j in range(1, n_obs):
         weight = float(_kernel_weight(np.array([j / band]), kernel)[0])
         if weight == 0.0 and kernel != "quadratic-spectral":
             break
         gamma_j = arr[j:].T @ arr[: n_obs - j] / n_obs
         delta += weight * gamma_j.T
+    if recolour is not None:
+        gamma0 = recolour @ gamma0 @ recolour.T
+        delta = recolour @ delta @ recolour.T
     omega = delta + delta.T - gamma0
     return LongRunCovariance(
         omega=np.asarray(omega, dtype=np.float64),
         delta=np.asarray(delta, dtype=np.float64),
-        sigma=np.asarray(gamma0, dtype=np.float64),
+        sigma=np.asarray(sigma, dtype=np.float64),
         bandwidth=band,
     )
 

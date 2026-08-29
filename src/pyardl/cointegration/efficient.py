@@ -148,6 +148,7 @@ class EfficientLongRunResults:
     kernel: str | None = None
     n_leads: int | None = None
     n_lags: int | None = None
+    prewhitened: bool = True
     resid: pd.Series = field(default_factory=pd.Series, repr=False)
 
     def summary(self) -> str:
@@ -214,6 +215,7 @@ def dols(
     n_lags: int | None = None,
     kernel: str = "bartlett",
     bandwidth: float | str = "andrews",
+    prewhiten: bool = True,
 ) -> EfficientLongRunResults:
     r"""Dynamic OLS (Stock & Watson 1993).
 
@@ -238,6 +240,11 @@ def dols(
     kernel, bandwidth
         HAC settings for the standard errors; see
         :func:`~pyardl.utils.longrun_covariance_kernel`.
+    prewhiten : bool, default True
+        Strip a VAR(1) before applying the kernel, then recolour. On by
+        default because leaving it off is what kept this estimator below
+        the coverage its own literature claims — measured, not assumed;
+        see the module page.
 
     Returns
     -------
@@ -278,7 +285,9 @@ def dols(
 
     # HAC covariance of the whole coefficient vector, then the block for
     # theta. The long-run variance of u is what makes the t standard.
-    lrv = longrun_covariance_kernel(resid[:, None], kernel=kernel, bandwidth=bandwidth)
+    lrv = longrun_covariance_kernel(
+        resid[:, None], kernel=kernel, bandwidth=bandwidth, prewhiten=prewhiten
+    )
     omega_u = float(lrv.omega[0, 0])
     xtx_inv = np.linalg.pinv(design.T @ design)
     # Omega is already the (1/T)-normalised long-run variance, so the
@@ -295,6 +304,7 @@ def dols(
     return EfficientLongRunResults(
         longrun=_table(theta, se, x_names),
         method="DOLS",
+        prewhitened=prewhiten,
         deterministic=pd.Series(beta[:n_det], index=pd.Index(det_names, name="term")),
         nobs=n_use,
         omega_uv=omega_u,
@@ -312,6 +322,7 @@ def _fm_pieces(
     det: DetType,
     kernel: str,
     bandwidth: float | str,
+    prewhiten: bool,
 ) -> tuple[FloatArray, FloatArray, FloatArray, LongRunCovariance, int]:
     """Static regression, its residuals, and the long-run covariances."""
     n_obs = y_arr.shape[0]
@@ -322,7 +333,9 @@ def _fm_pieces(
     v_hat = np.asarray(np.diff(x_arr, axis=0), dtype=np.float64)
     # u and v must share dates: v_t is defined from t = 2 onwards.
     stacked = np.column_stack([u_hat[1:], v_hat])
-    lrv = longrun_covariance_kernel(stacked, kernel=kernel, bandwidth=bandwidth)
+    lrv = longrun_covariance_kernel(
+        stacked, kernel=kernel, bandwidth=bandwidth, prewhiten=prewhiten
+    )
     return u_hat, v_hat, static, lrv, det_block.shape[1]
 
 
@@ -332,6 +345,7 @@ def fmols(
     det: DetType = "const",
     kernel: str = "bartlett",
     bandwidth: float | str = "andrews",
+    prewhiten: bool = True,
 ) -> EfficientLongRunResults:
     r"""Fully modified OLS (Phillips & Hansen 1990).
 
@@ -350,6 +364,11 @@ def fmols(
     det : {'none', 'const', 'trend'}
     kernel, bandwidth
         Passed to :func:`~pyardl.utils.longrun_covariance_kernel`.
+    prewhiten : bool, default True
+        Strip a VAR(1) before applying the kernel, then recolour. It
+        enters the bias correction itself here, not only the variance:
+        an underestimated Omega gives an underestimated lambda+, hence
+        an incomplete correction.
 
     Returns
     -------
@@ -361,10 +380,14 @@ def fmols(
     >>> d = load_denmark()
     >>> res = fmols(d["LRM"], d[["LRY", "IBO", "IDE"]], bandwidth=5)
     >>> round(float(res.longrun.loc["LRY", "theta"]), 6)
-    1.290357
+    1.26569
+    >>> res.prewhitened
+    True
     """
     y_arr, x_arr, x_names = _prepare(y, x)
-    _, v_hat, static, lrv, n_det = _fm_pieces(y_arr, x_arr, det, kernel, bandwidth)
+    _, v_hat, static, lrv, n_det = _fm_pieces(
+        y_arr, x_arr, det, kernel, bandwidth, prewhiten
+    )
     omega = np.asarray(lrv.omega, dtype=np.float64)
     delta = np.asarray(lrv.delta, dtype=np.float64)
 
@@ -409,6 +432,7 @@ def fmols(
     return EfficientLongRunResults(
         longrun=_table(theta, se, x_names),
         method="FMOLS",
+        prewhitened=prewhiten,
         deterministic=pd.Series(beta[:n_det], index=pd.Index(det_names, name="term")),
         nobs=n_use,
         omega_uv=omega_u_v,
@@ -424,6 +448,7 @@ def ccr(
     det: DetType = "const",
     kernel: str = "bartlett",
     bandwidth: float | str = "andrews",
+    prewhiten: bool = True,
 ) -> EfficientLongRunResults:
     r"""Canonical cointegrating regression (Park 1992).
 
@@ -444,7 +469,9 @@ def ccr(
     True
     """
     y_arr, x_arr, x_names = _prepare(y, x)
-    u_hat, v_hat, static, lrv, n_det = _fm_pieces(y_arr, x_arr, det, kernel, bandwidth)
+    u_hat, v_hat, static, lrv, n_det = _fm_pieces(
+        y_arr, x_arr, det, kernel, bandwidth, prewhiten
+    )
     omega = np.asarray(lrv.omega, dtype=np.float64)
     delta = np.asarray(lrv.delta, dtype=np.float64)
     sigma = np.asarray(lrv.sigma, dtype=np.float64)
@@ -496,6 +523,7 @@ def ccr(
     return EfficientLongRunResults(
         longrun=_table(theta, se, x_names),
         method="CCR",
+        prewhitened=prewhiten,
         deterministic=pd.Series(beta[:n_det], index=pd.Index(det_names, name="term")),
         nobs=int(y_star.size),
         omega_uv=omega_u_v,
@@ -514,6 +542,7 @@ def compare_longrun(
     bandwidth: float | str = "andrews",
     n_leads: int | None = None,
     n_lags: int | None = None,
+    prewhiten: bool = True,
 ) -> pd.DataFrame:
     """Long-run coefficients from every available estimator, side by side.
 
@@ -574,9 +603,12 @@ def compare_longrun(
                 n_lags=n_lags,
                 kernel=kernel,
                 bandwidth=bandwidth,
+                prewhiten=prewhiten,
             ),
-            fmols(y, x, det=det, kernel=kernel, bandwidth=bandwidth),
-            ccr(y, x, det=det, kernel=kernel, bandwidth=bandwidth),
+            fmols(
+                y, x, det=det, kernel=kernel, bandwidth=bandwidth, prewhiten=prewhiten
+            ),
+            ccr(y, x, det=det, kernel=kernel, bandwidth=bandwidth, prewhiten=prewhiten),
         ]
     for res in runs:
         label = res.method
