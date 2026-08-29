@@ -1257,9 +1257,9 @@ Released:
 
 Next:
 
-- **0.6+** — QARDL bands by row resampling, the algorithmic half of the
-  bootstrap's cost (the QR), and whatever the validation register turns
-  up.
+- **0.6+** — the optional Rust kernel and the augmented QR, together
+  1.53x to 1.80x on a bootstrap run; QARDL bands by row resampling; and
+  whatever the validation register turns up.
 
 ### Le backend natif, et ce que la mesure a dit
 
@@ -1279,11 +1279,22 @@ Une seule fonction a donc été portée. Le noyau inverse les boucles — une
 réplication traversant toutes les périodes, plutôt que toutes les
 réplications traversant une période — ce qui garde son état de travail
 en cache L2 et rend les réplications parallèles sans synchronisation :
-**4,1× à 5,0×** sur cette étape.
+**3,8× à 4,9×** sur cette étape.
 
-**De bout en bout, 1,37× à 1,52×.** C'est la loi d'Amdahl sur 27 %.
-Annoncer le 5× seul serait exact et trompeur ; la conclusion utile est
-que l'optimisation suivante est le QR, et qu'elle est algorithmique.
+**De bout en bout, 1,39× à 1,57×.** C'est la loi d'Amdahl sur 27 % : annoncer le
+5× seul serait exact et trompeur.
+
+Le QR, lui, a été optimisé côté NumPy — factorisation de la matrice
+augmentée `[X | y]` en `mode="r"`, si bien que `Q` n'est jamais formé et
+que les trois passes qui le consommaient disparaissent. La ligne
+`numpy.linalg.qr` tombe de 9,5 s à 3,87 s.
+
+**Et j'avais prédit que ce serait le plus gros gain des deux. C'était
+faux : 1,07× à 1,22× contre 1,39× à 1,57× pour le noyau.** La part du temps ne
+suffit pas à classer des optimisations — il faut la part *multipliée par
+la fraction réellement récupérable*, et c'est ce second facteur qui se
+devine mal. Retirer 80 % de 27 % bat diviser 36 % par deux. Les deux ne
+se concurrencent pas : ensemble, **1,53× à 1,80×**. OBS-28.
 
 L'équivalence entre les deux chemins est **exacte, pas
 distributionnelle** : le noyau ne tire rien, les innovations lui sont

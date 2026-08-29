@@ -1532,3 +1532,98 @@ ce recoupement, il serait entre dans la documentation.
 
 Le banc alterne desormais, jette un tour de rodage, et retient le
 minimum. `validation/backend_benchmark.py`.
+
+---
+
+## OBS-28 — La part la plus lourde n'est pas la plus rentable a optimiser
+
+- **Spec** : architecture (chemins chauds du bootstrap)
+- **Date** : 2026-08-29
+- **Statut** : prediction REFUTEE par la mesure ; les deux optimisations
+  sont en place et complementaires
+
+### LA PREDICTION
+
+OBS-27 avait bien identifie que le poste le plus lourd du bootstrap
+n'etait pas la recursion portee en Rust mais la decomposition QR — 36 %
+contre 27 %. La page du backend et le rapport de fin de cycle en
+tiraient une conclusion explicite : **l'optimisation suivante est le QR,
+et elle vaut plus que le noyau natif.**
+
+Elle etait fausse.
+
+### CE QUI A ETE FAIT
+
+La forme augmentee. Au lieu de factoriser X puis de projeter, on
+factorise `[X | y]` en demandant a LAPACK le facteur triangulaire seul :
+
+    [X | y] = Q R_a   ->   R = R_a[:k,:k],  Q_X'y = R_a[:k,k],
+                           ||u||^2 = R_a[k,k]^2
+
+Tout ce dont les statistiques ont besoin tient dans ce facteur, donc Q
+n'est jamais forme : LAPACK execute `dgeqrf` sans `dorgqr`, et les trois
+passes qui consommaient Q disparaissent avec lui — la projection, les
+residus, leur somme des carres. `_build_designs` empile le regressande
+comme derniere colonne, donc l'augmentation ne coute pas non plus de
+copie.
+
+Lire la somme des carres sur `R_a[k,k]` est en prime mieux conditionne :
+la difference `y - X beta` n'est jamais formee, et c'est precisement la
+que se produit la cancellation quand le design est presque singulier.
+
+### LE RESULTAT
+
+Le mecanisme a fonctionne exactement comme prevu : la ligne
+`numpy.linalg.qr` passe de **9,5 s a 3,87 s**.
+
+Et de bout en bout : **1,07x a 1,22x**. Le noyau natif, lui, donne
+1,39x a 1,57x.
+
+Mesure dans un seul processus, en alternance, avec le module d'avant le
+changement importe **tel quel depuis git** — une reconstitution qui
+aurait redecoupe la matrice augmentee aurait fait payer au bras de
+reference une copie que le code d'origine ne payait pas, et gonfle le
+gain de 1,22x a 1,30x. L'ecart entre ces deux chiffres est exactement la
+taille du biais qu'un banc d'essai mal construit introduit.
+
+| T | B | k | QR d'origine | QR augmente | + noyau natif |
+|---|---|---|---|---|---|
+| 100 | 2999 | 1 | 0,335 s | 0,314 s (1,07x) | 0,220 s (1,53x) |
+| 300 | 2999 | 1 | 0,707 s | 0,632 s (1,12x) | 0,408 s (1,73x) |
+| 1000 | 2999 | 3 | 5,711 s | 4,698 s (1,22x) | 3,177 s (1,80x) |
+| 1000 | 9999 | 3 | 17,333 s | 14,322 s (1,21x) | 9,807 s (1,77x) |
+
+Les trois bras rendent les memes valeurs critiques a 1e-9.
+
+### POURQUOI LA PREDICTION A ECHOUE
+
+Elle raisonnait sur la PART du temps, et la part ne suffit pas.
+
+Ce qui compte est la part MULTIPLIEE par la fraction qu'on peut
+reellement retirer. Le noyau natif retire environ quatre cinquiemes de
+ce qu'il touche : 0,27 x 0,8 = 0,22. La forme augmentee ne divise que
+par deux la factorisation, et la factorisation n'est pas tout le poste :
+0,36 x 0,5 = 0,18, moins encore une fois les resolutions triangulaires
+qui restent.
+
+Retirer 80 % de 27 % bat diviser 36 % par deux. Le second facteur —
+combien on peut effectivement enlever — est celui qui se devine mal, et
+c'est justement celui sur lequel la prediction a ete faite implicitement
+plutot que mesuree.
+
+### CE QUE CA APPREND
+
+Un profil dit ou le temps va, pas ou il est recuperable. Les deux
+questions se ressemblent assez pour qu'on les confonde, et la seconde ne
+se repond qu'en essayant.
+
+Corollaire pratique : les deux optimisations ne se concurrencent pas,
+elles se cumulent — **1,53x a 1,80x** ensemble. Choisir entre elles sur
+la foi du profil aurait fait renoncer a la meilleure des deux.
+
+### OU CA S'ARRETE
+
+Le profil est desormais plat : 16,1 s la ou il en faisait 26,8, sans
+poste dominant (recursion 30 %, QR 24 %, construction du design 18 %).
+C'est le signal d'arret — les 20 % suivants couteraient plus en
+complexite qu'ils ne rendraient en secondes.

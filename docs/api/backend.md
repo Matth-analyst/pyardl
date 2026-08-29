@@ -24,7 +24,9 @@ before writing any Rust. Profiling `bootstrap_bounds_test` at
 The largest item is **already LAPACK**. Rewriting a QR in Rust would
 call the same LAPACK and gain nothing; the way to make that faster is
 algorithmic — not computing the full `Q` when only `Q'y` and `R` are
-needed — and it belongs in the NumPy path.
+needed — and it belongs in the NumPy path. That optimisation has since
+been done; [its result is below](#the-qr-and-a-prediction-that-was-wrong),
+and it was smaller than this page originally predicted.
 
 The one place where Python genuinely costs something is the recursion
 that regenerates the null paths. It is **sequential in `t`**: period `t`
@@ -47,25 +49,25 @@ Measured on the recursion alone:
 
 | T | B | k | NumPy | native | speed-up |
 |---|---|---|---|---|---|
-| 100 | 999 | 1 | 0.023 s | 0.005 s | 4.6× |
-| 300 | 2999 | 1 | 0.233 s | 0.057 s | 4.1× |
-| 1000 | 2999 | 3 | 1.856 s | 0.368 s | 5.0× |
-| 1000 | 9999 | 3 | 6.167 s | 1.322 s | 4.7× |
+| 100 | 999 | 1 | 0.018 s | 0.005 s | 3.8× |
+| 300 | 2999 | 1 | 0.159 s | 0.042 s | 3.8× |
+| 1000 | 2999 | 3 | 1.246 s | 0.264 s | 4.7× |
+| 1000 | 9999 | 3 | 4.668 s | 0.958 s | 4.9× |
 
-And on the whole test, which is the number that matters:
+And on the whole test, which is the number that matters (measured
+against the current NumPy path, augmented QR included):
 
 | T | B | k | NumPy | native | speed-up |
 |---|---|---|---|---|---|
-| 100 | 2999 | 1 | 0.428 s | 0.295 s | **1.45×** |
-| 300 | 2999 | 1 | 0.900 s | 0.591 s | **1.52×** |
-| 1000 | 2999 | 3 | 6.210 s | 4.435 s | **1.40×** |
-| 1000 | 9999 | 3 | 20.341 s | 14.795 s | **1.37×** |
+| 100 | 2999 | 1 | 0.264 s | 0.191 s | **1.39×** |
+| 300 | 2999 | 1 | 0.551 s | 0.351 s | **1.57×** |
+| 1000 | 2999 | 3 | 4.050 s | 2.794 s | **1.45×** |
+| 1000 | 9999 | 3 | 13.512 s | 9.359 s | **1.44×** |
 
-**About 1.4×, and that is Amdahl's law doing exactly what it says.**
+**1.39× to 1.57×, and that is Amdahl's law doing exactly what it says.**
 Speeding up 27% of a run by 5× cannot give more. Reporting the 5×
 alone would be true and misleading; the honest headline is the smaller
-number, and the useful conclusion is that the next optimisation is the
-QR, not the language.
+number.
 
 ### The benchmark had to be fixed before these numbers meant anything
 
@@ -85,6 +87,66 @@ The script now alternates, discards a warm-up run of each, and takes the
 minimum rather than the mean. A benchmark that does not alternate
 measures thermal drift as much as it measures code — and it does so in a
 form that looks exactly like a result.
+
+## The QR, and a prediction that was wrong
+
+The section above closed, in its first version, with: *the next
+optimisation is the QR, not the language*. The QR has since been
+optimised, and the prediction did not survive the measurement.
+
+**What was done.** The batched estimator now factorises the *augmented*
+matrix and asks LAPACK for the triangular factor only:
+
+```
+[X | y] = Q R_a    →    R = R_a[:k,:k],  Q_X'y = R_a[:k,k],  ‖û‖² = R_a[k,k]²
+```
+
+Everything the statistics need is in that one factor, so `Q` is never
+formed: LAPACK runs `dgeqrf` without `dorgqr`, and three passes over the
+data disappear with it — the projection `Q'y`, the residuals
+`y − Xβ̂`, and their sum of squares. The regressand is stacked as the
+last column by `_build_designs` itself, so the augmentation costs no
+copy either. Reading `‖û‖²` off `R_a[k,k]` is also better conditioned
+than forming `y − Xβ̂`, where a near-singular design is exactly what
+produces cancellation.
+
+It worked: the `numpy.linalg.qr` line fell from **9.5 s to 3.87 s**.
+
+**And end to end it gives 1.07× to 1.22×** — less than the native
+kernel's 1.39× to 1.57×. Measured in one process, alternating the three
+configurations, with the pre-change module imported verbatim from git so
+that the baseline pays no cost the original code did not:
+
+| T | B | k | original QR | augmented QR | + native kernel |
+|---|---|---|---|---|---|
+| 100 | 2999 | 1 | 0.335 s | 0.314 s (1.07×) | 0.220 s (**1.53×**) |
+| 300 | 2999 | 1 | 0.707 s | 0.632 s (1.12×) | 0.408 s (**1.73×**) |
+| 1000 | 2999 | 3 | 5.711 s | 4.698 s (1.22×) | 3.177 s (**1.80×**) |
+| 1000 | 9999 | 3 | 17.333 s | 14.322 s (1.21×) | 9.807 s (**1.77×**) |
+
+All three arms return the same critical values, to 1e-9.
+
+**Why the prediction failed.** The QR was the *bigger share* — 36%
+against 27% — but the augmented route only halves the factorisation,
+while the kernel removes about four fifths of what it touches. Removing
+80% of 27% beats halving 36%. Share alone does not rank optimisations;
+share times the fraction you can actually remove does, and that second
+factor is the one that is hard to guess in advance.
+
+The two are complementary rather than competing: together, **1.53× to
+1.80×**.
+
+**Where it stands now.** The profile is flat — 16.1 s where it was
+26.8 s, with no dominant item left:
+
+| where | time | share |
+|---|---|---|
+| `simulate_paths` | 4.86 s | 30% |
+| `numpy.linalg.qr` | 3.87 s | 24% |
+| `numpy.stack` (building the designs) | 2.93 s | 18% |
+
+A flat profile is the signal to stop. The next 20% would cost more in
+complexity than it returns in seconds.
 
 ## Equivalence is exact, not distributional
 

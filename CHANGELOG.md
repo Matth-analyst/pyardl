@@ -5,6 +5,32 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — The batched estimator factorises the augmented matrix
+
+- `batch_uecm_statistics` now takes the QR of `[X | y]` in `mode="r"`.
+  `R`, `Q'y` and the residual sum of squares all read off that single
+  triangular factor, so `Q` is never formed: LAPACK runs `dgeqrf`
+  without `dorgqr`, and the three passes that consumed `Q` — the
+  projection, the residuals, their sum of squares — disappear with it.
+  `_build_designs` stacks the regressand as the last column, so the
+  augmentation costs no copy either.
+- Reading `‖û‖²` off `R_a[k,k]` is also the better-conditioned route: it
+  never forms `y − Xβ̂`, where a near-singular design produces
+  cancellation.
+- The `numpy.linalg.qr` line fell from **9.5 s to 3.87 s** on the
+  reference profile. **End to end it is 1.07x to 1.22x** — measured in
+  one process, alternating, with the pre-change module imported verbatim
+  from git so the baseline pays nothing the original code did not.
+- **That is less than the native kernel's 1.39x-1.57x, and it contradicts what
+  the previous release note predicted.** The QR was the bigger share
+  (36% against 27%) but the augmented route only halves the
+  factorisation, while the kernel removes about four fifths of what it
+  touches. Share alone does not rank optimisations; share times the
+  removable fraction does. The two are complementary: together,
+  **1.53x to 1.80x**. OBS-28.
+- All three arms return identical critical values (1e-9), and the
+  profile is now flat — 16.1 s where it was 26.8 s, no dominant item.
+
 ### Added — Optional native backend (`pyardl.backend`, `rust/`)
 
 - A Rust kernel for **one** function: the recursion that regenerates the
@@ -16,8 +42,8 @@ This project follows [semantic versioning](https://semver.org/).
   through one period at a time, since time is the one axis it cannot
   vectorise; the kernel walks one replication through every period, so
   its working set stays in L2 and the replications run in parallel.
-  Measured **4.1x to 5.0x** on that step.
-- **End to end the gain is 1.37x to 1.52x**, which is Amdahl's law
+  Measured **3.8x to 4.9x** on that step.
+- **End to end the gain is 1.39x to 1.57x**, which is Amdahl's law
   applied to a 27% share. Reporting the 5x alone would be true and
   misleading; the useful conclusion is that the next optimisation is the
   QR, and it is algorithmic rather than a matter of language.

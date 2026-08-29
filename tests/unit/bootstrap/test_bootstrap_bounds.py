@@ -634,7 +634,7 @@ class TestBatchedEstimator:
         y_b = np.cumsum(rng.standard_normal((3, 100)), axis=1)
         x_b = np.cumsum(rng.standard_normal((3, 100, 2)), axis=1)
         for case, expected in ((1, 3), (2, 4), (3, 3), (4, 4), (5, 3)):
-            _, _, tested, _ = _build_designs(y_b, x_b, 1, (1, 1), case)
+            _, tested, _ = _build_designs(y_b, x_b, 1, (1, 1), case)
             assert len(tested) == expected, f"case {case}"
 
     def test_singular_replication_flagged_not_raised(self) -> None:
