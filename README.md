@@ -192,6 +192,8 @@ Danish money demand in six seconds. Its companions:
   and when, if a regressor moves and stays there.
 - **[Distributed lags](docs/api/distributed-lags.md)** — Koyck and Almon,
   and why the obvious estimator fails on the first of them.
+- **[Native backend](docs/api/backend.md)** — what profiling said to
+  port, and why the honest headline is 1.4x and not 4.8x.
 - **[Glossary](docs/glossary.md)** — the vocabulary in English and
   French, with the notation.
 
@@ -1255,9 +1257,46 @@ Released:
 
 Next:
 
-- **0.6+** — a Rust backend for the bootstrap hot paths, always doubled by
-  the NumPy path and gated on a distributional equivalence test; QARDL
-  bands by row resampling; and whatever the validation register turns up.
+- **0.6+** — QARDL bands by row resampling, the algorithmic half of the
+  bootstrap's cost (the QR), and whatever the validation register turns
+  up.
+
+### Le backend natif, et ce que la mesure a dit
+
+```python
+res = bootstrap_bounds_test(y, x, case=3, backend="auto")
+```
+
+La chose évidente à accélérer dans un bootstrap, c'est « le bootstrap ».
+C'est faux ici, et le savoir demandait de profiler avant d'écrire une
+ligne de Rust. À T=1000, B=9999, k=3, le poste le plus lourd est
+`numpy.linalg.qr` — **36 %**, et c'est déjà du LAPACK : le réécrire
+appellerait le même LAPACK. Le seul endroit où Python coûte vraiment
+quelque chose est la récursion du DGP nul (**27 %**), parce qu'elle est
+séquentielle en `t` et que NumPy ne peut pas vectoriser le temps.
+
+Une seule fonction a donc été portée. Le noyau inverse les boucles — une
+réplication traversant toutes les périodes, plutôt que toutes les
+réplications traversant une période — ce qui garde son état de travail
+en cache L2 et rend les réplications parallèles sans synchronisation :
+**4,1× à 5,0×** sur cette étape.
+
+**De bout en bout, 1,37× à 1,52×.** C'est la loi d'Amdahl sur 27 %.
+Annoncer le 5× seul serait exact et trompeur ; la conclusion utile est
+que l'optimisation suivante est le QR, et qu'elle est algorithmique.
+
+L'équivalence entre les deux chemins est **exacte, pas
+distributionnelle** : le noyau ne tire rien, les innovations lui sont
+passées, donc les deux backends voient les mêmes nombres et doivent
+rendre les mêmes trajectoires — mesuré à 4e-14, contractualisé à 1e-12.
+Le test de Kolmogorov-Smirnov que l'architecture prévoyait est là aussi,
+mais il ne pouvait pas être le verrou : sur 2000 tirages il ne
+distingue pas deux lois qui diffèrent de 1e-9.
+
+`backend="numpy"` reste le défaut partout, et un test l'exige : NumPy
+est la référence contre laquelle le noyau est vérifié, et un défaut qui
+basculerait tout seul rendrait cet accord tautologique. `pip install
+pyardl` n'a besoin d'aucun compilateur.
 
 ## Contributing
 

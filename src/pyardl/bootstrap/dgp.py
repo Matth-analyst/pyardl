@@ -354,6 +354,7 @@ def simulate_paths(
     burn_in: int = 50,
     expand: Callable[[FloatArray], FloatArray] | None = None,
     det_paths: FloatArray | None = None,
+    backend: str = "numpy",
 ) -> tuple[FloatArray, FloatArray]:
     r"""Regenerate many bootstrap samples at once.
 
@@ -383,6 +384,18 @@ def simulate_paths(
         Values of the deterministic columns at every simulated period,
         burn-in included — extended backwards the same way the trend is.
         Required exactly when the DGP carries :attr:`NullDGP.det_coefs`.
+    backend : {"numpy", "rust", "auto"}, default "numpy"
+        Which implementation runs the recursion. NumPy is the default
+        and the **reference**: the native kernel is checked against it,
+        never the other way round. ``"rust"`` raises if the kernel was
+        not built; ``"auto"`` uses it when present.
+
+        The two are required to agree **exactly**, not distributionally.
+        The innovations are drawn here and passed in, so both see the
+        same numbers and must return the same trajectories; the test
+        suite pins the gap at 1e-12. A callback ``expand`` (the NARDL
+        decomposition) crosses the boundary once per period and would
+        cost more than the loop saves, so that case stays on NumPy.
 
     Returns
     -------
@@ -442,6 +455,28 @@ def simulate_paths(
     lag_max = max(dgp.p, max(dgp.q, default=0), r, 1)
     k_cond = dgp.n_conditional
 
+    from pyardl.backend import resolve
+
+    chosen = resolve(backend)
+    # `expand` is a Python callable invoked once per period; handing it
+    # to the native kernel would mean crossing the boundary a thousand
+    # times, which costs more than the loop it would replace. Falling
+    # back is a performance decision, not a methodological one, so it
+    # happens quietly.
+    if chosen == "rust" and expand is None and k_cond == k:
+        return _simulate_paths_rust(
+            dgp,
+            inn,
+            y0,
+            x0,
+            burn_in,
+            None if det_contrib is None else np.asarray(det_contrib, dtype=np.float64),
+            r,
+            lag_max,
+            k,
+            k_cond,
+        )
+
     dx = np.zeros((n_rep, n_total, k), dtype=np.float64)
     # The columns the conditional equation reads. Without `expand` this
     # is a view of `dx`, so the default path allocates nothing extra and
@@ -477,6 +512,64 @@ def simulate_paths(
         np.cumsum(dy[:, burn_in:], axis=1) + float(y0), dtype=np.float64
     )
     return y_star, x_star
+
+
+def _simulate_paths_rust(
+    dgp: NullDGP,
+    inn: FloatArray,
+    y0: float,
+    x0: FloatArray,
+    burn_in: int,
+    det_contrib: FloatArray | None,
+    var_order: int,
+    lag_max: int,
+    k: int,
+    k_cond: int,
+) -> tuple[FloatArray, FloatArray]:
+    """Hand the recursion to the native kernel.
+
+    ``omega`` is ragged — one array per regressor, of a length that
+    depends on that regressor's own lag order — so it is flattened with
+    an offset table rather than padded. Padding would have to invent a
+    value for the cells that do not exist, and a zero there is
+    indistinguishable from an estimated zero.
+    """
+    from pyardl.backend import module
+
+    offsets: list[int] = []
+    running = 0
+    for block in dgp.omega:
+        offsets.append(running)
+        running += int(np.asarray(block).size)
+    omega_flat = (
+        np.concatenate([np.asarray(b, dtype=np.float64).ravel() for b in dgp.omega])
+        if dgp.omega
+        else np.zeros(0, dtype=np.float64)
+    )
+
+    y_star, x_star = module().simulate_paths(
+        np.ascontiguousarray(inn, dtype=np.float64),
+        np.ascontiguousarray(dgp.x_const, dtype=np.float64),
+        np.ascontiguousarray(dgp.x_ar, dtype=np.float64).reshape(var_order, k, k),
+        float(dgp.y_const),
+        float(dgp.y_trend),
+        np.ascontiguousarray(dgp.psi, dtype=np.float64).ravel(),
+        np.ascontiguousarray(omega_flat, dtype=np.float64),
+        np.asarray(offsets, dtype=np.int64),
+        np.asarray(dgp.q[:k_cond], dtype=np.int64),
+        int(dgp.first_lag),
+        int(dgp.p),
+        None
+        if det_contrib is None
+        else np.ascontiguousarray(det_contrib, dtype=np.float64),
+        int(burn_in),
+        float(y0),
+        np.ascontiguousarray(np.asarray(x0, dtype=np.float64).ravel()),
+    )
+    return (
+        np.asarray(y_star, dtype=np.float64),
+        np.asarray(x_star, dtype=np.float64),
+    )
 
 
 def simulate_path(

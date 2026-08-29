@@ -5,6 +5,53 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Optional native backend (`pyardl.backend`, `rust/`)
+
+- A Rust kernel for **one** function: the recursion that regenerates the
+  null paths of the bootstrap. Which one to port was decided by
+  profiling, not intuition. At T = 1000, B = 9999, k = 3 that recursion
+  is 27% of the run, while the largest item — `numpy.linalg.qr` at 36% —
+  is already LAPACK and has nothing to gain from being rewritten.
+- The kernel inverts the loops: NumPy must advance all replications
+  through one period at a time, since time is the one axis it cannot
+  vectorise; the kernel walks one replication through every period, so
+  its working set stays in L2 and the replications run in parallel.
+  Measured **4.1x to 5.0x** on that step.
+- **End to end the gain is 1.37x to 1.52x**, which is Amdahl's law
+  applied to a 27% share. Reporting the 5x alone would be true and
+  misleading; the useful conclusion is that the next optimisation is the
+  QR, and it is algorithmic rather than a matter of language.
+- The benchmark itself had to be corrected before those numbers meant
+  anything. Timing all of NumPy then all of Rust, three repetitions
+  each, produced a **0.83x** — the kernel slower than NumPy — on a
+  configuration where the kernel-only measurement said 4.2x. The cause
+  was thermal drift landing entirely on whichever backend went first.
+  The script now alternates the two, discards a warm-up, and takes the
+  minimum.
+- **Equivalence is exact, not distributional.** The kernel draws
+  nothing: innovations are resampled in Python by a seeded generator and
+  passed in, so both backends see the same numbers and must return the
+  same trajectories. Measured at ~4e-14 across the five deterministic
+  cases and ragged lag orders, contracted at 1e-12. With the same seed
+  the two produce identical critical values and p-values.
+
+  The Kolmogorov-Smirnov check the architecture asked for is run too, on
+  the end-to-end distributions — but it could not be the lock: a KS on
+  2000 draws cannot separate two laws differing by 1e-9, and would have
+  passed a sign error on a rarely active coefficient.
+- `backend="numpy"` stays the default everywhere, and a test asserts it.
+  NumPy is the reference the kernel is checked against; a default that
+  flipped on its own would make that agreement a tautology. `"rust"`
+  raises rather than falling back silently — someone timing a speed-up
+  must know which implementation they timed.
+- `pip install pyardl` is untouched: no compiler, no Rust, and the wheel
+  stays `py3-none-any`. The binary is gitignored and excluded from the
+  build; it is specific to one platform *and* one Python version.
+  `python rust/build.py` compiles and installs it.
+- CI gains a blocking `rust` job — not to check that Rust compiles, but
+  that the two backends agree. A kernel drifting by an epsilon on a rare
+  deterministic case would break no other test.
+
 ## [0.5.0] — 2026-08-29
 
 Fifth release, and the one that closes the genealogy. The library now

@@ -303,6 +303,65 @@ jobs:
       # --strict transforme tout lien mort ou page orpheline en erreur.
       - run: mkdocs build --strict
 
+  # Noyau natif optionnel. Ce job est BLOQUANT, et il ne l'est pas pour
+  # verifier que Rust compile : il verifie que les deux backends
+  # produisent la MEME chose.
+  #
+  # Le reste de la CI tourne sans Rust, avec backend="numpy" par defaut,
+  # donc rien ici ne protege les tests habituels. Ce qui a besoin d'etre
+  # protege, c'est l'equivalence : un noyau qui derive d'un epsilon sur
+  # un cas deterministe rare ne casserait aucun autre test, et la
+  # divergence n'apparaitrait que dans les valeurs critiques d'un
+  # utilisateur ayant compile le noyau.
+  rust:
+    name: Noyau natif (equivalence avec NumPy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: pip install -e ".[dev,plot,bootstrap]"
+
+      - name: Le crate compile proprement
+        working-directory: rust
+        run: |
+          cargo fmt --check
+          cargo clippy --release -- -D warnings
+
+      - name: Construire et installer le noyau
+        run: python rust/build.py
+
+      # Sans cette garde, un noyau qui ne se charge pas ferait passer le
+      # job au vert : tous les tests d'equivalence portent un skipif, et
+      # un skip n'est pas un echec.
+      - name: Le noyau est bien charge (sinon tout serait SKIP)
+        run: |
+          python - <<'PY'
+          import sys
+          from pyardl import backend
+          if not backend.rust_available():
+              print(f"::error::noyau natif absent : {backend.why_unavailable()}")
+              sys.exit(1)
+          print(f"noyau charge, {backend.thread_count()} thread(s)")
+          PY
+
+      - name: Equivalence exacte des deux backends
+        run: pytest tests/unit/bootstrap/test_backend.py -ra -v --no-cov
+
+      # Et la suite complete AVEC le noyau present : le defaut reste
+      # numpy, donc rien ne doit changer. Si un test devenait sensible a
+      # la simple presence du binaire, c'est que le dispatch fuit.
+      - name: La suite complete est insensible a la presence du noyau
+        run: pytest -m "not slow" -ra --doctest-modules src/pyardl tests docs --no-cov
+
   # Monte Carlo complets. DEUX choses l'empechaient d'aboutir, et les
   # deux sont corrigees ici et dans le bloc `concurrency` ci-dessus.
   #

@@ -86,6 +86,8 @@ print(res.summary())
   the roots of the genealogy.
 - **[VECM simulator](api/simulate.md)** — one data generator for every
   Monte Carlo study in the library.
+- **[Native backend](api/backend.md)** — the optional Rust kernel, what
+  profiling said to port, and why the honest headline is 1.4x.
 
 ## What makes it different
 

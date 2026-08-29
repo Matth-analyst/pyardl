@@ -78,6 +78,12 @@ path = "src/pyardl/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyardl"]
+# Le noyau natif optionnel n'entre PAS dans la roue publiee. Il est
+# specifique a une plateforme et a une version de Python ; l'embarquer
+# depuis la machine de build livrerait un binaire qui ne se charge nulle
+# part ailleurs, et ferait de pyardl un paquet non universel alors qu'il
+# est pur Python. Qui le veut le compile (python rust/build.py).
+exclude = ["_rust.pyd", "_rust.so", "_rust.*.pyd", "_rust.*.so"]
 
 [tool.ruff]
 line-length = 88

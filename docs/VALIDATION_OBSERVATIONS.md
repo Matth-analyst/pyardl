@@ -1452,3 +1452,83 @@ est tres persistante, donc x_(t-1) explique mal y_(t-1) et le F de
 premiere etape tombe a **3.70**, bien sous le seuil de 10. La demande
 de monnaie danoise est un mauvais terrain pour un modele de Koyck, et
 c'est au logiciel de le dire plutot qu'a l'utilisateur de le deviner.
+
+---
+
+## OBS-27 — Le poste le plus lourd d'un bootstrap n'etait pas celui qu'on accelere
+
+- **Spec** : architecture (backend natif, phases 3+)
+- **Date** : 2026-08-29
+- **Statut** : mesure ; le noyau natif est en place et le plafond est documente
+
+### L'HYPOTHESE DE DEPART
+
+« Un backend Rust rendra le bootstrap beaucoup plus rapide. » Elle est
+dans l'architecture du projet depuis le debut, et elle a l'air
+evidente : un bootstrap, c'est B reestimations, donc du calcul en
+boucle, donc le terrain de jeu d'un langage compile.
+
+### CE QUE LA MESURE A DIT
+
+Profilage de `bootstrap_bounds_test` a T = 1000, B = 9999, k = 3
+(26,8 s sous cProfile) :
+
+| poste                          | temps  | part |
+|--------------------------------|--------|------|
+| `numpy.linalg.qr`              |  9,5 s |  36% |
+| `simulate_paths` (DGP nul)     |  7,3 s |  27% |
+| `numpy.stack` (design)         |  2,9 s |  11% |
+| ~42 000 petites allocations    |  ~2 s  |   7% |
+
+**Le poste le plus lourd est deja du LAPACK.** Le reecrire en Rust
+appellerait le meme LAPACK. Il n'y a rien a y gagner par un changement
+de langage : le gain, s'il existe, est algorithmique — ne pas calculer
+le Q complet quand seuls Q'y et R sont utilises — et il appartient au
+chemin NumPy.
+
+Le seul endroit ou Python coute vraiment quelque chose est la recursion
+du DGP nul, parce qu'elle est **sequentielle en t** : NumPy ne peut pas
+vectoriser le temps, donc la boucle paie 1050 tours d'interpreteur et
+une allocation par periode.
+
+### CE QUI A ETE FAIT, ET CE QUE CA DONNE
+
+Une seule fonction portee. Le noyau inverse les boucles — une
+replication traversant toutes les periodes, plutot que toutes les
+replications traversant une periode : l'etat de travail d'une
+replication (33 Ko) tient en cache L2, et les replications etant
+independantes, elles se parallelisent sans aucune synchronisation.
+
+Sur cette etape : **4,1x a 5,0x**. De bout en bout : **1,37x a 1,52x**.
+
+L'ecart entre les deux n'est pas une deception, c'est la loi d'Amdahl :
+accelerer 27 % du temps par 5x plafonne le total a 1,4x. Publier le 5x
+seul serait exact et trompeur.
+
+### CE QUE CA APPREND
+
+Un profil se lit avant d'ecrire, pas apres. L'intuition designait « le
+bootstrap » ; la mesure a designe une fonction de quarante lignes, et a
+disqualifie le poste principal.
+
+### UN SECOND PIEGE, DANS LA MESURE ELLE-MEME
+
+La premiere version du banc d'essai chronometrait tout NumPy, puis tout
+Rust, trois repetitions chacun. Elle a rapporte **0,83x** a
+T = 1000, B = 2999, k = 3 — le noyau natif PLUS LENT que NumPy — alors
+que la mesure du noyau seul donnait 4,2x sur la meme configuration.
+
+Les deux ne pouvaient pas etre vraies. La cause n'etait pas le code : le
+script tournait juste apres une suite de tests de 25 minutes, la machine
+n'avait pas fini de se refroidir, et le backend mesure en premier
+absorbait toute la derive. Remesure en **alternant** les deux, sept
+repetitions : 6,73 s contre 4,93 s, soit 1,37x.
+
+C'est la meme faute que la regle 10 decrit pour les Monte Carlo, sur un
+autre terrain : une mesure sous-dimensionnee ou mal ordonnancee produit
+un chiffre reproductible, coherent, et faux. Le 0,83x n'a ete rattrape
+que parce qu'il contredisait une autre mesure du meme dispositif — sans
+ce recoupement, il serait entre dans la documentation.
+
+Le banc alterne desormais, jette un tour de rodage, et retient le
+minimum. `validation/backend_benchmark.py`.

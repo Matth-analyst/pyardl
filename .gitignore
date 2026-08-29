@@ -29,3 +29,13 @@ validation/
 # en sont extraits dans docs/assets/, l'archive elle-meme n'a rien a faire
 # dans le depot.
 *.zip
+
+# Noyau natif optionnel : artefacts de compilation, jamais versionnes.
+# La bibliotheque partagee est specifique a une plateforme ET a une
+# version de Python ; la committer livrerait un binaire qui ne marche
+# que sur la machine qui l'a construit.
+rust/target/
+src/pyardl/_rust.pyd
+src/pyardl/_rust.so
+src/pyardl/_rust.*.so
+src/pyardl/_rust.*.pyd
