@@ -197,7 +197,15 @@ def cross_section_averages(
                     return float("nan")
                 return float(np.average(vals[ok], weights=wts[ok]))
 
-            out[f"cs_{name}"] = grouped.apply(_wmean, include_groups=False)
+            # Les colonnes sont selectionnees AVANT `apply`, ce qui
+            # exclut la cle de groupe sans avoir besoin de
+            # `include_groups=False` — un argument que pandas n'a
+            # introduit qu'en 2.2, alors que le plancher declare est
+            # 2.1. Sur 2.1 il n'etait pas ignore : il etait transmis a
+            # `_wmean`, qui levait un TypeError. Le job `floors` de la
+            # CI est ce qui l'a attrape.
+            columns = [name] if weights == name else [name, weights]
+            out[f"cs_{name}"] = grouped[columns].apply(_wmean)
 
     counts = grouped[names[0]].count()
     frame = pd.DataFrame(out)

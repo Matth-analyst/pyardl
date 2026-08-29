@@ -109,12 +109,12 @@ def test_a_naive_mean_group_is_biased_on_the_same_data() -> None:
         augmented = CSDL(
             df, y="y", X=["x"], id="id", time="t", trunc_lags=0, cs_lags=0
         ).fit()
+    # Colonnes selectionnees avant `apply` : la cle de groupe est deja
+    # exclue, donc `include_groups=False` (pandas >= 2.2) est inutile.
+    # Le passer cassait le job `floors`, qui installe le plancher 2.1.
     naive_theta = (
-        df.groupby("id")
-        .apply(
-            lambda block: block[["y", "x"]].cov().iloc[0, 1] / block["x"].var(),
-            include_groups=False,
-        )
+        df.groupby("id")[["y", "x"]]
+        .apply(lambda block: block[["y", "x"]].cov().iloc[0, 1] / block["x"].var())
         .mean()
     )
     true_theta = _EXPECTED["theta_true"]

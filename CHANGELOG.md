@@ -5,6 +5,27 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — `include_groups` broke the declared pandas floor
+
+- `cross_section_averages` and the spec-24 replication passed
+  `include_groups=False` to `DataFrameGroupBy.apply`. That argument
+  arrived in **pandas 2.2**, while `pyproject.toml` declares
+  `pandas>=2.1`. On 2.1 it is not ignored: it is forwarded to the
+  applied function, which raises `TypeError`. The package installed on
+  its own declared floor and broke at runtime.
+- Fixed by selecting the columns *before* `apply`, which excludes the
+  group key on every version and needs no argument at all.
+- Caught by the `floors` CI job — its whole reason for existing —
+  and now verified locally against a real floor environment
+  (Python 3.11, numpy 1.26.4, scipy 1.11.4, pandas 2.1.4,
+  statsmodels 0.14.0, matplotlib 3.8.4, arch 6.3.0): 1514 passed.
+- A local guard was added
+  (`tests/test_repo_hygiene.py::TestTheDeclaredFloorsAreRespected`). It
+  reads **tokens, not raw text**: both fixed files now mention
+  `include_groups` in a comment explaining why they avoid it, and a
+  substring search would flag them. A guard that cries wolf on its own
+  documentation gets disabled within the week.
+
 ### Changed — QARDL bands: the coverage study the specification asked for
 
 - `QARDLResults.longrun` gains a `bands` argument

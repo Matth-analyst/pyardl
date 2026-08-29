@@ -28,6 +28,7 @@ c'est bien le cas plutot que de l'interdire.
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 from pathlib import Path
 
@@ -138,3 +139,122 @@ class TestTheGuardItselfWorks:
         if not candidate.exists():
             pytest.skip("fichier regenere localement, absent ici")
         assert not _is_tracked(candidate)
+
+
+def _code_tokens(path: Path) -> str:
+    """Le source d'un fichier, commentaires et chaines RETIRES.
+
+    Un garde-fou qui cherche une chaine brute ne distingue pas un appel
+    d'un commentaire qui explique pourquoi on ne fait pas cet appel. Les
+    deux fichiers corriges le 2026-08-29 contiennent justement une telle
+    explication : une recherche naive les aurait signales, et le
+    garde-fou aurait ete desactive dans la semaine.
+    """
+    import tokenize
+
+    kept: list[str] = []
+    with path.open("rb") as handle:
+        try:
+            for token in tokenize.tokenize(handle.readline):
+                if token.type not in (tokenize.COMMENT, tokenize.STRING):
+                    kept.append(token.string)
+        except (tokenize.TokenError, SyntaxError):  # pragma: no cover
+            return path.read_text(encoding="utf-8")
+    return " ".join(kept)
+
+
+class TestTheDeclaredFloorsAreRespected:
+    """Le code ne doit pas utiliser d'API plus recente que ses planchers.
+
+    `pyproject.toml` annonce `pandas>=2.1`. Utiliser une API apparue en
+    2.2 rend cette borne mensongere : le paquet s'installe sur 2.1, et
+    casse a l'execution.
+
+    Le job `floors` de la CI est le garde-fou reel — il installe
+    vraiment les versions plancher et lance toute la suite. Ce test-ci
+    est son avant-poste local : il coute une milliseconde et signale la
+    faute au moment ou on l'ecrit, pas vingt minutes plus tard dans un
+    log de CI.
+
+    Il ne remplace pas le job : une API peut changer de COMPORTEMENT
+    sans changer de nom, et seul un vrai pandas 2.1 le dirait.
+    """
+
+    #: nom d'API -> version qui l'a introduite. La liste n'a pas
+    #: vocation a etre exhaustive : elle retient ce qui a deja casse une
+    #: fois, ce qui est le seul critere qui garde une denylist honnete.
+    _TOO_RECENT = {
+        # `DataFrameGroupBy.apply(..., include_groups=...)`, pandas 2.2.
+        # Sur 2.1 l'argument n'est pas ignore : il est transmis a la
+        # fonction appliquee, qui leve un TypeError. Attrape par le job
+        # `floors` le 2026-08-29 sur `cross_section_averages` et sur la
+        # replication de la spec 24. Le contournement est de selectionner
+        # les colonnes AVANT `apply`, ce qui exclut deja la cle de groupe.
+        "include_groups": ("pandas", "2.2"),
+    }
+
+    def _floor(self, package: str) -> str:
+        import tomllib
+
+        data = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        for spec in data["project"]["dependencies"]:
+            name = re.split(r"[<>=!~ ]", spec, maxsplit=1)[0]
+            if name == package:
+                match = re.search(r">=\s*([0-9.]+)", spec)
+                assert match, f"pas de plancher declare pour {package}"
+                return match.group(1)
+        raise AssertionError(f"{package} absent des dependances")
+
+    @pytest.mark.parametrize("api", sorted(_TOO_RECENT))
+    def test_no_api_newer_than_its_floor(self, api: str) -> None:
+        package, introduced = self._TOO_RECENT[api]
+        floor = self._floor(package)
+        if tuple(int(p) for p in floor.split(".")[:2]) >= tuple(
+            int(p) for p in introduced.split(".")[:2]
+        ):
+            pytest.skip(
+                f"le plancher {package}>={floor} couvre desormais {api} "
+                f"(introduit en {introduced}) : la garde ne s'applique plus"
+            )
+        offenders = [
+            str(path.relative_to(_ROOT))
+            for path in list((_ROOT / "src").rglob("*.py"))
+            + list((_ROOT / "tests").rglob("*.py"))
+            if api in _code_tokens(path)
+        ]
+        assert not offenders, (
+            f"{api} a ete introduit dans {package} {introduced}, mais le "
+            f"plancher declare est {floor}. Fichiers concernes : {offenders}"
+        )
+
+    def test_the_guard_reads_code_and_not_prose(self, tmp_path) -> None:
+        """Il doit dire OUI sur un appel et NON sur un commentaire.
+
+        Une recherche de chaine naive echoue ici : les deux fichiers
+        corriges PARLENT de `include_groups` dans un commentaire pour
+        expliquer pourquoi ils ne l'utilisent pas. Un garde-fou qui les
+        signalerait serait vite desactive, et c'est ainsi que meurent
+        les garde-fous.
+
+        Sans ce test, une faute de frappe dans le nom de l'API rendrait
+        le controle vert pour toujours.
+        """
+        offender = tmp_path / "offender.py"
+        offender.write_text(
+            "res = grouped.apply(f, include_groups=False)" + chr(10),
+            encoding="utf-8",
+        )
+        assert "include_groups" in _code_tokens(offender)
+
+        innocent = tmp_path / "innocent.py"
+        innocent.write_text(
+            chr(10).join(
+                [
+                    '"""On evite include_groups : pandas 2.2 seulement."""',
+                    "# include_groups casserait le plancher",
+                    "res = grouped[cols].apply(f)",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        assert "include_groups" not in _code_tokens(innocent)
