@@ -80,21 +80,22 @@ Same 1000 replications, `theta = 1.5`:
 
 | T | OLS | DOLS | FMOLS | CCR |
 |---|---|---|---|---|
-| 100 | +0.1380 | **+0.0087** | +0.0358 | +0.0532 |
-| 200 | +0.0773 | **+0.0013** | +0.0094 | +0.0176 |
-| 400 | +0.0397 | **+0.0013** | +0.0038 | +0.0064 |
+| 100 | +0.1380 | **+0.0087** | +0.0358 | +0.0321 |
+| 200 | +0.0773 | **+0.0013** | +0.0094 | +0.0085 |
+| 400 | +0.0397 | **+0.0013** | +0.0038 | +0.0036 |
 
 And coverage of a nominal 95% interval:
 
 | T | DOLS | FMOLS | CCR |
 |---|---|---|---|
-| 100 | 88.8% | 88.9% | 82.9% |
-| 200 | 91.5% | **92.2%** | 89.7% |
-| 400 | **93.4%** | **94.5%** | **92.8%** |
+| 100 | 88.8% | 88.9% | 87.4% |
+| 200 | 91.5% | **92.2%** | 91.1% |
+| 400 | **93.4%** | **94.5%** | **93.7%** |
 
-At T = 400 all three sit inside the 92–97% band, and DOLS and FMOLS meet
-the under-10% bias criterion (3.3% and 9.6%; CCR is at 16%). DOLS is the
-most reliable across the range — its bias is essentially gone by T = 200.
+At T = 400 all three meet **both** of the specification's criteria: the
+92–97% coverage band, and bias under 10% of the OLS bias (3.3%, 9.6%,
+9.1%). DOLS is the most reliable across the range — its bias is
+essentially gone by T = 200.
 
 **Prewhitening is why those numbers look like that, and it is on by
 default.** Without it the same study gave 90.4% / 88.7% / 87.6%
@@ -135,16 +136,16 @@ DOLS   LRY        1.2214  0.0878  13.9187
 FMOLS  LRY        1.2657  0.1326   9.5474
        IBO       -3.8893  0.4620  -8.4179
        IDE        4.0343  0.9709   4.1552
-CCR    LRY        1.2952  0.1179  10.9829
-       IBO       -3.5583  0.3657  -9.7311
-       IDE        3.2797  0.8628   3.8012
+CCR    LRY        1.1498  0.1179   9.7500
+       IBO       -4.2805  0.3657 -11.7063
+       IDE        4.0856  0.8628   4.7353
 ```
 
 The four agree on every **sign** and on every **verdict** — all three
 regressors are significant under all four estimators — and they disagree
 substantially on **magnitude**. The income elasticity runs from 1.00
-(ARDL) to 1.30 (CCR); the deposit-rate coefficient from 2.63 to 4.03, a
-factor of 1.5.
+(ARDL) to 1.27 (FMOLS); the deposit-rate coefficient from 2.63 to 4.09,
+a factor of 1.55.
 
 A paper reporting one of these rows as *the* long-run relation is
 reporting a choice of estimator as though it were a finding. Printing
@@ -195,6 +196,27 @@ that is precisely the coverage gap. `prewhiten=True` is therefore the
 default on `dols`, `fmols` and `ccr`; `longrun_covariance_kernel` keeps
 `False` so the plain estimate stays available and the two can be
 compared.
+
+### CCR is a fixed point, not a substitution
+
+Park's transformation of `y` depends on `theta` — the quantity being
+estimated. The textbook statement substitutes a first-stage estimate
+once, and pyardl originally used static OLS there, carrying that
+estimator's finite-sample bias straight into the transformation.
+
+Iterating to convergence takes CCR from 15% of the OLS bias to 9% at
+T = 400, and its coverage from 93.0% to 93.7% — the difference between
+missing the specification's bias criterion and meeting it. Two checks
+that this is the fixed point and not an artefact of the iteration count:
+starting from the FMOLS estimate instead of OLS reaches the *same* place
+(+0.0034 either way), and convergence is geometric at roughly 1/16 per
+step.
+
+`res.n_iter` and `res.converged` record what happened. The count differs
+sharply between simulation and real data — median 9 over 200 simulated
+samples at T = 200, but **34** on Danish money demand, where T = 55 with
+three regressors sits closer to the edge of the contraction. The cap is
+200 rather than the 50 the simulation alone would have suggested.
 
 A detail that cost a second bug. Prewhitening recolours the **long-run**
 matrices, `Omega` and `Delta`, through `(I-A)^-1 . (I-A')^-1`. It does

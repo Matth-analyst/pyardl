@@ -20,6 +20,16 @@ This project follows [semantic versioning](https://semver.org/).
   and its standard errors to 8.6e-13; DOLS to 7.2e-14 and 2.3e-12. CCR
   has no external reference — `cointReg` does not implement it — so it
   rests on convergence and on agreement with FMOLS.
+- `ccr` iterates Park's transformation to a **fixed point** (`res.n_iter`,
+  `res.converged`) rather than substituting a first-stage estimate once.
+  The transformation depends on `theta`, so a single pass carries the
+  static-OLS bias into it: iterating takes CCR from 15% of the OLS bias
+  to 9% at T = 400, and its coverage from 93.0% to 93.7%.
+- All three estimators meet **both** criteria of the specification at
+  T = 400: bias under 10% of the OLS bias (3.3%, 9.6%, 9.1%) and
+  coverage inside [92, 97]% (93.4%, 94.5%, 93.7%). Prewhitening
+  (Andrews-Monahan, on by default) is what makes DOLS and FMOLS meet
+  them; the fixed point is what makes CCR meet them.
 
 ### Added — Documentation as tested code
 

@@ -1225,19 +1225,42 @@ c'est exactement l'ecart de couverture observe.
 
 |   T |     OLS |   DOLS |  FMOLS |    CCR |
 |-----|---------|--------|--------|--------|
-| 100 | +0.1380 |+0.0087 |+0.0358 |+0.0532 |
-| 200 | +0.0773 |+0.0013 |+0.0094 |+0.0176 |
-| 400 | +0.0397 |+0.0013 |+0.0038 |+0.0064 |
+| 100 | +0.1380 |+0.0087 |+0.0358 |+0.0321 |
+| 200 | +0.0773 |+0.0013 |+0.0094 |+0.0085 |
+| 400 | +0.0397 |+0.0013 |+0.0038 |+0.0036 |
 
 |   T | OLS naive | OLS HAC |  DOLS | FMOLS |   CCR |
 |-----|-----------|---------|-------|-------|-------|
-| 100 |    42.1 % |  71.1 % |88.8 % |88.9 % |82.9 % |
-| 200 |    38.4 % |  71.8 % |91.5 % |92.2 % |89.7 % |
-| 400 |    41.4 % |  71.8 % |93.4 % |94.5 % |92.8 % |
+| 100 |    42.1 % |  71.1 % |88.8 % |88.9 % |87.4 % |
+| 200 |    38.4 % |  71.8 % |91.5 % |92.2 % |91.1 % |
+| 400 |    41.4 % |  71.8 % |93.4 % |94.5 % |93.7 % |
 
-**A T = 400 les TROIS atteignent la bande [92, 97] %** de la spec, et
-DOLS et FMOLS son critere de biais (3.3 % et 9.6 % de celui de l'OLS ;
-CCR reste a 16 %).
+**A T = 400 les TROIS atteignent les DEUX criteres de la spec** : la
+bande de couverture [92, 97] % et le biais sous 10 % de celui de l'OLS
+(3.3 %, 9.6 %, 9.1 %).
+
+### UN TROISIEME CORRECTIF : LE POINT FIXE DE CCR
+
+Apres le preblanchiment, CCR restait a 16 % du biais OLS quand DOLS et
+FMOLS etaient passes sous 10 %. Cause : la transformation de Park depend
+de theta — la quantite meme qu'on estime — et j'y substituais une seule
+fois le theta de l'OLS STATIQUE. Le biais de ce premier etage passait
+donc entier dans la transformation.
+
+C'est un point fixe, pas une substitution. Itere jusqu'a convergence, le
+biais tombe de 15 % a 9 % a T = 400 et la couverture monte de 93.0 % a
+93.7 %. Deux verifications que c'est bien la limite et non un artefact
+du nombre d'iterations : partir du theta de FMOLS plutot que de l'OLS
+mene au MEME point (+0.0034 dans les deux cas), et la convergence est
+geometrique de facteur ~1/16 par pas.
+
+Le nombre d'iterations necessaire differe nettement entre simulation et
+donnees reelles : mediane 9 sur 200 echantillons simules a T = 200,
+mais 34 sur la demande de monnaie danoise, ou T = 55 avec trois
+regresseurs place le probleme plus pres du bord de la contraction. Le
+plafond est donc a 200 et non aux 50 que la simulation seule aurait
+suggeres — un cas ou se fier au DGP aurait donne une marge trop courte
+sur les vraies donnees.
 
 ### UN SECOND BUG, REVELE PAR LE PREMIER CORRECTIF
 

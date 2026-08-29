@@ -149,6 +149,8 @@ class EfficientLongRunResults:
     n_leads: int | None = None
     n_lags: int | None = None
     prewhitened: bool = True
+    n_iter: int | None = None
+    converged: bool | None = None
     resid: pd.Series = field(default_factory=pd.Series, repr=False)
 
     def summary(self) -> str:
@@ -369,6 +371,11 @@ def fmols(
         enters the bias correction itself here, not only the variance:
         an underestimated Omega gives an underestimated lambda+, hence
         an incomplete correction.
+    tol, max_iter : float, int
+        The transformation depends on ``theta``, so it is iterated to a
+        fixed point rather than evaluated once at a first-stage
+        estimate. Convergence is geometric and fast; see the module
+        page for the measurement.
 
     Returns
     -------
@@ -449,6 +456,8 @@ def ccr(
     kernel: str = "bartlett",
     bandwidth: float | str = "andrews",
     prewhiten: bool = True,
+    tol: float = 1e-10,
+    max_iter: int = 200,
 ) -> EfficientLongRunResults:
     r"""Canonical cointegrating regression (Park 1992).
 
@@ -501,15 +510,54 @@ def ccr(
     shift = z @ (inv_sigma @ delta_2)
 
     beta_static, *_ = np.linalg.lstsq(static, y_arr, rcond=None)
-    theta_static = beta_static[n_det:]
     gamma = (inv_vv @ omega[1:, 0:1]).ravel()
 
     x_star = x_arr[1:] - shift
-    y_star = y_arr[1:] - shift @ theta_static - v_hat @ gamma
-
-    det_block, det_names = _deterministic(y_star.size, det, offset=1)
+    det_block, det_names = _deterministic(x_star.shape[0], det, offset=1)
     design = np.column_stack([c for c in (det_block, x_star) if c.size])
-    beta, *_ = np.linalg.lstsq(design, y_star, rcond=None)
+
+    # Park's transformation of y depends on theta — the very thing being
+    # estimated. Substituting the static OLS estimate once, as the
+    # textbook statement does, carries that estimator's finite-sample
+    # bias straight into the transformation.
+    #
+    # It is a fixed point, so it is iterated. Measured on the DGP of
+    # validation/spec08_montecarlo.py: one pass leaves CCR at 15% of the
+    # OLS bias at T = 400, iterating to convergence brings it to 9% —
+    # the difference between missing the specification's criterion and
+    # meeting it. Convergence is geometric at roughly 1/16 per step;
+    # over 200 simulated samples the median was 9 iterations to 1e-10
+    # and the worst 12. Real data can be slower — the Danish money-demand
+    # example takes 34, since T = 55 with three regressors sits closer to
+    # the contraction's edge — so the cap is 200, not the 50 the
+    # simulation alone would have suggested.
+    #
+    # Omega, Delta and Sigma are held at their first-stage values: they
+    # come from residuals that are already consistent, and refreshing
+    # them each pass buys nothing measurable while costing a kernel
+    # estimate per iteration.
+    theta_current = beta_static[n_det:]
+    beta = beta_static
+    n_iter = 0
+    converged = False
+    while n_iter < max_iter:
+        n_iter += 1
+        y_star = y_arr[1:] - shift @ theta_current - v_hat @ gamma
+        beta, *_ = np.linalg.lstsq(design, y_star, rcond=None)
+        step = float(np.max(np.abs(beta[n_det:] - theta_current)))
+        theta_current = beta[n_det:]
+        if step < tol:
+            converged = True
+            break
+    if not converged:
+        warnings.warn(
+            f"CCR did not reach tol={tol} in {max_iter} iterations. The "
+            "estimate is wherever the iteration stopped; the transformation "
+            "still depends on a theta that has not settled.",
+            PyardlMethodologyWarning,
+            stacklevel=2,
+        )
+    y_star = y_arr[1:] - shift @ theta_current - v_hat @ gamma
 
     omega_u_v = float(
         omega[0, 0] - (omega[0:1, 1:] @ inv_vv @ omega[1:, 0:1]).ravel()[0]
@@ -524,6 +572,8 @@ def ccr(
         longrun=_table(theta, se, x_names),
         method="CCR",
         prewhitened=prewhiten,
+        n_iter=n_iter,
+        converged=converged,
         deterministic=pd.Series(beta[:n_det], index=pd.Index(det_names, name="term")),
         nobs=int(y_star.size),
         omega_uv=omega_u_v,

@@ -998,15 +998,23 @@ de la variance. C'est l'argument qui justifie ces trois estimateurs
 plutôt qu'une simple OLS-HAC.
 
 Mesuré sur 1000 réplications : DOLS atteint **93.4 %** de couverture à
-T=400, FMOLS **94.5 %**, CCR **92.8 %** — les trois dans la bande
-[92, 97] % que la spec demandait, et DOLS et FMOLS sous le critère de
-biais (3.3 % et 9.6 % de celui de l'OLS).
+T=400, FMOLS **94.5 %**, CCR **93.7 %** — les trois dans la bande
+[92, 97 %] que la spec demandait, et les trois sous son critère de biais
+(3.3 %, 9.6 % et 9.1 % de celui de l'OLS).
 
 Ces chiffres tiennent au **préblanchiment** d'Andrews-Monahan, actif par
 défaut. Sans lui la même étude donnait 90.4 / 88.7 / 87.6 % et manquait
 les deux critères — un écart que j'avais d'abord attribué aux
 estimateurs eux-mêmes avant de mesurer. Sur un AR(1) de coefficient 0.8,
 le noyau seul sous-estime Ω de **53 %**. OBS-24.
+
+Et le CCR est un **point fixe**, pas une substitution : la
+transformation de Park dépend de θ, la quantité même qu'on estime. La
+formulation manuelle y substitue une fois l'OLS statique, dont le biais
+passe alors entier dans la transformation. Itéré jusqu'à convergence, le
+biais du CCR tombe de 15 % à 9 % de celui de l'OLS. Partir du θ de FMOLS
+plutôt que de l'OLS mène au même point — c'est ce qui montre que c'est
+bien la limite, et non un artefact du nombre d'itérations.
 
 Sur la demande de monnaie danoise les quatre méthodes s'accordent sur
 tous les signes et toutes les significativités, et divergent d'un

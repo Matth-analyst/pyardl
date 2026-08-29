@@ -16,6 +16,7 @@ import pytest
 
 from pyardl.cointegration import ccr, compare_longrun, dols, fmols
 from pyardl.cointegration.efficient import default_dols_lags
+from pyardl.exceptions import PyardlMethodologyWarning
 from pyardl.utils import lead_lag_matrix, longrun_covariance_kernel
 
 
@@ -328,6 +329,62 @@ class TestDolsSpecifics:
         y, x = endogenous_dgp(n_obs=100, seed=22)
         with pytest.raises(ValueError, match="non-negative"):
             dols(y, x, n_leads=-1)
+
+
+class TestCCRIteration:
+    """La transformation de Park depend de theta, qui est ce qu'on
+    estime. C'est un point fixe, pas une substitution unique."""
+
+    def test_it_converges_and_records_the_count(self) -> None:
+        y, x = endogenous_dgp(n_obs=400, seed=60)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = ccr(y, x, bandwidth=8)
+        assert res.converged
+        assert 1 <= res.n_iter <= 200
+
+    def test_iterating_beats_a_single_pass(self) -> None:
+        """Verification par contraste : `max_iter=1` reproduit la version
+        textuelle, qui substitue une seule fois le theta de l'OLS
+        statique. Elle doit etre PLUS eloignee du vrai coefficient.
+
+        Sans ce test, l'iteration pourrait etre retiree sans qu'aucune
+        assertion ne bouge — elle ne change rien a la forme du
+        resultat, seulement a sa justesse."""
+        errs_one = []
+        errs_many = []
+        for seed in range(61, 76):
+            y, x = endogenous_dgp(n_obs=300, seed=seed)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                one = ccr(y, x, bandwidth=8, max_iter=1)
+                many = ccr(y, x, bandwidth=8)
+            errs_one.append(abs(one.longrun.loc["x", "theta"] - 1.5))
+            errs_many.append(abs(many.longrun.loc["x", "theta"] - 1.5))
+        assert np.mean(errs_many) < np.mean(errs_one)
+
+    def test_the_fixed_point_matches_starting_from_fmols(self) -> None:
+        """Un point fixe ne depend pas du point de depart. Partir du
+        theta de FMOLS plutot que de celui de l'OLS doit mener au meme
+        endroit — c'est ce qui dit que la limite est une propriete du
+        probleme et non de l'initialisation."""
+        y, x = endogenous_dgp(n_obs=400, seed=76)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from_ols = ccr(y, x, bandwidth=8)
+            fm = fmols(y, x, bandwidth=8)
+        # FMOLS et CCR sont asymptotiquement equivalents ; a T = 400 le
+        # point fixe doit etre proche de FMOLS, ce qui n'etait PAS le cas
+        # avec une substitution unique.
+        assert from_ols.longrun.loc["x", "theta"] == pytest.approx(
+            fm.longrun.loc["x", "theta"], abs=0.05
+        )
+
+    def test_failure_to_converge_warns(self) -> None:
+        y, x = endogenous_dgp(n_obs=300, seed=77)
+        with pytest.warns(PyardlMethodologyWarning, match="did not reach tol"):
+            res = ccr(y, x, bandwidth=8, tol=1e-16, max_iter=2)
+        assert not res.converged
 
 
 class TestResults:

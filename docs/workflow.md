@@ -201,13 +201,13 @@ FMOLS and CCR repair it three different ways, and
 >>> sorted(set(table.index.get_level_values("method")))
 ['ARDL', 'CCR', 'DOLS', 'FMOLS']
 >>> [round(float(v), 4) for v in table.xs("IDE", level="regressor")["theta"]]
-[2.8915, 2.6308, 4.0343, 3.2797]
+[2.8915, 2.6308, 4.0343, 4.0856]
 
 ```
 
 The four agree on the sign and on significance, and disagree on
-magnitude by a factor of 1.5 — the deposit-rate coefficient runs from
-2.63 to 4.03.
+magnitude by a factor of 1.55 — the deposit-rate coefficient runs from
+2.63 to 4.09.
 
 **The common error.** Reporting whichever of these four rows supports
 the story. A paper that shows one row is presenting a choice of
