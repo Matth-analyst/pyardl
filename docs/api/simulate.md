@@ -2,6 +2,12 @@
 
 `pyardl.simulate`
 
+!!! note "Looking for dynamic simulations of a fitted model?"
+    This page is about *generating data* for Monte Carlo studies. To run
+    a **fitted** ARDL forward under a counterfactual shock — the
+    interpretation layer of Jordan and Philips (2018) — see
+    [Dynamic simulation](dynardl.md).
+
 Every Monte Carlo study in this library draws its data from one
 generator. Before that, each specification carried its own — which is
 how two studies end up disagreeing for a reason nobody can locate: not

@@ -1,0 +1,64 @@
+{
+  "_provenance": {
+    "spec": "25 (Jordan & Philips 2018, simulations dynamiques d'ARDL)",
+    "source": "dynamac 0.1.12 (CRAN, GPL-2), R 4.6.1",
+    "generated": "2026-08-29",
+    "script": "validation/external/spec25_dynamac.R",
+    "log": "validation/results/external_logs/spec25_dynamac.json",
+    "data": "pyardl.datasets.load_denmark \u2014 le jeu danois que pyardl embarque et redistribue deja. AUCUNE donnee de dynamac n'est utilisee : le package sert d'implementation de reference, pas de source de donnees.",
+    "design": "dynardl(LRM ~ LRY + IBO + IDE, lags = list(LRM = 1:3, LRY = 1, IBO = 1:3, IDE = 1:2), ec = FALSE), choc permanent de 1 sur IBO en t=10, horizon 61",
+    "sims": 10000,
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "tolerance_coefficients": 1e-08,
+    "tolerance_baseline": 0.0005,
+    "tolerance_final": 0.02,
+    "tolerance_note": "TROIS tolerances, parce que les trois quantites n'ont pas le meme statut. (1) Les coefficients : dynardl(ec=FALSE) estime EXACTEMENT la meme regression, l'accord doit etre machine \u2014 mesure a 3.5e-14, contrat a 1e-8. (2) L'equilibre de base : dynamac le produit par Monte Carlo, son ecart entre les trois graines vaut 9.3e-05 ; ecart mesure a pyardl 5.8e-05, contrat a 5e-4. (3) Le niveau d'arrivee : l'ecart entre graines de dynamac vaut 5.0e-03, la valeur exacte de pyardl (7.230808) tombe DANS l'intervalle des trois graines ; contrat a 2e-2, soit environ quatre fois le bruit mesure.",
+    "bands_not_compared": "Les bandes ne sont PAS comparees terme a terme, et ce n'est pas un renoncement. dynamac tient le niveau d'avant-choc quasiment fixe (bande a 95 % large de 0.012) ; pyardl fait partir chaque tirage de SON propre equilibre, donc sa bande sur le NIVEAU porte aussi la dispersion d'echantillonnage de y*. Deux questions differentes sur le niveau, aucune des deux fausse. La bande sur la REPONSE est une difference appariee et n'est pas concernee."
+  },
+  "coefficients": {
+    "(Intercept)": 2.62019158521382,
+    "l.1.LRM": 0.319207661367153,
+    "l.2.LRM": 0.532606283617217,
+    "l.3.LRM": -0.268666343898561,
+    "l.1.IBO": -0.106197296958164,
+    "l.2.IBO": 0.287668854567117,
+    "l.3.IBO": -0.994678070510478,
+    "IBO": -1.07851801105534,
+    "LRY": 0.672799272450834,
+    "IDE": 0.12546434757664,
+    "l.1.LRY": -0.257419348052059,
+    "l.1.IDE": -0.327984718227875,
+    "l.2.IDE": 1.40785747702434
+  },
+  "name_map": {
+    "(Intercept)": "const",
+    "l.1.LRM": "LRM.L1",
+    "l.2.LRM": "LRM.L2",
+    "l.3.LRM": "LRM.L3",
+    "IBO": "IBO.L0",
+    "l.1.IBO": "IBO.L1",
+    "l.2.IBO": "IBO.L2",
+    "l.3.IBO": "IBO.L3",
+    "LRY": "LRY.L0",
+    "l.1.LRY": "LRY.L1",
+    "IDE": "IDE.L0",
+    "l.1.IDE": "IDE.L1",
+    "l.2.IDE": "IDE.L2"
+  },
+  "baseline_central": [
+    11.768960397947,
+    11.7689348822353,
+    11.7688670556282
+  ],
+  "final_central": [
+    7.22798107520403,
+    7.22779178981258,
+    7.23277411459406
+  ],
+  "baseline_spread": 9.3342318841394e-05,
+  "final_spread": 0.00498232478148086
+}

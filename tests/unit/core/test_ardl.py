@@ -294,3 +294,56 @@ class TestPresentation:
         y, x = _dgp_clean(seed=62)
         sel = ARDL.select_order(y, x, max_p=2, max_q=1, ic="aic")
         assert len(sel.top(3)) == 3
+
+
+class TestContractOrderingOfTheCovariance:
+    """OBS-25 — les vues de long terme lisent le vecteur PAR NOM.
+
+    Le design met les dummies saisonnières entre la constante et les
+    retards. Tant que ``ardl_params`` découpait ``_params``
+    positionnellement, ``seasonal=True`` décalait la tranche des beta de
+    trois colonnes et TOUT le long terme (theta, son erreur type, la
+    vitesse d'ajustement, la demi-vie) était lu sur les mauvais
+    coefficients — sans message, sans NaN, avec des chiffres d'allure
+    normale.
+    """
+
+    @staticmethod
+    def _seasonal_fit(det: str, seasonal: bool):  # type: ignore[no-untyped-def]
+        y, x = _dgp_clean(n=240, seed=77)
+        return ARDL(y, x, order=(2, 1), det=det, seasonal=seasonal)._fit()
+
+    @pytest.mark.parametrize("det", ["none", "const", "trend"])
+    def test_theta_matches_the_hand_computation(self, det: str) -> None:
+        res = self._seasonal_fit(det, seasonal=True)
+        p = res.params
+        expected = (p["x.L0"] + p["x.L1"]) / (1 - p["y.L1"] - p["y.L2"])
+        assert float(res.longrun.loc["x", "theta"]) == pytest.approx(
+            expected, rel=1e-12
+        )
+
+    def test_adjustment_speed_reads_the_right_block(self) -> None:
+        res = self._seasonal_fit("const", seasonal=True)
+        p = res.params
+        assert float(res.adjustment["lambda"]) == pytest.approx(
+            p["y.L1"] + p["y.L2"] - 1.0, rel=1e-12
+        )
+        names = list(res._param_names)
+        idx = [names.index("y.L1"), names.index("y.L2")]
+        v_phi = res._cov_params[np.ix_(idx, idx)]
+        assert float(res.adjustment["se"]) == pytest.approx(
+            float(np.sqrt(np.ones(2) @ v_phi @ np.ones(2))), rel=1e-12
+        )
+
+    def test_seasonal_dummies_do_not_change_the_longrun_standard_error(self) -> None:
+        """Sans saisonnalité dans le DGP, les ajouter ne doit rien casser.
+
+        La tranche fautive donnait une erreur type d'un ordre de grandeur
+        différent : c'est le symptôme qui rendait le bug visible une fois
+        qu'on comparait les deux specifications.
+        """
+        plain = self._seasonal_fit("const", seasonal=False)
+        seasonal = self._seasonal_fit("const", seasonal=True)
+        assert float(seasonal.longrun.loc["x", "se"]) == pytest.approx(
+            float(plain.longrun.loc["x", "se"]), rel=0.15
+        )

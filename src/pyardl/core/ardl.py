@@ -39,7 +39,7 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 from itertools import product
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -62,6 +62,7 @@ from pyardl.utils import check_series, lag_matrix
 
 if TYPE_CHECKING:  # pragma: no cover
     from pyardl.core.restrictions import LongRunRestrictionResults
+    from pyardl.simulate.dynardl import DynardlSimulation
 
 FloatArray = npt.NDArray[np.float64]
 
@@ -869,15 +870,26 @@ class ARDLResults:
                 "has fixed regressors: they are neither phi nor beta "
                 "coefficients."
             )
+        # Coefficients are picked BY NAME, and the covariance matrix is
+        # restricted to the same names in the order
+        # ``ARDLParams.param_vector`` documents. Slicing the design
+        # positionally instead was a silent bug: seasonal dummies sit
+        # between the intercept and the lags, so with ``seasonal=True``
+        # the beta slice started three columns early and every long-run
+        # quantity was read off the wrong coefficients. OBS-25.
+        names = list(self._param_names)
+        keep: list[int] = []
+        if model.det in ("const", "trend"):
+            keep.append(names.index("const"))
+        if model.det == "trend":
+            keep.append(names.index("trend"))
+        keep.extend(names.index(f"{model._y_name}.L{i}") for i in range(1, model.p + 1))
         beta = []
-        pos = (
-            (1 if model.det in ("const", "trend") else 0)
-            + (1 if model.det == "trend" else 0)
-            + model.p
-        )
-        for qj in model.q:
-            beta.append(self._params[pos : pos + qj + 1])
-            pos += qj + 1
+        for x_name, qj in zip(model._x_names, model.q, strict=True):
+            idx = [names.index(f"{x_name}.L{lag}") for lag in range(qj + 1)]
+            beta.append(self._params[idx])
+            keep.extend(idx)
+        cov_contract = self._cov_params[np.ix_(keep, keep)]
         return ARDLParams(
             p=model.p,
             q=model.q,
@@ -890,7 +902,7 @@ class ARDLResults:
             has_const=model.det in ("const", "trend"),
             has_trend=model.det == "trend",
             x_names=model._x_names,
-            cov_params=self._cov_params,
+            cov_params=cov_contract,
         )
 
     def to_ecm(self) -> ECMParams:
@@ -936,7 +948,11 @@ class ARDLResults:
         n_lead = (1 if self.model.det in ("const", "trend") else 0) + (
             1 if self.model.det == "trend" else 0
         )
-        v_phi = self._cov_params[n_lead : n_lead + p, n_lead : n_lead + p]
+        # params.cov_params is already restricted to the contract order,
+        # so this slice lands on phi whatever else the design carries.
+        v_full = params.cov_params
+        assert v_full is not None  # ardl_params always supplies it
+        v_phi = v_full[n_lead : n_lead + p, n_lead : n_lead + p]
         se_lam = float(np.sqrt(np.ones(p) @ v_phi @ np.ones(p)))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -1055,6 +1071,30 @@ class ARDLResults:
 
         design, y_dep, _ = self.model._build_design()
         return stability_tests(y_dep, design, alpha=alpha)
+
+    def dynardl_simulate(self, shock: str, **kwargs: Any) -> DynardlSimulation:
+        """Simulate the response of ``y`` to a counterfactual shock.
+
+        The interpretation layer of Jordan and Philips (2018): the
+        coefficient table says how the pieces fit together, this says
+        what happens and when. See
+        :func:`pyardl.simulate.dynardl.dynardl_simulate` for the
+        arguments.
+
+        Examples
+        --------
+        >>> import numpy as np, pandas as pd
+        >>> rng = np.random.default_rng(0)
+        >>> x = pd.Series(rng.normal(size=200).cumsum(), name="x")
+        >>> y = pd.Series(2.0 + 1.5 * x.to_numpy() + rng.normal(size=200), name="y")
+        >>> res = ARDL(y, pd.DataFrame({"x": x}), order=(1, 1)).fit()
+        >>> sim = res.dynardl_simulate("x", size=1.0, r=200, seed=7)
+        >>> round(float(sim.summary_df[("response", "point")].iloc[-1]), 6)
+        1.502278
+        """
+        from pyardl.simulate.dynardl import dynardl_simulate
+
+        return dynardl_simulate(self, shock, **kwargs)
 
     # -------------------------- presentation --------------------------
     def summary(self) -> str:

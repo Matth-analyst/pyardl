@@ -1283,3 +1283,172 @@ seul a utiliser.
 - **Statut** : corrigee (2026-08-31). La bande est fixee a 8
   dans cette etude ; la faire varier pour atteindre la borne aurait ete
   choisir le resultat.
+
+---
+
+## OBS-25 — Un decoupage positionnel, trois dummies saisonnieres, et tout le long terme lu sur les mauvais coefficients
+
+- **Spec** : 25 (simulations dynamiques), mais le bug est dans 03/05
+- **Date** : 2026-08-29
+- **Statut** : corrigee, avec test de non-regression
+
+### CE QUE CHERCHAIT LE TEST
+
+Rien a voir avec la saisonnalite. Le plan de tests de la spec 25 demande
+qu'un choc permanent simule conduise exactement au coefficient de long
+terme calcule algebriquement — le pont entre la figure et la table. Je
+l'ai ecrit pour trois configurations de deterministes, dont une avec
+`seasonal=True`, uniquement pour verifier que les dummies traversent la
+recursion sans la casser.
+
+Elles la traversaient tres bien. C'est l'ALGEBRE qui donnait un autre
+chiffre : reponse simulee 1.2745, `longrun` 0.3768. Un facteur 3.4.
+
+### LA CAUSE
+
+`ARDLResults.ardl_params` decoupait le vecteur de parametres par
+POSITION :
+
+```python
+pos = has_const + has_trend + p
+for qj in model.q:
+    beta.append(self._params[pos : pos + qj + 1])
+```
+
+Le design range les colonnes ainsi : `const`, `season.2..s`, `y.L1..p`,
+`x.L0..q`. Les dummies saisonnieres sont donc entre la constante et les
+retards, et `pos` ne les comptait pas. Avec `det="const"`, `seasonal=True`
+et `p=1`, `pos` valait 2 : la tranche « beta » ramassait `season.3` et
+`season.4`.
+
+Les phi, eux, etaient lus PAR NOM (`_phi_values`) et restaient justes.
+D'ou un theta = (0.1374 + 0.0155) / (1 - 0.5942) : une formule correcte
+appliquee a deux coefficients qui n'ont rien a y faire.
+
+### POURQUOI IL A SURVECU A TOUT LE RESTE
+
+Le meme decalage frappait `cov_params`, transmis en entier a
+`longrun_covariance`, qui redecoupe lui aussi positionnellement. Donc
+theta ET son erreur type etaient faux ENSEMBLE, de facon coherente. Le t
+avait l'air normal. La vitesse d'ajustement, la demi-vie, `to_ecm`, tout
+ce qui passe par `ardl_params` heritait du decalage — sans exception,
+sans NaN, sans avertissement.
+
+Et surtout : aucun test existant ne combinait `seasonal=True` avec une
+lecture du long terme. Les tests de saisonnalite verifiaient que les
+dummies EXISTENT et qu'elles captent la saisonnalite ; les tests de long
+terme tournaient sans dummies. Chaque moitie passait.
+
+### LE CORRECTIF
+
+Lecture par nom, et covariance RESTREINTE a l'ordre du contrat que
+`ARDLParams.param_vector` documente, avant d'etre transmise. Les
+fonctions de `transforms` continuent de decouper positionnellement — ce
+qui est legitime — mais sur une matrice dont on garantit desormais
+l'ordre, au lieu de la matrice brute du design.
+
+### CE QUE CA APPREND
+
+Un decoupage positionnel est un contrat implicite entre deux fichiers
+qui ne se lisent pas l'un l'autre. Il tient tant que personne n'insere
+une colonne au milieu — et l'ajout des dummies saisonnieres (spec 04)
+etait exactement cela, dans un module qui ne savait pas que quelqu'un
+comptait ses colonnes ailleurs.
+
+Le bug n'a pas ete trouve par un test de saisonnalite ni par un test de
+long terme, mais par un test qui obligeait DEUX chemins independants —
+une recursion numerique et une formule algebrique — a produire le meme
+nombre. C'est le seul genre de test qui attrape une erreur ou toutes les
+sorties restent plausibles.
+
+---
+
+## OBS-26 — Instrumenter le mauvais regresseur coute plus cher que de ne rien instrumenter
+
+- **Spec** : 01 (Koyck 1954)
+- **Date** : 2026-08-29
+- **Statut** : divergence documentee et mesuree ; pyardl suit Liviatan
+
+### CE QUI S'EST PASSE
+
+La concordance croisee de la spec 01 devait etre une formalite : `dLagM`
+implemente le Koyck par variables instrumentales, pyardl aussi, les deux
+tournent sur les memes donnees danoises. Les coefficients de la
+regression transformee sont sortis completement differents :
+
+|                | (Intercept) |    Y.1 |    X.t |
+|----------------|-------------|--------|--------|
+| pyardl         |      0.8013 | 0.1453 | 1.5535 |
+| dLagM 1.1.13   |      0.2653 | 1.1075 |-0.2555 |
+
+Un ecart de cette taille n'est pas une convention numerique. Il fallait
+donc trouver ce qui differe, sans lire le code du package (regle 8) : la
+piste etait dans l'objet lui-meme. `koyckDlm` renvoie un `ivreg`, et un
+`ivreg` porte sa formule d'instruments :
+
+```
+y.t ~ Y.1 + X.t | Y.1 + X.t_1
+```
+
+**Y.1 figure des deux cotes de la barre.** Il est donc traite comme
+exogene, et c'est `X.t` qui est instrumente par `X.t_1`.
+
+Verification que c'est bien la seule difference : ce jeu d'instruments
+reproduit dans pyardl retombe sur les coefficients de dLagM a mieux que
+1e-8. Une explication qui reproduit le chiffre est une explication ;
+une qui se contente d'etre plausible n'en est pas une.
+
+### POURQUOI C'EST LE MAUVAIS REGRESSEUR
+
+Dans le modele de Koyck, l'endogeneite ne vient pas de x. Elle est
+CREEE par la transformation : u_t = e_t - lambda e_(t-1) contient
+e_(t-1), qui est aussi dans y_(t-1), d'ou
+Cov(y_(t-1), u_t) = -lambda sigma^2. Le regresseur a instrumenter est
+y_(t-1), et l'instrument de Liviatan (1963) est x_(t-1).
+
+### LE COUT, MESURE
+
+DGP a verite connue, lambda = 0.6, x autoregressif de coefficient 0.8
+(un x bruit blanc rendrait x_(t-1) non pertinent pour x_t et ferait
+exploser le second estimateur sans rien mesurer d'interpretable), 400
+replications a T = 2000 :
+
+| estimateur   | moyenne | biais   | erreur MC | biais / erreur MC |
+|--------------|---------|---------|-----------|-------------------|
+| liviatan     |  0.6001 | +0.0001 |    0.0004 |               0.2 |
+| autre jeu    |  0.5052 | -0.0948 |    0.0005 |             190.4 |
+| ols          |  0.5620 | -0.0380 |    0.0003 |             148.5 |
+
+Liviatan est a 0.2 erreur type de la verite : indiscernable de zero.
+L'autre jeu est a 190 erreurs types — et **plus biaise que l'OLS nue**,
+qui au moins ne pretend rien corriger.
+
+`validation/spec01_montecarlo.py`.
+
+### CE QUE CA APPREND
+
+Une methode d'estimation ne se verifie pas au fait qu'elle porte le bon
+nom. « Koyck par variables instrumentales » decrit les deux
+estimateurs ; un seul instrumente la variable que la theorie designe.
+
+Et le desaccord n'aurait rien appris s'il etait reste un desaccord. Ce
+qui en fait un resultat, c'est d'avoir REPRODUIT le chiffre de l'autre
+implementation en adoptant son choix : la difference se reduit alors a
+une decision identifiable, qu'on peut mettre a l'epreuve d'un DGP.
+
+### CE QUE CA NE DIT PAS
+
+Que `dLagM` est defaillant dans l'absolu. Le package peut viser une
+autre parametrisation ou un autre modele que celui de la spec 01 ; ce
+qui est etabli ici, c'est que sur le modele de Koyck tel que la spec
+01 §1 l'ecrit, ce jeu d'instruments ne corrige pas l'endogeneite que la
+transformation produit. Sa composante Almon (`polyDlm`), elle, concorde
+avec pyardl a **1.8e-13** sur les beta — meme algorithme, meme resultat.
+
+### UNE NOTE SUR LES DONNEES DANOISES
+
+pyardl emet un avertissement d'instrument faible sur cet exemple : LRY
+est tres persistante, donc x_(t-1) explique mal y_(t-1) et le F de
+premiere etape tombe a **3.70**, bien sous le seuil de 10. La demande
+de monnaie danoise est un mauvais terrain pour un modele de Koyck, et
+c'est au logiciel de le dire plutot qu'a l'utilisateur de le deviner.

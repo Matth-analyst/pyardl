@@ -188,6 +188,10 @@ Danish money demand in six seconds. Its companions:
   produces.
 - **[Efficient long-run estimators](docs/api/efficient.md)** — DOLS,
   FMOLS, CCR, and what static OLS inference actually costs.
+- **[Dynamic simulation](docs/api/dynardl.md)** — what happens to `y`,
+  and when, if a regressor moves and stays there.
+- **[Distributed lags](docs/api/distributed-lags.md)** — Koyck and Almon,
+  and why the obvious estimator fails on the first of them.
 - **[Glossary](docs/glossary.md)** — the vocabulary in English and
   French, with the notation.
 
@@ -1021,6 +1025,80 @@ tous les signes et toutes les significativités, et divergent d'un
 facteur 1.5 sur les magnitudes. `compare_longrun` les met dans un seul
 tableau, parce que publier une seule ligne revient à présenter un choix
 d'estimateur comme un résultat.
+
+### Retards distribués — Koyck et Almon, les racines de la généalogie
+
+```python
+pyardl.distributed_lags.KoyckModel(y, x, method="iv").fit()
+pyardl.distributed_lags.AlmonModel(y, x, q=4, r=2).fit()
+```
+
+Le modèle de Koyck existe pour une raison : sa transformation crée
+mécaniquement un régresseur endogène, donc **l'estimateur évident est
+inconvergent**. Sur un DGP où λ = 0.6, l'OLS donne 0.4727 ; le biais
+mesuré vaut 0.118 à T = 2000 et 0.121 à T = 8000 — quadrupler
+l'échantillon ne rachète rien. L'IV de Liviatan donne 0.6010. La méthode
+`"ols"` reste disponible et **avertit à chaque appel** : cacher le biais
+supprimerait la seule chose que ce modèle a à enseigner.
+
+Le modèle d'Almon produit *toujours* une distribution de retards lisse —
+c'est ce qu'on lui a demandé. `polynomial_restriction_test` figure donc
+dans chaque résumé, confrontant la forme obtenue au retard libre : une
+courbe lisse obtenue en supposant la lissité n'est pas une preuve de
+lissité.
+
+Concordance avec R `dLagM` sur la partie Almon : **1.8e-13** sur les
+poids. Sur la partie Koyck, désaccord — et c'est le plus instructif. La
+formule d'instruments que l'objet `ivreg` de `dLagM` renvoie lui-même,
+`y.t ~ Y.1 + X.t | Y.1 + X.t_1`, place `Y.1` des deux côtés de la barre :
+elle instrumente `X.t` et traite le régresseur retardé comme exogène. Or
+c'est lui que la transformation rend endogène. Reproduire ce jeu
+d'instruments dans pyardl retombe sur ses coefficients à 1e-8 ; sur un
+DGP à vérité connue il porte un biais de −0.095 quand Liviatan porte
++0.0001, et il est **plus biaisé que l'OLS nue**. OBS-26.
+
+### Simulations dynamiques — la table de coefficients devient une trajectoire
+
+```python
+sim = res.dynardl_simulate("IBO", size="1sd", t0=5, horizon=40, r=2000, seed=25)
+sim.summary_df   # blocs "response" et "level", bandes 75/90/95 %
+sim.plot()
+```
+
+Un ARDL(3, {1,3,2}) répartit l'effet d'un régresseur sur trois retards
+de la variable dépendante et quatre du régresseur. La réponse est
+*dans* la table de coefficients ; elle n'y est pas **lisible**.
+
+La réponse rapportée est une **différence appariée** avec un
+contrefactuel sans choc, calculée tirage par tirage : la constante, la
+tendance, les dummies saisonnières et le point de départ s'annulent
+exactement, pas approximativement. Chaque tirage part de SON propre
+équilibre implicite, ce qui rend la branche sans choc plate pour chaque
+tirage plutôt qu'en dérive depuis un départ emprunté à un autre vecteur
+de paramètres.
+
+Conséquence qui n'était pas évidente avant de la vérifier :
+`stochastic=True` ajoute des innovations aux DEUX branches, et comme le
+modèle est linéaire en y, elles **s'annulent exactement de la réponse**
+(1.4e-14, soit l'arrondi des deux sommations, pas un écart Monte
+Carlo). L'incertitude de prévision se voit sur le niveau — le seul
+endroit où elle a un sens.
+
+Couverture des bandes mesurée, pas supposée : 1000 réplications d'un
+ARDL(1,1) à coefficients connus donnent 93.7 / 94.8 / 94.3 / **95.0 %**
+pour un nominal de 95 %, aux horizons 5, 6, 10 et 60 — y compris à
+l'horizon de long terme, là où la quantité est un ratio et où
+l'asymétrie aurait pu mordre. Concordance avec R `dynamac` 0.1.12 :
+**3.5e-14** sur les treize coefficients.
+
+Cette spec a aussi révélé un bug ancien : les vues de long terme
+découpaient le vecteur de paramètres par POSITION, et les dummies
+saisonnières s'intercalent entre la constante et les retards. Avec
+`seasonal=True`, θ, son erreur type, la vitesse d'ajustement et la
+demi-vie étaient tous lus sur les mauvais coefficients — sans message,
+avec des chiffres d'allure normale. Trouvé par le test qui force une
+récursion numérique et une formule algébrique à donner le même nombre.
+OBS-25.
 
 ### VECM simulator
 

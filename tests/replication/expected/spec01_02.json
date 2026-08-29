@@ -1,0 +1,51 @@
+{
+  "_provenance": {
+    "spec": "01 (Koyck 1954) et 02 (Almon 1965)",
+    "source": "dLagM 1.1.13 (CRAN, GPL-2.1), R 4.6.1",
+    "generated": "2026-08-29",
+    "script": "validation/external/spec01_02_dlagm.R",
+    "log": "validation/results/external_logs/spec01_02_dlagm.json",
+    "data": "pyardl.datasets.load_denmark - le jeu danois que pyardl embarque et redistribue deja. dLagM sert d'implementation de reference, pas de source de donnees.",
+    "design": "y = LRM, x = LRY ; polyDlm(q=4, k=2) et koyckDlm()",
+    "tolerance_beta": 1e-08,
+    "tolerance_se": 1e-06,
+    "tolerance_koyck": 1e-08,
+    "tolerance_note": "Almon : accord MESURE a 1.8e-13 sur les beta, 1.2e-9 sur leurs erreurs types, 7.4e-15 sur la SSR, 5.0e-14 en base de Tchebychev. Les contrats sont poses tres au-dela (1e-8 et 1e-6) pour rester insensibles a un reordonnancement BLAS ; l'ecart plus large sur les erreurs types vient de la base BRUTE i^j de dLagM, moins bien conditionnee que la base normalisee (i/q)^j de pyardl - c'est un argument pour cette derniere, pas un desaccord. Koyck : le jeu d'instruments de dLagM reproduit dans pyardl retombe sur ses coefficients a mieux que 1e-8.",
+    "koyck_divergence": "dLagM et pyardl n'instrumentent PAS le meme regresseur. La formule que l'objet ivreg de dLagM renvoie, 'y.t ~ Y.1 + X.t | Y.1 + X.t_1', place Y.1 des deux cotes de la barre : Y.1 est traite comme exogene et c'est X.t qui est instrumente par X.t_1. Dans le modele de Koyck le regresseur endogene est y_(t-1) - c'est lui que la transformation correle a l'erreur - et pyardl l'instrumente par x_(t-1), suivant Liviatan (1963). Consequence mesuree sur un DGP a verite connue dans validation/spec01_montecarlo.py et OBS-26."
+  },
+  "q": 4,
+  "k": 2,
+  "nobs_poly": 51,
+  "polydlm": {
+    "intercept": 0.136200236780398,
+    "beta": [
+      1.67508587610642,
+      0.380220374858298,
+      -0.262137900141032,
+      -0.251988948891573,
+      0.410667228606676
+    ],
+    "se_beta": [
+      0.346951483660436,
+      0.15267820873016,
+      0.27799245901895,
+      0.161188214803364,
+      0.332716283005379
+    ],
+    "ssr": 0.294154532673735
+  },
+  "koyckdlm": {
+    "instrument_formula": "y.t ~ Y.1 + X.t | Y.1 + X.t_1",
+    "coefficients": {
+      "intercept": 0.265287790443349,
+      "y_lag1": 1.10745682731422,
+      "x_t": -0.255450673340659
+    },
+    "geometric": {
+      "alpha": -2.46878487922983,
+      "beta": -0.255450673340659,
+      "phi": 1.10745682731422
+    }
+  },
+  "pyardl_first_stage_f": 3.697999606854974
+}

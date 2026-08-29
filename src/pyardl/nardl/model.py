@@ -509,6 +509,34 @@ class NARDLResults:
         out.attrs["alpha"] = float(alpha)
         return out
 
+    def dynardl_simulate(self, shock: str, **kwargs: Any) -> Any:
+        r"""Simulate the response of ``y`` to a shock on one branch.
+
+        The NARDL is a linear ARDL in the decomposed regressors, so the
+        simulation of Jordan and Philips (2018) applies to it unchanged
+        — and that is exactly what makes it informative here: shocking
+        ``x_pos`` alone *is* the counterfactual "x rises and never
+        falls", which is the asymmetry the model was fitted to
+        represent.
+
+        A step of size one on ``x_pos`` reproduces the ``m_pos`` column
+        of :meth:`dynamic_multipliers` exactly; the test suite checks
+        the two agree to 1e-10, since two routes to the same object that
+        disagree would mean one of them is wrong.
+
+        Parameters
+        ----------
+        shock : str
+            One of the decomposed columns, e.g. ``"x_pos"``.
+        **kwargs
+            Passed to :func:`pyardl.simulate.dynardl.dynardl_simulate`.
+
+        Returns
+        -------
+        pyardl.simulate.dynardl.DynardlSimulation
+        """
+        return self._ardl_res.dynardl_simulate(shock, **kwargs)
+
     def plot_multipliers(
         self,
         h: int = 40,

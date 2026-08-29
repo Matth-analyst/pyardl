@@ -5,6 +5,83 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Distributed lags (`pyardl.distributed_lags`, specs 01 & 02)
+
+- `KoyckModel` — the geometric lag, with three estimators. `"ols"` is
+  kept and warns on every fit, because the point of this model is that
+  the obvious estimator is *inconsistent*: measured bias on lambda of
+  0.118 at T = 2000 and 0.121 at T = 8000 (Monte Carlo error 0.002), so
+  it does not shrink. `"iv"` (Liviatan, default) and `"ml"` (the MA(1)
+  cross-restriction) recover the truth.
+- Durbin's `h` instead of Durbin-Watson, with an automatic fallback to
+  Durbin's alternative test when `n * var(lambda)` makes `h` undefined,
+  and the index naming which one ran.
+- `AlmonModel` (alias `PDL`) — polynomial lags with endpoint
+  constraints imposed on the null space (exact to 1e-10, not by
+  penalty), a normalised or Chebyshev basis for conditioning, and
+  `select_order` on a **common sample**.
+- `polynomial_restriction_test` in every Almon summary. An Almon model
+  always produces a smooth lag distribution — that is what it was asked
+  for — so the only informative question is whether the shape survives a
+  comparison with the unrestricted finite lag.
+- Bridges to the core: `to_ardl()` matches an ARDL(1, 0) to 1e-12 and
+  `to_fdl()` shows the free weights the restriction replaced.
+- Cross-validated against R `dLagM` 1.1.13: Almon weights to **1.8e-13**,
+  standard errors to 1.2e-9, SSR to 7.4e-15, and the same weights again
+  from the Chebyshev basis (5.0e-14).
+- **The Koyck comparison disagreed, and the disagreement is documented
+  rather than smoothed over.** `koyckDlm`'s own `ivreg` formula,
+  `y.t ~ Y.1 + X.t | Y.1 + X.t_1`, puts `Y.1` on both sides of the bar:
+  it instruments `X.t` and treats the lagged dependent variable as
+  exogenous. Reproducing that instrument set inside pyardl lands on its
+  coefficients to 1e-8; on a DGP with `lambda = 0.6` known, it carries a
+  bias of −0.095 where Liviatan carries +0.0001, and is more biased than
+  plain OLS. OBS-26.
+
+### Added — Dynamic simulation (`pyardl.simulate`, spec 25)
+
+- `dynardl_simulate` / `ARDLResults.dynardl_simulate` /
+  `NARDLResults.dynardl_simulate` — run a fitted model forward under a
+  counterfactual step or impulse, with bands from parameter draws. The
+  interpretation layer of Jordan and Philips (2018): the coefficient
+  table says how the pieces fit, this says what happens and when.
+- The reported response is a **paired difference** from a no-shock
+  counterfactual, computed draw by draw, so the intercept, trend,
+  seasonal dummies and starting point cancel exactly rather than
+  approximately. Each draw starts at its own implied equilibrium, which
+  is what makes the no-shock branch flat for every draw.
+- `stochastic=True` adds innovations to both branches. Because the model
+  is linear in `y`, they cancel out of the response *exactly* — the
+  columns are identical to `stochastic=False` up to rounding (1.4e-14),
+  and the test suite pins it. Forecast uncertainty shows up on the
+  level, which is where it belongs.
+- Band coverage measured, not assumed: 1000 replications of an ARDL(1,1)
+  with known coefficients give 93.7% / 94.8% / 94.3% / 95.0% at h = 5,
+  6, 10 and 60 for a nominal 95%, with a Monte Carlo standard error of
+  0.69 point (`validation/spec25_montecarlo.py`).
+- A step of size one on a NARDL's `x_pos` reproduces the `m_pos` column
+  of `dynamic_multipliers` to 1e-10 — two routes to the same object.
+- `param_draws` accepts bootstrap replications, so a figure and a bounds
+  test can rest on one notion of uncertainty rather than two.
+- Cross-validated against R `dynamac` 0.1.12 on the Danish data pyardl
+  already ships: the 13 regression coefficients to **3.5e-14**, the
+  baseline equilibrium to 5.8e-05, and the final level inside dynamac's
+  own three-seed spread.
+
+### Fixed — Long-run views read the parameter vector by name (OBS-25)
+
+- `ardl_params` sliced `_params` **positionally**, and seasonal dummies
+  sit between the intercept and the lags in the design. With
+  `seasonal=True` the beta slice therefore started `s-1` columns early:
+  `longrun`, `adjustment`, `half_life` and `to_ecm` were all read off
+  the wrong coefficients — silently, with plausible-looking numbers and
+  a coherent standard error, since the same shift hit `cov_params`.
+  On a test fit, theta came out 0.3768 instead of 1.2745.
+  Coefficients are now picked by name and the covariance is restricted
+  to the order `ARDLParams.param_vector` documents. Found by the spec-25
+  test that forces a numerical recursion and an algebraic formula to
+  agree.
+
 ### Added — Efficient long-run estimators (`pyardl.cointegration`)
 
 - `dols`, `fmols`, `ccr` — Stock-Watson, Phillips-Hansen and Park. The
