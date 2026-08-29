@@ -581,11 +581,15 @@ paraît anormal quand un test reste silencieux.
   reste probablement conservateur, et cela se dit dans la documentation
   plutôt que de se lire comme une conformité.
 
-- **Conséquence pour les bandes** : celles de θ(τ) proviennent toujours
-  des tirages sur les lignes, donc elles sont **trop larges** dans le
-  même rapport. Une bande trop large sous-estime ce que disent les
-  données — c'est la moins grave des deux erreurs, mais c'en est une, et
-  elle est écrite en clair.
+- **Conséquence pour les bandes — CETTE DÉDUCTION ÉTAIT FAUSSE.**
+  J'écrivais ici que les bandes de θ(τ), venant des mêmes tirages sur
+  les lignes, étaient « trop larges dans le même rapport ». C'était un
+  raisonnement, pas une mesure. Mesurée directement (OBS-29), la bande
+  sur les lignes couvre **88 à 94 %** pour un nominal de 90 % : elle est
+  correcte. L'inflation de 1.36 vaut pour le CONTRASTE entre quantiles,
+  pas pour le NIVEAU de θ(τ) — deux fonctionnelles différentes des mêmes
+  tirages. Le paragraphe est laissé ici, corrigé, parce qu'un registre
+  qui efface ses erreurs ne sert plus à rien.
 
 - **Trace** : `validation/spec18_constancy_size.py`,
   `validation/spec18_calibrations.py`, résultats dans
@@ -1627,3 +1631,103 @@ Le profil est desormais plat : 16,1 s la ou il en faisait 26,8, sans
 poste dominant (recursion 30 %, QR 24 %, construction du design 18 %).
 C'est le signal d'arret — les 20 % suivants couteraient plus en
 complexite qu'ils ne rendraient en secondes.
+
+---
+
+## OBS-29 — La bande que j'ai ecrite pour corriger les bandes sous-couvre
+
+- **Spec** : 18 (QARDL, bandes de theta(tau))
+- **Date** : 2026-08-29
+- **Statut** : hypothese REFUTEE ; l'ancienne route est conservee par
+  defaut, la nouvelle documentee comme sous-couvrante
+
+### CE QUE JE CROYAIS SAVOIR
+
+OBS-14 avait etabli, par la mesure, que reechantillonner des LIGNES du
+design casse le test de constance : melanger des blocs d'un regresseur
+integre preserve la dependance locale mais pas la tendance stochastique,
+et la dispersion bootstrap du contraste sort **1.36 fois** trop grande.
+Le test avait ete corrige en tirant a design fixe.
+
+J'en avais deduit — et ecrit dans OBS-14 — que les bandes de theta(tau),
+qui venaient des memes tirages, etaient « trop larges dans le meme
+rapport ». La deduction paraissait mecanique. Elle n'avait jamais ete
+verifiee, et le plan de tests de la spec 18 demandait pourtant
+explicitement une couverture Monte Carlo.
+
+### CE QUE J'AI FAIT
+
+Ecrit une route a design fixe pour les bandes : residus reechantillonnes
+par blocs autour de l'ajustement DE CHAQUE quantile (et non autour de la
+mediane, ce qui aurait impose un simple decalage de position et rendu la
+bande etroite exactement la ou la figure du QARDL a quelque chose a
+montrer). Puis mesure la couverture des trois routes, sur deux DGP dont
+theta(tau) est connu analytiquement.
+
+### CE QUE LA MESURE A DIT
+
+150 replications, nominal 90 %, erreur type 2.45 points.
+
+**(A) DGP homogene**, vrai theta(tau) = 1.500 partout :
+
+| route | tau=0.25 | tau=0.5 | tau=0.75 | largeur |
+|---|---|---|---|---|
+| `rows` | 94.0 % | 91.3 % | 90.7 % | 0.320 |
+| `fixed-design` | 80.7 % | 81.3 % | 82.7 % | 0.258 |
+| `delta` | 88.7 % | 91.3 % | 92.0 % | 0.311 |
+
+**(B) DGP a pente variable**, theta(tau) = 1.449 / 1.500 / 1.551 :
+
+| route | tau=0.25 | tau=0.5 | tau=0.75 | largeur |
+|---|---|---|---|---|
+| `rows` | 92.7 % | 88.0 % | 90.7 % | 0.295 |
+| `fixed-design` | 76.7 % | 81.3 % | 80.7 % | 0.236 |
+| `delta` | 88.0 % | 90.0 % | 88.0 % | 0.281 |
+
+La bande sur les lignes **couvre**. Celle que j'avais ecrite pour la
+corriger sous-couvre de 8 a 13 points — dans la direction dangereuse,
+celle qui fait publier des conclusions que les donnees ne portent pas.
+
+### POURQUOI
+
+Tenir le design fixe retire une source de variabilite qui, ici, est
+**reelle**. Le regresseur est aleatoire : la loi d'echantillonnage de
+theta_hat(tau) inclut sa variation d'un echantillon a l'autre. Fixer le
+design revient a conditionner dessus, et la bande obtenue est alors
+conditionnelle quand la couverture, elle, est evaluee de facon non
+conditionnelle.
+
+L'argument « le design n'est pas aleatoire, cette litterature ne le
+traite pas comme tel » a ete verifie pour le CONTRASTE entre quantiles.
+Il ne se transporte pas au NIVEAU du coefficient. Ce sont deux
+fonctionnelles differentes des memes tirages, et rien n'obligeait
+l'inflation observee sur l'une a se retrouver sur l'autre.
+
+### CE QUE CA APPREND
+
+Une erreur mesuree sur une quantite ne se propage pas par deduction aux
+autres quantites du meme calcul. J'ai transporte un facteur 1.36 d'un
+contraste vers un niveau, et le transport etait faux — pas de peu, mais
+en sens inverse de ce qui comptait : je croyais la bande trop prudente,
+elle etait juste, et ma correction l'a rendue trop courte.
+
+Le detail qui aurait du alerter plus tot : OBS-14 elle-meme ecrivait
+« recalibrer contre sa propre distribution bootstrap ne suffit pas, la
+FORME de la loi differe aussi ». Une loi dont la forme differe ne se
+resume pas a un facteur d'echelle transportable.
+
+### CE QUI A ETE RETENU
+
+- Le defaut reste `rows`, choisi sur la couverture mesuree et non sur le
+  raisonnement.
+- `fixed-design` est conservee, documentee comme sous-couvrante avec ses
+  chiffres, parce que la comparaison merite d'etre reproductible. La
+  supprimer effacerait la trace de l'erreur.
+- La `delta` couvre elle aussi correctement (88-92 %) pour une largeur
+  legerement moindre — a `inference='kernel'` elle reste le seul choix,
+  et ce n'est pas un pis-aller.
+- OBS-14 est corrigee sur place plutot que reecrite : son paragraphe sur
+  les bandes porte desormais la refutation.
+
+- **Trace** : `validation/spec18_band_coverage.py`, resultats dans
+  `validation/results/spec18_band_coverage.*`.

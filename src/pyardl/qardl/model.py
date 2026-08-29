@@ -174,13 +174,51 @@ class QARDLResults:
             theta = -gamma / lam
         return np.where(np.abs(lam) < LAMBDA_TOL, np.nan, theta)
 
-    def longrun(self, variable: str | None = None) -> pd.DataFrame:
+    def longrun(self, variable: str | None = None, bands: str = "rows") -> pd.DataFrame:
         r"""Long-run coefficients :math:`\theta_j(\tau)`, with bands.
 
         Parameters
         ----------
         variable : str, optional
             Restrict to one regressor. Defaults to all of them.
+        bands : {"rows", "fixed-design", "delta"}
+            How the interval is built when the fit used ``'mbb'``.
+
+            ``"rows"`` (default) resamples blocks of rows, design
+            included. ``"fixed-design"`` resamples only the residuals,
+            in blocks, around each quantile's own fit. ``"delta"``
+            forces the per-quantile delta method even under ``'mbb'``.
+
+            **The default was chosen by measuring coverage, and the
+            measurement contradicted what this module expected.**
+            OBS-14 had established that row resampling inflates the
+            spread of a *contrast between quantiles* by 1.36, and
+            inferred that the bands were correspondingly too wide. They
+            are not. On 150 replications of a DGP with a known
+            ``theta(tau)``, at a nominal 90% (standard error 2.45
+            points):
+
+            =============== ================ ==================
+            route           homogeneous DGP  tau-varying DGP
+            =============== ================ ==================
+            ``rows``        90.7 - 94.0 %    88.0 - 92.7 %
+            ``fixed-design``  80.7 - 82.7 %    76.7 - 81.3 %
+            ``delta``       88.7 - 92.0 %    88.0 - 90.0 %
+            =============== ================ ==================
+
+            Holding the design fixed **removes a real source of
+            variability**: here the regressor is random, and the
+            sampling variation of ``theta_hat(tau)`` genuinely includes
+            it. The argument that the design is not random belongs to
+            the *contrast* problem, where it was verified; it does not
+            transfer to the level of the coefficient. ``"fixed-design"``
+            is kept because the comparison is worth reproducing, and it
+            is documented as under-covering rather than removed
+            silently. See OBS-29 and
+            ``validation/spec18_band_coverage.py``.
+
+            Under ``inference='kernel'`` there are no draws and the
+            delta method is used whatever this says.
 
         Returns
         -------
@@ -197,6 +235,17 @@ class QARDLResults:
             When the adjustment speed is indistinguishable from zero at
             some quantile, so the ratio is not defined there.
         """
+        if bands not in ("fixed-design", "rows", "delta"):
+            raise ValueError(
+                f'bands must be "fixed-design", "rows" or "delta", got {bands!r}.'
+            )
+        if bands == "fixed-design":
+            source = self._fixed_design_draws()
+        elif bands == "rows":
+            source = self._draws
+        else:
+            source = None
+
         variables = self.regressors if variable is None else (variable,)
         out: dict[str, FloatArray] = {}
         degenerate: list[float] = []
@@ -206,8 +255,8 @@ class QARDLResults:
             degenerate += [
                 t for t, v in zip(self.taus, point, strict=True) if np.isnan(v)
             ]
-            if self._draws is not None:
-                drawn = self._theta_from(self._draws, name)
+            if source is not None:
+                drawn = self._theta_from(source, name)
                 out[f"{name}_lower"] = np.nanquantile(drawn, 0.05, axis=0)
                 out[f"{name}_upper"] = np.nanquantile(drawn, 0.95, axis=0)
             else:
@@ -286,6 +335,32 @@ class QARDLResults:
             rng,
         )
         self._cache["null_draws"] = drawn
+        return drawn
+
+    def _fixed_design_draws(self, n_boot: int | None = None) -> FloatArray | None:
+        """Band draws with the design held fixed, computed once and cached.
+
+        Lazy on purpose. A fit that is never asked for bands should not
+        pay for a second bootstrap, and most fits are made for the
+        constancy test rather than for the figure.
+        """
+        if self._draws is None:
+            return None
+        cached: FloatArray | None = self._cache.get("band_draws")
+        if cached is not None and (n_boot is None or cached.shape[0] == n_boot):
+            return cached
+        block = self.block_length or _block_length(self.nobs)
+        rng = np.random.default_rng(self.seed)
+        drawn = _band_draws(
+            self._target,
+            self._design,
+            self.taus,
+            self._params,
+            self.n_boot if n_boot is None else n_boot,
+            block,
+            rng,
+        )
+        self._cache["band_draws"] = drawn
         return drawn
 
     def wald_constancy(
@@ -577,6 +652,71 @@ class QARDLResults:
                 "  across quantiles. Refit with inference='mbb'.",
             ]
         return "\n".join(lines)
+
+
+def _band_draws(
+    target: FloatArray,
+    design: FloatArray,
+    taus: tuple[float, ...],
+    params: FloatArray,
+    n_boot: int,
+    block: int,
+    rng: np.random.Generator,
+) -> FloatArray:
+    r"""Sampling law of :math:`\hat\beta(\tau)`, design held **fixed**.
+
+    Same lesson as :func:`_null_contrast_draws`, applied to the bands.
+    Resampling rows of the design mixes blocks of an **integrated**
+    regressor: the blocks keep the local dependence but not the
+    stochastic trend, which is what makes an I(1) series an I(1) series.
+    The bootstrap designs come out more erratic than the real one, the
+    estimates more dispersed, and the bands too wide by the same factor
+    of 1.36 that OBS-14 measured on the contrasts.
+
+    So the design is not resampled. Only the residuals are, in blocks,
+    and **around each quantile's own fit** rather than around a common
+    one:
+
+    .. math::
+
+        y^{*}_\tau = X \hat\beta(\tau) + \hat u_\tau[\text{idx}],
+        \qquad \hat u_\tau = y - X\hat\beta(\tau).
+
+    Bootstrapping every quantile around the median fit instead would be
+    simpler, and it is what the null route does — deliberately, because
+    that *is* the null being tested there. Here it would impose the very
+    thing the bands are supposed to display: a location shift, in which
+    the slopes do not vary with tau. The band would then be narrow
+    exactly where the interesting case is.
+
+    **This route is NOT the default, and the reason is measured.** It
+    covers 77 % to 83 % at a nominal 90 %, against 88 % to 94 % for the
+    row resampling it was written to replace. Holding the design fixed
+    removes a source of variability that is real here: the regressor is
+    random, and the sampling law of ``theta_hat(tau)`` includes it. The
+    "the design is not random" argument was verified for the *contrast*
+    between quantiles (OBS-14) and does not carry over to the level of
+    the coefficient. It is kept for the comparison, not for use. OBS-29.
+
+    The residual :math:`\hat u_\tau` has its tau-quantile at zero by
+    construction, so the resampled sample has the same conditional
+    quantile at tau as the fit it came from, and the draw is centred on
+    the estimate rather than on some other quantile of it.
+    """
+    n_obs = design.shape[0]
+    drawn = np.empty((n_boot, len(taus), design.shape[1]))
+    drawn.fill(np.nan)
+    fitted = design @ params.T  # (n_obs, n_tau)
+    for i, tau in enumerate(taus):
+        resid = target - fitted[:, i]
+        for b in range(n_boot):
+            idx = _moving_block_indices(n_obs, block, rng)
+            star = fitted[:, i] + resid[idx]
+            try:
+                drawn[b, i], _ = quantile_regression(star, design, tau)
+            except (ValueError, np.linalg.LinAlgError):  # pragma: no cover
+                continue
+    return drawn
 
 
 def _null_contrast_draws(

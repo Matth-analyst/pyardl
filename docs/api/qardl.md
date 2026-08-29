@@ -162,11 +162,48 @@ points, so 3.0% sits 1.3 standard errors from 5%. The test is probably
 still conservative, and that is written here rather than left to read as
 a clean bill of health.
 
-The bands on `θ(τ)` still come from the row-resampled draws, and are
-therefore **wider than they need to be** by roughly the same factor.
-That is stated rather than hidden: a band that is too wide understates
-what the data say, which is the safer of the two errors but is still an
-error.
+### And the bands, where the same reasoning turned out not to apply
+
+The paragraph above used to end by saying that the bands on `θ(τ)`,
+coming from the same row-resampled draws, were **too wide by the same
+factor**. That was a deduction, not a measurement, and the measurement
+contradicted it.
+
+Coverage of a nominal 90% band, 150 replications, two DGPs whose
+`θ(τ)` is known analytically (standard error 2.45 points):
+
+| route | homogeneous DGP | `τ`-varying DGP | mean width |
+|---|---|---|---|
+| `"rows"` *(default)* | **90.7 – 94.0%** | **88.0 – 92.7%** | 0.320 / 0.295 |
+| `"fixed-design"` | 80.7 – 82.7% | 76.7 – 81.3% | 0.258 / 0.236 |
+| `"delta"` | 88.7 – 92.0% | 88.0 – 90.0% | 0.311 / 0.281 |
+
+The row-resampled band **covers**. The fixed-design band — written
+specifically to correct it — under-covers by 8 to 13 points, which is
+the dangerous direction.
+
+The reason is that holding the design fixed removes a source of
+variability that is real here: the regressor is random, and the sampling
+law of `θ̂(τ)` includes its variation. Conditioning on the design gives a
+conditional band, while coverage is evaluated unconditionally. The
+argument that "the design is not random" was *verified* for the contrast
+between quantiles; it does not transfer to the level of the coefficient.
+Two different functionals of the same draws, and nothing obliged the
+1.36 inflation on one to appear on the other.
+
+So the default stays `"rows"`, chosen on measured coverage rather than
+on the reasoning. `"fixed-design"` is kept and documented as
+under-covering — removing it would erase the trace of the mistake — and
+`"delta"` covers correctly too, which matters because under
+`inference="kernel"` it is the only band available and is not a fallback.
+
+```python
+res.longrun(bands="rows")          # default, 88-94% coverage
+res.longrun(bands="delta")         # 88-92%, slightly narrower
+res.longrun(bands="fixed-design")  # 77-83%: kept for comparison only
+```
+
+OBS-29, and `validation/spec18_band_coverage.py`.
 
 ## Cointegration at a quantile
 

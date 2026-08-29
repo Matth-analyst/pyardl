@@ -5,6 +5,30 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — QARDL bands: the coverage study the specification asked for
+
+- `QARDLResults.longrun` gains a `bands` argument
+  (`"rows"` default, `"fixed-design"`, `"delta"`), and spec 18 §4.3's
+  Monte Carlo coverage study now exists
+  (`validation/spec18_band_coverage.py`): 150 replications on two DGPs
+  whose `theta(tau)` is known analytically, at a nominal 90%.
+- **The study refuted the reason it was written.** OBS-14 had measured
+  that row resampling inflates the spread of a *contrast between
+  quantiles* by 1.36, and this project had inferred — in writing, in the
+  register — that the bands were correspondingly too wide. They are not:
+  measured, the row-resampled band covers **88-94%**, while the
+  fixed-design route written to correct it covers **77-83%**, in the
+  dangerous direction.
+- Holding the design fixed removes variability that is real here: the
+  regressor is random, and the sampling law of `theta_hat(tau)` includes
+  it. The "the design is not random" argument was verified for the
+  contrast and does not transfer to the level of the coefficient. Two
+  functionals of the same draws.
+- The default therefore stays `"rows"` — chosen on measured coverage,
+  not on the reasoning — and `"fixed-design"` is kept, documented with
+  its numbers, because deleting it would erase the trace of the mistake.
+  OBS-14 is corrected in place, and the new finding is OBS-29.
+
 ### Changed — The batched estimator factorises the augmented matrix
 
 - `batch_uecm_statistics` now takes the QR of `[X | y]` in `mode="r"`.

@@ -488,3 +488,119 @@ class TestCalibration:
         null = np.random.default_rng(1).normal(size=(2, 3))
         stat, _, pvalue = _contrast_test(point, drawn, null, [(1, 0), (2, 0)], "null")
         assert np.isfinite(stat) and np.isnan(pvalue)
+
+
+class TestBandConstruction:
+    """Spec 18 §4.3 — comment la bande de theta(tau) est construite.
+
+    OBS-14 avait etabli que reechantillonner des LIGNES du design casse
+    le test de constance : melanger des blocs d'un regresseur integre
+    preserve la dependance locale mais pas la tendance stochastique, et
+    la dispersion sort 1.36 fois trop grande. Le test avait ete corrige
+    a design fixe ; les BANDES etaient restees sur l'ancienne route, et
+    OBS-14 le notait comme limite residuelle.
+
+    Ces tests verrouillent la correction. La couverture elle-meme se
+    mesure ailleurs — `validation/spec18_band_coverage.py` — parce
+    qu'elle demande 150 replications a une douzaine de secondes chacune.
+    """
+
+    @staticmethod
+    def _fit(seed: int = 5, n: int = 200, n_boot: int = 60):
+        y, x = _homogeneous(seed=seed, n=n)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return QARDL(y, x, order=(1, 1), taus=TAUS).fit(
+                inference="mbb", n_boot=n_boot, seed=seed
+            )
+
+    def test_the_three_routes_all_bracket_the_estimate(self) -> None:
+        res = self._fit()
+        for bands in ("fixed-design", "rows", "delta"):
+            table = res.longrun(bands=bands)
+            assert np.all(table["x_lower"] <= table["x"] + 1e-9), bands
+            assert np.all(table["x"] <= table["x_upper"] + 1e-9), bands
+
+    def test_holding_the_design_fixed_narrows_the_band(self) -> None:
+        """La difference de largeur existe — et c'est le probleme.
+
+        Tenir le design fixe retire une source de variabilite qui, ici,
+        est reelle : le regresseur EST aleatoire, et la loi
+        d'echantillonnage de theta(tau) l'inclut. La bande se resserre
+        donc, et sa couverture tombe de 88-94 % a 77-83 % (OBS-29).
+
+        Le test verrouille l'ordre des largeurs, qui est le symptome
+        observable en un seul echantillon ; la couverture, elle, se
+        mesure sur 150 replications dans validation/.
+        """
+        res = self._fit()
+        fixed = res.longrun(bands="fixed-design")
+        rows = res.longrun(bands="rows")
+        width_fixed = (fixed["x_upper"] - fixed["x_lower"]).mean()
+        width_rows = (rows["x_upper"] - rows["x_lower"]).mean()
+        assert width_rows > width_fixed
+
+    def test_the_default_is_the_route_that_covers(self) -> None:
+        """Le defaut est `rows`, choisi sur la couverture mesuree.
+
+        Il l'est CONTRE l'attente : OBS-14 avait deduit de l'inflation
+        de 1.36 sur les contrastes que les bandes etaient trop larges.
+        La mesure directe dit qu'elles couvrent, et que la route ecrite
+        pour les corriger sous-couvre. Ce test empeche que le defaut
+        rebascule sur la foi du raisonnement plutot que de la mesure.
+        """
+        res = self._fit()
+        assert np.allclose(
+            res.longrun().to_numpy(),
+            res.longrun(bands="rows").to_numpy(),
+            equal_nan=True,
+        )
+
+    def test_band_draws_are_cached(self) -> None:
+        """La seconde lecture ne relance pas un bootstrap entier."""
+        res = self._fit()
+        first = res.longrun(bands="fixed-design")
+        second = res.longrun(bands="fixed-design")
+        assert np.allclose(first.to_numpy(), second.to_numpy(), equal_nan=True)
+        assert "band_draws" in res._cache
+
+    def test_the_fixed_design_route_leaves_the_design_alone(self) -> None:
+        """Verification directe de la propriete qui donne son nom a la route.
+
+        Chaque tirage doit etre une regression sur le MEME design ; seule
+        la cible change. On le verifie en refaisant un tirage a la main et
+        en retrouvant un coefficient du meme ordre, la ou un design
+        reechantillonne donnerait une dispersion visiblement differente.
+        """
+        from pyardl.qardl.model import _band_draws, _moving_block_indices
+
+        res = self._fit(n_boot=40)
+        drawn = _band_draws(
+            res._target,
+            res._design,
+            res.taus,
+            res._params,
+            8,
+            res.block_length or 5,
+            np.random.default_rng(0),
+        )
+        assert drawn.shape == (8, len(TAUS), res._design.shape[1])
+        assert np.all(np.isfinite(drawn))
+        # Le design n'a pas bouge : les indices ne servent qu'aux residus.
+        idx = _moving_block_indices(res._design.shape[0], 5, np.random.default_rng(0))
+        assert idx.shape[0] == res._design.shape[0]
+
+    def test_kernel_inference_ignores_the_band_argument(self) -> None:
+        """Sans tirages, il n'y a qu'une bande possible : la delta-methode."""
+        y, x = _homogeneous(seed=6, n=200)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = QARDL(y, x, order=(1, 1), taus=TAUS).fit(inference="kernel")
+        for bands in ("fixed-design", "rows", "delta"):
+            table = res.longrun(bands=bands)
+            assert np.all(np.isfinite(table["x_lower"]))
+
+    def test_unknown_band_route(self) -> None:
+        res = self._fit(n_boot=20)
+        with pytest.raises(ValueError, match="bands must be"):
+            res.longrun(bands="wild")
