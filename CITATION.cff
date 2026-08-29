@@ -14,7 +14,7 @@ authors:
   - family-names: Adjoh
     given-names: Komlan Matthania
     email: komlanadjohmatthania@gmail.com
-version: 0.5.0
+version: 0.6.0
 date-released: "2026-08-29"
 license: MIT
 repository-code: "https://github.com/Matth-analyst/pyardl"
@@ -45,4 +45,6 @@ abstract: >-
   the efficient long-run estimators FMOLS, DOLS and CCR, stochastic
   dynamic simulations of a fitted model, the Koyck and Almon
   distributed-lag models the family descends from, and a reproducible
-  Monte Carlo simulation engine.
+  Monte Carlo simulation engine. An optional native kernel accelerates
+  the bootstrap, doubled at all times by the reference NumPy path the
+  two are required to agree with exactly.

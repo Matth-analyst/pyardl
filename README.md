@@ -1255,11 +1255,17 @@ Released:
   With that, the 28 specifications the project set out to implement are
   implemented, each with its own external cross-validation.
 
+- **0.6.0** — performance, and three measurements that contradicted the
+  reasoning behind them: an optional Rust kernel plus an augmented QR
+  (**1.53x to 1.80x** on a bootstrap run), the QARDL band coverage study
+  the specification had always asked for, and a declared pandas floor
+  that had stopped being true.
+
 Next:
 
-- **0.6+** — the optional Rust kernel and the augmented QR, together
-  1.53x to 1.80x on a bootstrap run; QARDL bands by row resampling; and
-  whatever the validation register turns up.
+- **0.7+** — whatever the validation register turns up. The 28
+  specifications are implemented and the performance profile is flat;
+  what remains is use, and the questions use raises.
 
 ### Le backend natif, et ce que la mesure a dit
 

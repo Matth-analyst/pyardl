@@ -5,6 +5,39 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-29
+
+Sixth release. Performance, and three occasions where the measurement
+contradicted the reasoning that motivated the work.
+
+The bootstrap runs **1.53x to 1.80x** faster — an optional Rust kernel
+for the null recursion, and an augmented QR that never forms `Q`. The
+QARDL bands finally have the coverage study the specification asked for.
+And the declared pandas floor stopped being a fiction.
+
+**What the measurements said, against expectation:**
+
+- The heaviest item in the profile was not the most profitable to
+  optimise. The QR was 36% of the run against the recursion's 27%, and
+  this project predicted in writing that it was the bigger prize. It is
+  not: 1.07x-1.22x against 1.39x-1.57x. Share alone does not rank
+  optimisations — share times the fraction you can actually remove does,
+  and that second factor is the one that is hard to guess. OBS-28.
+- The QARDL bands were believed too wide, deduced from a 1.36 inflation
+  measured on a *contrast between quantiles*. Measured directly, they
+  cover 88-94% at a nominal 90%, while the fixed-design route written to
+  correct them covers 77-83% — in the dangerous direction. An error
+  measured on one functional does not propagate by deduction to another.
+  OBS-29, and OBS-14 corrected in place.
+- A benchmark that does not alternate its arms measures thermal drift as
+  much as it measures code, and does so in a form that looks exactly
+  like a result: 0.83x on one configuration where the isolated kernel
+  said 4.2x. OBS-27.
+
+Every published figure in this release is generated from the benchmark's
+own JSON and checked cell by cell, rather than transcribed.
+
+
 ### Fixed — `include_groups` broke the declared pandas floor
 
 - `cross_section_averages` and the spec-24 replication passed

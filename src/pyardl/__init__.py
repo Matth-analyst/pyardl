@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 # name -> module it lives in. Kept explicit rather than derived, so that
 # what is public here is a decision and not a side effect of a scan.
