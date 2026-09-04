@@ -39,3 +39,8 @@ src/pyardl/_rust.pyd
 src/pyardl/_rust.so
 src/pyardl/_rust.*.so
 src/pyardl/_rust.*.pyd
+
+# Site de documentation (Next.js) : application locale de consultation
+# des specs, pas un artefact du package pyardl. node_modules/.next
+# rendraient le depot enorme et n'ont rien a faire dans le portfolio.
+docs-app/

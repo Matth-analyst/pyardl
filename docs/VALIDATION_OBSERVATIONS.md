@@ -60,8 +60,31 @@ validation de l'article JOSS.
   test `needs_review` dédié documentant l'état (plus grand écart absolu
   du recoupement, ~2σ) ; à vérifier contre l'article original quand il
   sera consultable.
-- **Statut** : expliquée par le critère dérivé (2026-07-07), maintenue
-  en observation.
+- **Révision (2026-09-03)** : la question posée était « l'écart
+  survivrait-il à une simulation beaucoup plus précise, ou n'est-ce
+  qu'un manque de puissance ? ». Cible fixée *avant* d'exécuter, suivant
+  la règle 10 de CLAUDE.md : pousser SE_sim assez bas pour que
+  l'incertitude finale soit dominée par la seule imprécision
+  irréductible de la table PSS elle-même (SE_pss ≈ 0.0977, dérivée de
+  `spec12_pss_crosscheck.csv`), ce qui donne n_sims ≥ 4 000 000 par
+  graine. Exécuté à 4 000 000 répétitions sur deux graines indépendantes
+  (seeds 910100 / 920100, `pyardl.critical_values.simulate.simulate_bounds`,
+  T=1000, case=1, k=0) : quantiles 6.9412 et 6.9577, moyenne poolée sur
+  8 000 000 tirages = **6.9494**. Écart à la valeur publiée : **-0.2206**.
+  La tolérance à 3σ ne s'est resserrée que de 0.3467 à **0.2937** (de
+  0.35 à 0.29), parce que l'erreur type de notre propre simulation
+  (0.0069 à 8M tirages) est désormais négligeable face à celle,
+  irréductible, de la table PSS à 40 000 réplications : multiplier notre
+  précision par 40 ne fait presque plus bouger la tolérance. L'écart
+  observé reste à **2.25σ** — verdict inchangé, mais établi cette fois
+  au maximum de précision qu'une simulation interne peut apporter. Aller
+  plus loin exigerait une source externe à l'erreur MC plus petite que
+  celle de PSS elle-même (l'article original, ou une seconde table
+  publiée), pas davantage de calcul de notre côté.
+- **Statut** : confirmée à la précision maximale atteignable par
+  simulation interne (2026-09-03) ; maintenue en observation, faute
+  d'une source externe indépendante plus précise que la table PSS
+  elle-même.
 
 ## OBS-3 — Non-monotonie ponctuelle dans Narayan 2005
 

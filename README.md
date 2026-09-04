@@ -9,7 +9,6 @@
 **ARDL models, bounds tests for cointegration, and critical values you can trace back to their source.**
 
 [![CI](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml?query=event%3Apush)
-[![Monte Carlo nightly](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml/badge.svg?event=schedule)](https://github.com/Matth-analyst/pyardl/actions/workflows/ci.yml?query=event%3Aschedule)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -64,10 +63,9 @@ F_indep   = 8.1619   decision (5%): cointegration
 CLASSIFICATION (5%): cointegration
 ```
 
-That gap is the reason this library exists.
-
-Engle-Granger and Johansen ship here too — you should be able to compare — but
-they are the point of reference, not the recommended route.
+That gap is the reason this library exists. Engle-Granger and Johansen ship
+here too — you should be able to compare — but they are the point of
+reference, not the recommended route.
 
 ---
 
@@ -89,7 +87,9 @@ pip install -e ".[dev,plot,bootstrap]"
 
 Requires Python 3.11+. Runtime dependencies are numpy, scipy, pandas and
 statsmodels — nothing else. `matplotlib` (extra `plot`) and `arch` (extra
-`bootstrap`) are optional and imported lazily.
+`bootstrap`) are optional and imported lazily. An optional native Rust kernel
+speeds up the bootstrap; it is never required (see
+[Native backend](docs/api/backend.md)).
 
 ---
 
@@ -116,7 +116,7 @@ CLASSIFICATION (5%): cointegration
   F_overall, t_BDM and F_indep all reject: the level terms are jointly significant, y adjusts back towards equilibrium, and the regressors carry the long-run relationship.
 
         F_I0   F_I1   t_I0   t_I1  F_indep_I0  F_indep_I1
-alpha                                                    
+alpha
 0.10   2.730  3.747 -2.570 -3.460       2.084       3.864
 0.05   3.229  4.322 -2.860 -3.780       2.619       4.646
 0.01   4.311  5.543 -3.430 -4.370       3.814       6.311
@@ -124,147 +124,82 @@ alpha
 
 ---
 
-## Table of contents
-
-- [Design principles](#design-principles)
-- [The workflow](#the-workflow)
-  - [Step 0 — Screen for I(2)](#step-0--screen-for-i2)
-  - [Step 1 — Choose lag orders](#step-1--choose-lag-orders)
-  - [Step 2 — Run the bounds test](#step-2--run-the-bounds-test)
-  - [Step 3 — Read the long run](#step-3--read-the-long-run)
-  - [Step 4 — Test what theory says](#step-4--test-what-theory-says)
-  - [Step 5 — Check the model held still](#step-5--check-the-model-held-still)
-  - [Step 6 — Remove the inconclusive zone](#step-6--remove-the-inconclusive-zone)
-- [API reference](#api-reference)
-  - [Bootstrap bounds test](#bootstrap-bounds-test)
-  - [Johansen test](#johansen-test)
-  - [VECM simulator](#vecm-simulator)
-- [Validation](#validation)
-- [Compatibility](#compatibility)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [Citing](#citing)
-- [References](#references)
-
----
-
 ## Design principles
 
-Four rules shape the API. They are the reason to prefer this library over
+Four rules shape the API, and are the reason to prefer this library over
 writing the same tests yourself.
 
 **An inconclusive result stays inconclusive.** The bounds test compares a
-statistic against a *pair* of critical values, so the verdict has three states —
-`cointegration`, `no_cointegration`, `inconclusive` — and never collapses to a
-boolean. When the answer lands in the middle you get the p-value interval, so
-you can see how close it was.
+statistic against a *pair* of critical values, so the verdict has three
+states — `cointegration`, `no_cointegration`, `inconclusive` — and never
+collapses to a boolean.
 
 **Nothing is silently substituted.** Ask for a critical value that does not
-exist — a level nobody tabulated, more regressors than the tables cover,
-`trend='n'` for Engle-Granger — and you get an exception naming a source that
-does have it. Never a neighbouring cell quietly returned in its place.
+exist and you get an exception naming a source that does have it, never a
+neighbouring cell quietly returned in its place.
 
 **Invalid inference is refused, not decorated.** A confidence interval on the
-speed of adjustment is produced only once cointegration is established; before
-that its distribution is non-standard, so you get `NaN` and a warning.
-First-step Engle-Granger coefficients come with no standard errors at all,
-because the usual ones are wrong there.
+speed of adjustment is produced only once cointegration is established;
+before that you get `NaN` and a warning.
 
-**Every number is traceable.** Every critical value ships with its exact source,
-and every table was cross-checked against an independent one or against an
-in-house Monte Carlo engine. See [Validation](#validation).
+**Every number is traceable.** Every critical value ships with its exact
+source and a cross-check against an independent source or an in-house Monte
+Carlo engine — see [Validation](#validation).
 
 ---
 
 ## The workflow
 
-The condensed version is below. The full sequence — with the *why* of
-each step, the common error, and every code block executed in CI — is
-in **[docs/workflow.md](docs/workflow.md)**, which runs end to end on
-Danish money demand in six seconds. Its companions:
+The full sequence — with the *why* of each step, the common error at each
+one, and every code block executed in CI — lives in
+**[docs/workflow.md](docs/workflow.md)**, which runs end to end on Danish
+money demand in a few seconds. Its companions:
 
-- **[Common mistakes](docs/common-mistakes.md)** — six errors that recur
-  in published applications, each shown running with the number it
-  produces.
-- **[Efficient long-run estimators](docs/api/efficient.md)** — DOLS,
-  FMOLS, CCR, and what static OLS inference actually costs.
-- **[Dynamic simulation](docs/api/dynardl.md)** — what happens to `y`,
-  and when, if a regressor moves and stays there.
-- **[Distributed lags](docs/api/distributed-lags.md)** — Koyck and Almon,
-  and why the obvious estimator fails on the first of them.
-- **[Native backend](docs/api/backend.md)** — what profiling said to
-  port, and why the honest headline is 1.4x and not 4.8x.
-- **[Glossary](docs/glossary.md)** — the vocabulary in English and
-  French, with the notation.
+- **[Common mistakes](docs/common-mistakes.md)** — six errors that recur in
+  published applications, each shown running with the number it produces.
+- **[Bootstrap or classical bounds?](docs/bootstrap-or-bounds.md)** — when
+  each route is right, measured rather than asserted.
+- **[Glossary](docs/glossary.md)** — the vocabulary in English and French,
+  with the notation.
 
-Every `>>>` block in those pages is executed in CI. A documentation that
-is not run drifts in silence, and its numbers look exactly like correct
-ones: writing the mistakes page I invented the table comparing the five
-deterministic cases, and the doctest rejected it within the minute. The
-real spread is wider than the invention — `F` runs from **0.71 to 6.79**
-across the cases on the same data and the same lag orders.
+In brief, the workflow is: screen every series for I(2) (the bounds test is
+invalid, and silent, if one is present) → select lag orders on a common
+sample → run the bounds test and read its three-test classification → read
+the long-run coefficients and test what theory predicts about them → check
+CUSUM *and* CUSUM-of-squares, since they fail differently → fall back to the
+bootstrap version if the classical test lands in its inconclusive zone.
 
-### Step 0 — Screen for I(2)
+---
 
-The bounds test tolerates a mix of I(0) and I(1). It is **invalid if any series
-is I(2)**, and it cannot detect that itself — it would return a number.
+## What's in the library
 
-```python
-from pyardl.unitroot import report
+Every model below has its own documentation page with the full API, worked
+examples, and the measurements behind its design choices. This table is the
+map — the pages are where the detail lives.
 
-print(report(data))          # DF-GLS on the level, then on the difference
-```
-
-Each series is tested twice, because failing to reject a unit root in the level
-is compatible with I(1) *and* I(2):
-
-| Level | First difference | Verdict |
+| Model | Answers | Docs |
 |---|---|---|
-| rejects | (not needed) | I(0) |
-| does not reject | rejects | I(1) |
-| does not reject | does not reject | **I(2) suspect** |
+| **ARDL / UECM** | Estimate the model, read the long-run relationship, test restrictions on it | [ardl.md](docs/api/ardl.md), [restrictions.md](docs/api/restrictions.md), [transforms.md](docs/api/transforms.md) |
+| **Bounds test (PSS)** | Is there cointegration, without knowing the integration orders in advance? | [bounds.md](docs/api/bounds.md), [three-tests.md](docs/api/three-tests.md) |
+| **Bootstrap bounds test** | Remove the classical test's inconclusive zone | [bootstrap.md](docs/api/bootstrap.md), [conditional.md](docs/api/conditional.md) |
+| **Critical values** | Response-surface, small-sample and simulated tables, every one sourced | [critical-values.md](docs/api/critical-values.md) |
+| **Unit-root pre-tests** | DF-GLS and Ng-Perron, needed before trusting a bounds test | [unitroot.md](docs/api/unitroot.md) |
+| **Stability diagnostics** | CUSUM and CUSUM-of-squares — they catch different breaks | [diagnostics.md](docs/api/diagnostics.md) |
+| **Engle-Granger / Johansen** | The classical alternatives, for comparison | [cointegration.md](docs/api/cointegration.md), [johansen.md](docs/api/johansen.md) |
+| **NARDL** | Does `y` respond differently to rises and falls in `x`? | [nardl.md](docs/api/nardl.md) |
+| **QARDL** | Does the long run change across the distribution of `y`, not just its mean? | [qardl.md](docs/api/qardl.md) |
+| **Fourier ARDL / Fourier-ADL** | Cointegration under a smooth, undated structural break | [fourier.md](docs/api/fourier.md), [fourier-adl.md](docs/api/fourier-adl.md) |
+| **Unified analysis** | One entry point over asymmetry × Fourier × bootstrap, 8 configurations | [unified.md](docs/api/unified.md) |
+| **Heterogeneous panels** | Mean Group, PMG, DFE, CS-ARDL, CS-DL, and the Hausman test between them | [panel.md](docs/api/panel.md) |
+| **DOLS / FMOLS / CCR** | Long-run inference that static OLS on cointegrated data does not give you | [efficient.md](docs/api/efficient.md) |
+| **Koyck / Almon** | The distributed-lag models the whole family descends from | [distributed-lags.md](docs/api/distributed-lags.md) |
+| **Dynamic simulation** | Trace what happens to `y` if a regressor moves and stays there | [dynardl.md](docs/api/dynardl.md) |
+| **VECM simulator** | One reproducible data generator behind every Monte Carlo study in the library | [simulate.md](docs/api/simulate.md) |
+| **Native backend** | An optional Rust kernel for the bootstrap — what profiling said to port, and by how much | [backend.md](docs/api/backend.md) |
 
-"Suspect" is literal. A double failure to reject is also what a short, noisy
-sample looks like. A `PyardlMethodologyWarning` fires when it happens.
-
-### Step 1 — Choose lag orders
-
-```python
-from pyardl.core import ARDL
-
-sel = ARDL.select_order(y, x, max_p=3, max_q=3, ic="bic")
-print(sel.top(4).round(3))
-```
-
-```text
-   p  q_LRY  q_IBO  q_IDE      aic      bic       hq      llf  nobs
-0  3      1      0      0 -248.783 -231.222 -242.050  133.391    52
-1  3      1      0      1 -247.580 -228.067 -240.099  133.790    52
-2  3      2      0      0 -247.304 -227.792 -239.823  133.652    52
-3  3      1      1      0 -246.834 -227.322 -239.354  133.417    52
-```
-
-Every candidate is estimated on the **same sample** — note the constant `nobs`
-column. Comparing information criteria computed on different numbers of
-observations is a silent, common mistake that biases the choice towards short
-lags. Look at `top(n)` rather than only the winner: criteria often separate the
-leading specifications by very little.
-
-### Step 2 — Run the bounds test
-
-```python
-from pyardl.bounds import bounds_test
-
-res = bounds_test(y, x, case=3, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}))
-```
-
-Three statistics, and **all three** must reject:
-
-- **`F_overall`** tests that all level terms are jointly zero.
-- **`t_BDM`** tests the adjustment coefficient alone. Left-tailed: rejection
-  requires a *negative* estimate, an actual pull back towards equilibrium.
-- **`F_indep`** tests the regressors' levels alone. Without it, two situations
-  that are not cointegration pass for it.
+A representative taste, so the table above is not just names: on the
+Danish data, three tests must all reject for `bounds_test` to call it
+cointegration —
 
 ```python
 label, reason = res.classification()
@@ -273,946 +208,44 @@ label, reason = res.classification()
 | `F_overall` | `t_BDM` | `F_indep` | `classification()` |
 |---|---|---|---|
 | rejects | rejects | rejects | `cointegration` |
-| rejects | rejects | does not | `degenerate_1` |
-| rejects | does not | rejects | `degenerate_2` |
+| rejects | rejects | does not | `degenerate_1` — y reverts to its own past, not to the regressors |
+| rejects | does not | rejects | `degenerate_2` — the regressors matter, but nothing pulls y back |
 | does not | does not | does not | `no_cointegration` |
 | anything else | | | `inconclusive` |
 
-**`degenerate_1`** — `y` adjusts towards its own past while the regressors
-carry nothing. What looks like error correction is `y` returning to a constant.
-
-**`degenerate_2`** — the regressors' levels are jointly significant, but
-nothing pulls `y` back. No mechanism restores the relationship, so nothing
-holds it together.
-
-The mapping is total: every combination of three three-state verdicts lands on
-a named outcome, and `reason` says in one sentence which test decided. The
-older two-test `decision_joint` is still there, but it can only *suspect* a
-degeneracy — with two tests, the information needed to tell them apart does not
-exist.
-
-### Step 3 — Read the long run
-
-```python
-model = ARDL(y, x, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2})).fit()
-print(model.longrun.round(4))
-print(res.adjustment().round(4))
-```
-
-```text
-      theta      se
-LRY  0.9965  0.1239
-IBO -4.5381  0.5203
-IDE  2.8915  0.9951
-
-lambda     -0.4169
-se          0.0917
-ci_lower   -0.5965
-ci_upper   -0.2372
-```
-
-Standard errors come from the delta method with an analytical gradient. About
-42% of a disequilibrium is corrected each quarter. The confidence interval
-appears only because cointegration was established.
-
-### Step 4 — Test what theory says
-
-An income elasticity of 0.9965 *looks* like one. With a standard error of 0.124,
-so would 0.85. Ask properly:
-
-```python
-out = model.test_longrun_restriction([[1.0, 0.0, 0.0]], 1.0, impose=True)
-print(out.summary())
-```
-
-```text
-Long-run restriction test - Wald chi2(1) = 0.0008, p = 0.9773
-  decision (5%): not_rejected
-  R.theta - r = [-0.0035]
-
-  imposed: F = 0.0008, p = 0.9774
-  SSR unrestricted = 0.014228, restricted = 0.014229
-```
-
-With `impose=True` the two level terms collapse into `(LRM − LRY)` — the
-velocity of money, a ratio theory expects to be stationary. The restriction
-costs nothing in fit and buys an interpretable model plus a degree of freedom.
-This is the discipline of Davidson, Hendry, Srba & Yeo (1978).
-
-### Step 5 — Check the model held still
-
-A long-run coefficient estimated across a structural break is an average of two
-regimes, not an equilibrium.
-
-```python
-print(model.stability())
-```
-
-```text
-                  stable  max_excess  first_crossing
-test
-CUSUM               True         0.0             NaN
-CUSUM-of-squares    True         0.0             NaN
-```
-
-Both are reported, always, because they fail differently — see
-[Stability diagnostics](#stability-diagnostics).
-
----
-
-### Step 6 — Remove the inconclusive zone
-
-The bounds test compares a statistic against *two* critical values, because the
-true distribution depends on integration orders nobody knows. When the
-statistic lands between them the answer is **inconclusive** — and on the sample
-sizes this literature works with, that happens often enough to be a practical
-problem.
-
-The bootstrap builds the distribution instead of bracketing it: regenerate the
-data many times under a null that is true by construction, recompute the
-statistic each time, read the critical value off the result.
-
-```python
-from pyardl.bootstrap import bootstrap_bounds_test
-
-res = bootstrap_bounds_test(
-    y, x, case=3, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2}),
-    n_boot=2999, seed=42,
-)
-print(res.summary())
-```
-
-```text
-Bootstrap bounds test (McNown, Sam & Goh 2018) - case 3, B=2999, resample='iid', seed=42
-
-F_overall = 6.2059   bootstrap p = 0.0123   decision (5%): cointegration
-t_BDM     = -4.5479   bootstrap p = 0.0110   decision (5%): cointegration
-F_indep   = 8.1619   bootstrap p = 0.0090   decision (5%): cointegration
-
-  CLASSIFICATION (5%): cointegration
-  F_overall, t_BDM and F_indep all reject: the level terms are jointly significant, y adjusts back towards equilibrium, and the regressors carry the long-run relationship.
-
-  bootstrap critical values
-    alpha           F           t     F_indep
-      0.1      4.1105     -3.3914      4.8594
-     0.05      4.8319     -3.7780      5.7467
-     0.01      6.5195     -4.5739      7.8825
-
-  bootstrap against classical bounds (5%)
-        test      stat   boot cv   boot p     I(0)     I(1)  boot             bounds           
-   F_overall    6.2059    4.8319   0.0123    3.229    4.322  cointegration    cointegration    
-       t_BDM   -4.5479   -3.7780   0.0110   -2.860   -3.780  cointegration    cointegration    
-     F_indep    8.1619    5.7467   0.0090    2.619    4.646  cointegration    cointegration    
-
-  classification: bootstrap -> cointegration, bounds -> cointegration
-```
-
-Both routes are reported side by side, because a disagreement between them is
-itself a result: `res.comparison()` returns it as a frame,
-`res.agrees_with_bounds()` as a boolean.
-
-**What the bootstrap buys, measured** — 1000 replications, `T = 100`, on the
-four canonical systems:
-
-| DGP | bootstrap correct | bounds correct | bounds inconclusive |
-|---|---|---|---|
-| cointegration | 100.0% | 100.0% | 0.0% |
-| degenerate_1 | 99.4% | 93.2% | 5.5% |
-| degenerate_2 | 96.3% | 99.8% | 0.1% |
-| no cointegration | 91.5% | 71.3% | 24.8% |
-
-Full guidance on which route to believe, including what happens when they
-disagree, is in [Bootstrap or classical bounds?](docs/bootstrap-or-bounds.md).
-
-Almost all of the gain is the disappearance of the inconclusive zone, and it
-shows only where that zone is wide. Where neither route hesitates, the
-bootstrap adds nothing — and under a type 2 degeneracy it is confidently wrong
-3.7% of the time against the bounds' 0.1%. Deciding has a price, and it is
-recorded rather than advertised away.
-
----
-
-## API reference
-
-### Unit-root pre-tests
-
-`pyardl.unitroot`
-
-| Function | Purpose |
-|---|---|
-| `report(data, trend, alpha, method)` | Sequential screening, one row per variable |
-| `integration_order(y, ...)` | Same, for a single series |
-| `dfgls(y, trend, lags, method, max_lags)` | DF-GLS test (Elliott, Rothenberg & Stock 1996) |
-| `ng_perron(y, ...)` | The four M statistics (Ng & Perron 2001) |
-| `gls_detrend`, `ols_detrend`, `adf_regression`, `select_lags` | The shared machinery, exposed |
-
-The classical ADF removes the mean by ordinary least squares, which is what
-costs it most of its power under a near-unit root. DF-GLS detrends under a
-*local alternative* instead and recovers it. The M tests add an autoregressive
-long-run variance and a modified lag criterion, which is what removes the size
-distortion the ADF suffers when the errors carry a negative moving-average
-component.
-
-```text
-Ng-Perron M tests (2001) - trend 'c', lags=2 (maic), nobs=52
-  long-run variance (autoregressive): 0.0050
-
-  statistic        value    5% bound  decision (5%)
-  MZa            -3.9863     -9.3800  unit_root
-  MZt            -1.1521     -2.1023  unit_root
-  MSB             0.2890      0.2205  unit_root
-  MPT             6.4313      2.8557  unit_root
-
-  H0: the series has a unit root (reject when below)
-```
-
-All four are lower-tail, so there is no direction to get wrong.
-
-**On lag selection.** `maic` is the default for `dfgls` and `ng_perron`: it is
-what protects against a negative MA component, and it is Ng & Perron's central
-contribution. It has a measurable cost, though — its penalty is large exactly
-when a series looks stationary, so it over-selects on I(0) data. The screening
-functions `report` and `integration_order` therefore default to `bic`, which
-classifies clean data better. Over 40 replications of length 250:
-
-| criterion | I(0) correct | I(1) correct | I(2) flagged |
-|---|---|---|---|
-| BIC | 40/40 | 40/40 | 35/40 |
-| MAIC | 29/40 | 32/40 | 37/40 |
-
-### ARDL estimation
-
-`pyardl.core.ardl`
-
-```python
-ARDL(y, x, order=(p, q), det="const", seasonal=False, seasonal_periods=4,
-     fixed_regressors=None, hold_back=None).fit(cov_type="nonrobust")
-```
-
-| Argument | Meaning |
-|---|---|
-| `order` | `(p, q)` with `q` an int or a dict `{name: q_j}` |
-| `det` | `"none"`, `"const"`, `"trend"` (which includes the intercept) |
-| `seasonal` | adds `s-1` seasonal dummies (`s` when `det="none"`) |
-| `fixed_regressors` | variables entered without lags, e.g. dummies |
-| `hold_back` | initial observations excluded, to force a common sample |
-| `cov_type` | `"nonrobust"`, `"HC0"`–`"HC3"`, `"HAC"` |
-
-`q_j = 0` is supported: the regressor enters contemporaneously with no dynamics
-of its own. `statsmodels` rejects this case; `pyardl` and Stata's `ardl` both
-accept it.
-
-Every fit runs a Ljung-Box test and warns when it rejects. Valid long-run
-inference requires enough lags to whiten the errors, so this is a condition of
-validity, not an optional diagnostic.
-
-**Results.** `params`, `bse`, `tvalues`, `pvalues`, `resid`, `fittedvalues`,
-`aic`/`bic`/`hqic`, `rsquared`, plus the error-correction views: `to_ecm()`,
-`longrun`, `adjustment`, `ar_roots`, `is_stable`, `diagnostics()`,
-`stability()`, `test_longrun_restriction()`, `summary()`.
-
-**Order selection.** `ARDL.select_order(...)` searches by grid or per-variable.
-`ARDL.gets(...)` performs a general-to-specific reduction over terminal lags,
-guarded by residual diagnostics and an F test, and returns the full
-`reduction_path` so the reduction is auditable rather than a black box.
-
-### Bounds test
-
-```python
-pyardl.bounds.bounds_test(
-    y, x, case=3, order=None, ic="aic", max_p=4, max_q=4,
-    alpha=0.05, cv_source="kripfganz", finite_t=False, fixed_regressors=None,
-    conditional=True,
-)
-```
-
-The five deterministic cases of PSS:
-
-| `case` | Intercept | Trend | Use |
-|---|---|---|---|
-| 1 | none | none | demeaned data only |
-| 2 | restricted | none | no trend anywhere |
-| 3 | unrestricted | none | **the usual choice** |
-| 4 | unrestricted | restricted | trending data, no trend in the relation |
-| 5 | unrestricted | unrestricted | trending data and relation |
-
-Under cases 2 and 4 the restricted deterministic term is part of the tested
-vector, giving `k+2` restrictions instead of `k+1`.
-
-**Results.** `f_stat`, `t_stat`, `f_indep_stat`, `decision_f`, `decision_t`,
-`decision_indep`, `classification()`, `decision_joint` (the older two-test
-verdict, kept for continuity), `bounds`, `p_values`, `uecm`,
-`adjustment(alpha)`, `stability(alpha)`, `diagnostics(alpha)`, `conditional`,
-`summary()`.
-
-`diagnostics()` reports residual tests *and* both stability tests:
-
-```text
-                    statistic  pvalue
-Ljung-Box(10)         12.2814  0.2667
-Jarque-Bera           85.2392  0.0000
-Breusch-Pagan             NaN  0.9731
-CUSUM(5%) excess       0.0000     NaN
-CUSUMSQ(5%) excess     0.0000     NaN
-```
-
-The stability rows carry no p-value, and the column is `NaN` rather than a
-plausible-looking number: they are boundary-crossing procedures, not statistics
-with a null distribution to integrate.
-
-**Assumptions.** The test is valid if the regressors are weakly exogenous, are
-not cointegrated among themselves, no series is I(2), and the residuals are not
-autocorrelated. Only the last is checked automatically — hence step 0.
-
-### Critical values
-
-`pyardl.critical_values`
-
-Because the limiting distribution depends on the unknown integration order of
-the regressors, critical values come in pairs: a lower bound assuming all
-regressors are I(0), an upper bound assuming all are I(1).
-
-| `cv_source` | Use for | Coverage |
-|---|---|---|
-| `"kripfganz"` | everyday work — the default | cases 1–5, `k = 1..10`, F, any level, with p-values |
-| `"pss"` | reproducing published results exactly | cases 1–5, `k = 0..10`, F and t, 10/5/2.5/1% |
-| `"narayan"` | small samples, `30 ≤ T ≤ 80` | cases 2, 3, 5, `k ≤ 7`, F, 10/5/1% |
-
-Asymptotic bounds over-reject when `T` is between 30 and 80 — where annual data
-lands. Using them there produces spurious findings.
-
-Also available: `simulate_bounds(...)`, a reproducible Monte Carlo engine for
-configurations no table covers, recording seed, replications and batch size on
-the result so a run reproduces exactly; and `bde1975`, `ers1996`,
-`ngperron2001`, `mackinnon` for the other tests' bounds.
-
-### Long-run restrictions
-
-```python
-ARDLResults.test_longrun_restriction(R, r, impose=False)
-```
-
-Wald test of `R θ = r` on the long-run coefficients, using the same delta-method
-covariance as the standard errors in `.longrun`, so the two cannot disagree.
-The discrepancy `R θ − r` is returned **signed**.
-
-With `impose=True` the error-correction model is re-estimated with `θ_j = 1`
-applied — the level term becomes the ratio `(y − x_j)` — and a regression F test
-compares the two residual sums of squares. That comparison is legitimate only
-because the unrestricted error-correction design reproduces the ARDL regression
-exactly, residuals identical to 1e-10; a test verifies it across lag orders and
-deterministic cases rather than assuming it.
-
-The verdict is `not_rejected`, never `accept`.
-
-### Stability diagnostics
-
-`pyardl.diagnostics`
-
-| Function | Detects |
-|---|---|
-| `cusum(y, x, alpha)` | a shift in the **mean** of the coefficients |
-| `cusumsq(y, x, alpha)` | a change in **variance** |
-| `stability_tests(y, x, alpha)` | both, in one table |
-| `recursive_residuals(y, x)` | the standardised one-step-ahead prediction errors |
-| `plot_cusum`, `plot_cusumsq` | the two canonical graphs, bands included |
-
-**The two are not interchangeable.** A break in the slope on a zero-mean
-regressor leaves the recursive residuals centred on zero: the CUSUM path stays
-flat and reports stability, however large the break, while the inflated variance
-pushes the CUSUM of squares straight out of its band. On 20 simulated samples
-with exactly that break, the CUSUM said "stable" 20 times out of 20 and the
-CUSUM of squares detected it 20 times out of 20.
-
-Reporting only the CUSUM — as much applied work does — leaves an entire family
-of common instabilities untested. `pyardl` always produces both.
-
-Results carry `stable`, `max_excess` (how far from stability, not merely
-whether) and `crossings` (when the break happened).
-
-### Bootstrap bounds test
-
-```python
-pyardl.bootstrap.bootstrap_bounds_test(
-    y, x, case=3, order=None, n_boot=2999, resample="iid", seed=None,
-    var_order=1, burn_in=50, store_distribution=False, conditional=True,
-)
-```
-
-The verdict is **binary**: no inconclusive zone. The p-value is
-`(1 + #)/(B + 1)` and never exactly zero — `B` replications cannot resolve more
-than `1/(B+1)`. A replication that cannot be estimated is counted and reported,
-never replaced by a fresh draw, which would bias the distribution towards
-estimable samples.
-
-Same seed, same critical values, bit for bit. When no seed is given, one is
-drawn from entropy and **recorded**, so any run can be reproduced after the
-fact.
-
-All three statistics are drawn under the **same joint null**. That is a
-measured choice, not a reading: giving each test its own weaker null inflates
-size to 9.3% at a nominal 5% for the `t`, and to 8.5% for `F_indep`. See OBS-8
-and the deviation note in `DEVIATIONS`.
-
-**Results.** `f_stat`, `t_stat`, `f_indep_stat`, the matching `*_critical` and
-`*_pvalue`, `classification(alpha)`, `comparison(alpha)`,
-`agrees_with_bounds(alpha)`, `classical`, `distribution`, `summary()`.
-
-Building blocks are exposed, because a bootstrap you cannot inspect is a
-bootstrap you cannot debug: `estimate_null_dgp`, `simulate_paths`,
-`simulate_path`, `resample_residuals`.
-
-**Cost.** 0.19 to 1.81 s for a full test at `B = 2999`, depending on the
-specification. Both hot paths are vectorised across replications and the `B`
-fits are solved by one stacked QR — never the normal equations, which would
-square the condition number of a design built on lagged levels of integrated
-series.
-
-### Conditional and unconditional models
-
-`conditional=False`, on `bounds_test` and `bootstrap_bounds_test` alike, drops
-the contemporaneous differences of the regressors and changes nothing else —
-the distinction of Bertelli, Vacca and Zoia (2022). The tested vector is
-untouched, so the two forms test the same restriction on two specifications.
-
-The setting is threaded through the observed statistic, the null model, the
-regenerated data and each replication. If the null model kept `Δx_t` while the
-statistic did not, the simulated null would not be the null being tested — and
-nothing in the output would say so.
-
-The convention was measured against `bootCT`, which reports its own
-unconditional statistic: of two candidate specifications, only one reproduces
-it, to 1e-12.
-
-### Johansen test
-
-```python
-pyardl.cointegration.johansen(y, det_order=0, k_ar_diff=1, alpha=0.05, method="trace")
-```
-
-```text
-Johansen test (1988, 1991) - 4 variables (LRM, LRY, IBO, IDE), det_order=0, k_ar_diff=1
-
-        H0       trace     cv 5%      maxeig     cv 5%
-     r = 0     48.8037   47.8545     31.5136   27.5858
-    r <= 1     17.2902   29.7961     10.1453   21.1314
-    r <= 2      7.1449   15.4943      6.5889   14.2639
-    r <= 3      0.5560    3.8415      0.5560    3.8415
-
-selected rank (trace, 5%): 1
-```
-
-A thin wrapper over `statsmodels`, plus what it leaves to the caller: the
-**sequential decision** (stop at the *first* non-rejection — continuing past it
-is a different procedure with a different size), the result object, and
-normalised cointegrating vectors.
-
-`check_no_cointegration_among_x(x, ...)` checks the assumption the bounds test
-makes and never reveals on its own: that the regressors are not cointegrated
-among themselves. It warns, naming the number of relations found.
-
-Measured (OBS-10): the trace statistic **over-selects** the rank — 87.8%
-correct against `maxeig`'s 92.5% on a rank-1 DGP — and never under-selects.
-`trace` remains the default because it is what the applied literature reports;
-a borderline rank deserves a second reading by `maxeig`, and both are always
-computed.
-
-Deterministic conventions differ across implementations and the naming is a
-trap: `urca`'s `ecdet="none"` matches `det_order=0`, **not** `det_order=-1`.
-The correspondence was established by running both sides, not by reading either
-manual — see [`docs/api/johansen.md`](docs/api/johansen.md).
-
-### NARDL — asymmetric responses
-
-```python
-pyardl.nardl.NARDL(y, x, asym=["oil"], order=(1, 1), case=3, threshold=0.0)
-```
-
-An ARDL assumes `y` responds to a rise in `x` exactly as to a fall. The
-NARDL splits each regressor into cumulated rises and falls and lets the
-data say otherwise. The long run gets two coefficients, `θ⁺` and `θ⁻`,
-and asymmetry becomes a restriction to test rather than an assumption.
-
-The decomposition is a regrouping, and the identity `x = x₀ + x⁺ + x⁻`
-is verified to 1e-12 before anything else in the module — an error there
-would not raise, it would produce plausible wrong numbers everywhere
-downstream.
-
-`order="auto"` selects the lag orders by information criterion on the
-transformed model, with `asym_lags="paired"` (the two sides share an order)
-or `"free"`. All candidates are estimated on the same sample.
-
-**Results.** `longrun_asym`, `asymmetry_tests()` (four Wald tests),
-`suggests_symmetric_model()`, `bounds_test()`,
-`dynamic_multipliers(h, r, seed)`, `plot_multipliers()`, `uecm`,
-`summary()`.
-
-The dynamic multipliers are the signature output of this literature, and
-the first figure the library draws:
-
-![Asymmetric dynamic multipliers](docs/assets/nardl-multipliers.png)
-
-The lower panel is the one that answers the question: asymmetry shows
-when the band on the **difference** excludes zero, not when the two
-curves look far apart.
-
-**Its critical values are not PSS's.** Reading a NARDL statistic against
-the usual tables rejects 7.3% of the time at a nominal 5% counting the
-decomposed pieces, or 2.6% counting the original variable — where a
-genuine two-regressor model is correctly sized at 4.8%. Two partial sums
-of one series are not two independent I(1) regressors: they correlate at
-−0.993 and never move on the same date. `pyardl` therefore ships values
-simulated for this null, and lands at 5.7%. Full account in OBS-13 and
-[`docs/api/nardl.md`](docs/api/nardl.md).
-
-### QARDL — a relation that can differ across the distribution
-
-```python
-pyardl.qardl.QARDL(y, x, order=(1, 1), taus=..., asym=None, case=3).fit(
-    inference="mbb", n_boot=299, seed=42
-)
-```
-
-An ARDL describes the conditional **mean** — one number, and the wrong
-one whenever the relationship is not the same everywhere in the
-distribution. Cho, Kim & Shin (2015) estimate the same error-correction
-model at a grid of quantiles, so `λ(τ)` and `θ_j(τ)` become functions of
-`τ`, and "does the long run depend on the state of the world?" becomes a
-hypothesis to test.
-
-![QARDL coefficients across quantiles](docs/assets/qardl-coefficients.png)
-
-A flat line says a mean regression would have sufficed. A sloped one
-says it would not — and `res.wald_constancy()` decides which, from the
-**joint** law of the coefficients across quantiles.
-
-**One measurement changed the implementation.** Quantile regression is a
-linear program, so its optimum is exact and any estimate can be scored
-on the check loss. Scored that way, `statsmodels` at its default
-tolerance misses the optimum by up to 3.4e-03 in loss and 2.6e-02 in
-coefficients — silently. `pyardl` runs it at a tolerance that converges
-and checks every estimate against the linear-programming optimum in its
-test suite. Details in [`docs/api/qardl.md`](docs/api/qardl.md).
-
-`asym=[...]` composes with the NARDL decomposition, giving `θ⁺(τ)` and
-`θ⁻(τ)`: a response that may differ both between rises and falls and
-across the distribution.
-
-### Fourier terms — smooth structural change
-
-```python
-pyardl.fourier.fourier_terms(n_obs, freqs)
-pyardl.fourier.fourier_f_test(y, n_sims=2000, seed=42)
-pyardl.fourier.fourier_kpss(y, n_sims=2000, seed=42)
-```
-
-Instead of dating breaks and adding dummies, approximate a moving
-deterministic component by a few low-frequency sinusoids — two
-parameters per frequency, no dates to estimate. The proviso is in the
-word *smooth*: a Fourier component cannot represent a jump.
-
-**Choosing the frequency on the data multiplies the size by five.**
-Under the null the frequency is not identified, so picking the best of a
-grid is a search, not an estimate — the Davies problem. Measured on 2000
-replications: 4.8% rejection with the frequency fixed, **24.6%** with it
-selected, against a nominal 5%. Both tests therefore simulate their own
-critical values with the search inside the loop, and the result says
-which construction it used.
-
-The library also reports what the method *does not* buy: a single
-frequency captures 86% of a logistic break, not 90%, and the persistent
-remainder is enough that a Fourier KPSS still rejects stationarity —
-though at 66–83% below the plain KPSS statistic. OBS-15 and OBS-16.
-
-### Fourier-ADL — cointegration with a smooth break
-
-```python
-pyardl.fourier.fourier_bounds_test(y, x, case=3, n_sims=2000, seed=42)
-```
-
-The UECM augmented with the sinusoids, tested by the left-tailed `t` on
-the error-correction coefficient (Banerjee, Arčabić & Lee 2017). The
-sinusoids sit in the design, never in the tested vector. Critical values
-are simulated with the frequency search inside the loop, for two reasons
-rather than one: the regressors are integrated *and* the frequency was
-chosen on the data.
-
-**Measured, it does not deliver the power its authors claim.** Both
-tests are correctly sized first — 5.0% for the plain bounds test, 3.5%
-here, under two independent random walks — so the comparison is fair.
-Under true cointegration with a smooth break the Fourier-ADL is behind:
-93 vs 99% with no break, 77 vs 91% at amplitude 3, 59 vs 59% at 6. A
-four-configuration scan found every difference inside the noise. Use it
-when you want the drifting intercept *estimated*, not for free power.
-OBS-17.
-
-A pre-test says whether the two extra parameters are buying anything.
-Its first version answered yes in 100% of replications — it read an
-integrated series against a null simulated on white noise. Corrected, it
-flags 0% with no break and 35% at amplitude 6. OBS-18.
-
-### Unified analysis — the whole matrix, one entry point
-
-```python
-pyardl.unified.cointegration_analysis(y, x, asym=["oil"], fourier={"k": 1},
-                                      inference="bootstrap")
-```
-
-Applied work in 2026 rarely runs a plain bounds test: it runs one with a
-smooth-break correction, an asymmetric decomposition and bootstrap
-critical values. Three switches, eight configurations, one call. The
-module owns no estimator — each cell delegates to the brick validated
-for it, and its one real job is giving each cell the critical values
-that cell requires. The combination with no validated non-bootstrap
-source **raises** instead of borrowing a neighbouring table.
-
-The bootstrap engine is pinned to the brick it generalises: with the
-extras switched off it reproduces `bootstrap_bounds_test` to machine
-precision on the same seed (largest difference 1.4e-14, all nine
-critical values identical).
-
-**Combining features is not free, and not in the way expected.** Size
-under a true null, 2000 replications, nominal 5%, standard error 0.49
-point: the decomposition does *not* distort (5.30 / 5.85 / 4.35), but
-the Fourier terms do — 7.10 / 7.50 with them, 7.35 / 8.50 with both. An
-arbitration on 2000 replications per arm shows neither half causes it
-alone: the search is re-run inside the bootstrap, but the null DGP was
-estimated *conditional on the frequency the search had already won*.
-Putting a selection step inside the loop is not enough if the world you
-simulate from has already been fitted to its outcome. The call warns and
-names the correctly sized alternative. OBS-19.
-
-One result worth keeping: the three-test joint classification stays
-conservative in every cell (1.70–3.10%), including the one whose
-individual tests over-reject most. Requiring all three to agree
-protects — a measured argument for the framework, not an assumed one.
-
-### Heterogeneous panels — Mean Group
-
-```python
-pyardl.panel.MeanGroup(df, y="y", X=["x"], id="country", time="year",
-                       order=(1, 1)).fit()
-```
-
-The first module that leaves one country behind, and it opens on a
-negative result. Pooling a dynamic panel whose coefficients differ is
-not a bias-for-precision trade: the heterogeneity becomes serial
-correlation correlated with the lagged dependent variable, and pooled
-estimators are **inconsistent even as N and T both grow**. Measured on a
-heterogeneous DGP (2000 replications, Monte Carlo standard error
-0.0014): the dynamic-fixed-effects bias is +0.0242 at T=50 and +0.0273
-at T=100 — it does not shrink — while the Mean Group bias goes from
-−0.0050 to −0.0026.
-
-**The standard error is the counter-intuitive part.** It comes from the
-dispersion *across* individuals, never from pooling the individual
-standard errors. The naive version covers 54% at T=50 and **27%** at
-T=100 against a nominal 95%, while the correct one holds 94–95%. It gets
-worse as T grows because `se_between` converges to a non-zero constant
-while `se_naive` falls at rate 1/T — superconsistency under integrated
-regressors — so the gap grows without bound and naive coverage tends to
-zero. OBS-20.
-
-Cross-validated against `plm::pmg(model="mg")` to 5.6e-16 on the group
-coefficients and 4.9e-17 on the between-individual standard errors, on a
-panel pyardl generates itself from a fixed seed.
-
-### Pooled Mean Group, DFE and Hausman
-
-```python
-pyardl.panel.PMG(df, y="y", X=["x"], id="country", time="year").fit()
-pyardl.panel.compare(df, ...)   # MG / PMG / DFE + Hausman
-```
-
-The middle term between pooling everything and pooling nothing: long-run
-coefficients constrained equal, short-run dynamics free, by concentrated
-maximum likelihood (back-fitting as in `xtpmg`, plus a quasi-Newton path
-that must agree with it).
-
-**Under exact homogeneity it delivers** — bias −0.14% where the spec
-asked for under 1%, and a **2.41x** efficiency gain over MG. **Then it
-breaks, and the guard does not fire.** At a 13% dispersion of the true
-coefficients, PMG is biased +2.55%, its 95% interval covers **36%**, and
-its efficiency advantage has inverted. At that same dispersion the
-Hausman test rejects only **18.6%** of the time: in four samples out of
-five where PMG is materially wrong, the standard diagnostic says it is
-fine. MG meanwhile does not move (coverage 94.2–94.8% throughout). Read
-`mg_res.heterogeneity()` rather than a non-significant Hausman. OBS-22.
-
-Cross-validated against `ardlverse::panel_ardl` (which replicates
-`xtpmg`): PMG `theta` to 1.9e-08, its standard error to 2.1e-10, the
-log-likelihood to 4.1e-12; DFE to 1.1e-16.
-
-That cross-check earned its keep twice. It caught a variance bug — the
-formula projected out only the short-run regressors, forgetting
-`lambda_i` is estimated too, and returned a standard error 5% too small,
-which nothing internal would have flagged. And when the two
-implementations disagreed by 2.7e-07, the concentrated log-likelihood
-ranked them instead of splitting the difference: the reference had
-stopped at its default tolerance. OBS-21.
-
-### CS-ARDL / CS-DL — quand les individus ne sont pas indépendants
-
-```python
-pyardl.panel.CSARDL(df, y="y", X=["x"], id="country", time="year").fit()
-pyardl.panel.CSDL(df, ...).fit()
-pyardl.panel.cd_test(residuals)
-```
-
-MG et PMG supposent l'indépendance transversale. Un cycle mondial ou un
-prix de matière première la brise, le facteur omis corrèle avec le
-régresseur, et chaque `theta_i` est biaisé **avant** que la moyenne
-commence. Chudik et Pesaran remplacent le facteur inobservé par les
-**moyennes transversales** des variables, qui en engendrent l'espace.
-
-**Ce que ça coûte de ne pas le faire, mesuré.** Sur le panel de
-référence (facteur dans `y` et dans `x`, chargements hétérogènes, vrai
-`theta = 0.80`) : Mean Group nu → **1.1938**, soit +49 % ; CS-ARDL →
-0.8058 ; CS-DL → 0.8059. Ce n'est pas une perte d'efficacité qu'un
-échantillon plus grand réparerait.
-
-Le test CD de Pesaran encadre l'opération : il rejette avant
-augmentation (corrélation absolue moyenne 0.30) et rejette encore après
-(0.10). L'essentiel de la dépendance est absorbé, pas la totalité — et
-`summary(context='before'|'after')` dit laquelle des deux lectures
-s'applique, parce que la même p-value veut dire des choses opposées de
-part et d'autre.
-
-Les colonnes colinéaires sont retirées par une **règle déclarée**, de
-gauche à droite, moyennes en dernier, chaque retrait enregistré — et non
-par ce que le solveur préfère, ce qui donnerait des coefficients
-différents d'une machine à l'autre sur les mêmes données.
-
-Validé contre `plm::pcce(model="mg")` à **1.1e-16** — mais cela ne
-couvre que le cas **statique**. Le volet dynamique n'a pas de référence
-externe ici : `xtdcce2` est sous Stata, un script `.do` est fourni, et
-aucune valeur n'a été inventée en attendant.
-
-### DOLS, FMOLS, CCR — l'inférence que l'OLS statique n'a pas
-
-```python
-pyardl.cointegration.dols(y, X, n_leads=2, n_lags=2)
-pyardl.cointegration.fmols(y, X)
-pyardl.cointegration.compare_longrun(y, X, ardl_results=fit)
-```
-
-L'OLS statique sur variables cointégrées est superconvergente — et son
-inférence est fausse. **Un intervalle à 95 % en couvre 42.** Pire :
-corriger l'erreur type ne suffit pas, l'OLS-HAC plafonne à 71 % quelle
-que soit T, parce que le biais de second ordre survit à toute réparation
-de la variance. C'est l'argument qui justifie ces trois estimateurs
-plutôt qu'une simple OLS-HAC.
-
-Mesuré sur 1000 réplications : DOLS atteint **93.4 %** de couverture à
-T=400, FMOLS **94.5 %**, CCR **93.7 %** — les trois dans la bande
-[92, 97 %] que la spec demandait, et les trois sous son critère de biais
-(3.3 %, 9.6 % et 9.1 % de celui de l'OLS).
-
-Ces chiffres tiennent au **préblanchiment** d'Andrews-Monahan, actif par
-défaut. Sans lui la même étude donnait 90.4 / 88.7 / 87.6 % et manquait
-les deux critères — un écart que j'avais d'abord attribué aux
-estimateurs eux-mêmes avant de mesurer. Sur un AR(1) de coefficient 0.8,
-le noyau seul sous-estime Ω de **53 %**. OBS-24.
-
-Et le CCR est un **point fixe**, pas une substitution : la
-transformation de Park dépend de θ, la quantité même qu'on estime. La
-formulation manuelle y substitue une fois l'OLS statique, dont le biais
-passe alors entier dans la transformation. Itéré jusqu'à convergence, le
-biais du CCR tombe de 15 % à 9 % de celui de l'OLS. Partir du θ de FMOLS
-plutôt que de l'OLS mène au même point — c'est ce qui montre que c'est
-bien la limite, et non un artefact du nombre d'itérations.
-
-Sur la demande de monnaie danoise les quatre méthodes s'accordent sur
-tous les signes et toutes les significativités, et divergent d'un
-facteur 1.5 sur les magnitudes. `compare_longrun` les met dans un seul
-tableau, parce que publier une seule ligne revient à présenter un choix
-d'estimateur comme un résultat.
-
-### Retards distribués — Koyck et Almon, les racines de la généalogie
-
-```python
-pyardl.distributed_lags.KoyckModel(y, x, method="iv").fit()
-pyardl.distributed_lags.AlmonModel(y, x, q=4, r=2).fit()
-```
-
-Le modèle de Koyck existe pour une raison : sa transformation crée
-mécaniquement un régresseur endogène, donc **l'estimateur évident est
-inconvergent**. Sur un DGP où λ = 0.6, l'OLS donne 0.4727 ; le biais
-mesuré vaut 0.118 à T = 2000 et 0.121 à T = 8000 — quadrupler
-l'échantillon ne rachète rien. L'IV de Liviatan donne 0.6010. La méthode
-`"ols"` reste disponible et **avertit à chaque appel** : cacher le biais
-supprimerait la seule chose que ce modèle a à enseigner.
-
-Le modèle d'Almon produit *toujours* une distribution de retards lisse —
-c'est ce qu'on lui a demandé. `polynomial_restriction_test` figure donc
-dans chaque résumé, confrontant la forme obtenue au retard libre : une
-courbe lisse obtenue en supposant la lissité n'est pas une preuve de
-lissité.
-
-Concordance avec R `dLagM` sur la partie Almon : **1.8e-13** sur les
-poids. Sur la partie Koyck, désaccord — et c'est le plus instructif. La
-formule d'instruments que l'objet `ivreg` de `dLagM` renvoie lui-même,
-`y.t ~ Y.1 + X.t | Y.1 + X.t_1`, place `Y.1` des deux côtés de la barre :
-elle instrumente `X.t` et traite le régresseur retardé comme exogène. Or
-c'est lui que la transformation rend endogène. Reproduire ce jeu
-d'instruments dans pyardl retombe sur ses coefficients à 1e-8 ; sur un
-DGP à vérité connue il porte un biais de −0.095 quand Liviatan porte
-+0.0001, et il est **plus biaisé que l'OLS nue**. OBS-26.
-
-### Simulations dynamiques — la table de coefficients devient une trajectoire
-
-```python
-sim = res.dynardl_simulate("IBO", size="1sd", t0=5, horizon=40, r=2000, seed=25)
-sim.summary_df   # blocs "response" et "level", bandes 75/90/95 %
-sim.plot()
-```
-
-Un ARDL(3, {1,3,2}) répartit l'effet d'un régresseur sur trois retards
-de la variable dépendante et quatre du régresseur. La réponse est
-*dans* la table de coefficients ; elle n'y est pas **lisible**.
-
-La réponse rapportée est une **différence appariée** avec un
-contrefactuel sans choc, calculée tirage par tirage : la constante, la
-tendance, les dummies saisonnières et le point de départ s'annulent
-exactement, pas approximativement. Chaque tirage part de SON propre
-équilibre implicite, ce qui rend la branche sans choc plate pour chaque
-tirage plutôt qu'en dérive depuis un départ emprunté à un autre vecteur
-de paramètres.
-
-Conséquence qui n'était pas évidente avant de la vérifier :
-`stochastic=True` ajoute des innovations aux DEUX branches, et comme le
-modèle est linéaire en y, elles **s'annulent exactement de la réponse**
-(1.4e-14, soit l'arrondi des deux sommations, pas un écart Monte
-Carlo). L'incertitude de prévision se voit sur le niveau — le seul
-endroit où elle a un sens.
-
-Couverture des bandes mesurée, pas supposée : 1000 réplications d'un
-ARDL(1,1) à coefficients connus donnent 93.7 / 94.8 / 94.3 / **95.0 %**
-pour un nominal de 95 %, aux horizons 5, 6, 10 et 60 — y compris à
-l'horizon de long terme, là où la quantité est un ratio et où
-l'asymétrie aurait pu mordre. Concordance avec R `dynamac` 0.1.12 :
-**3.5e-14** sur les treize coefficients.
-
-Cette spec a aussi révélé un bug ancien : les vues de long terme
-découpaient le vecteur de paramètres par POSITION, et les dummies
-saisonnières s'intercalent entre la constante et les retards. Avec
-`seasonal=True`, θ, son erreur type, la vitesse d'ajustement et la
-demi-vie étaient tous lus sur les mauvais coefficients — sans message,
-avec des chiffres d'allure normale. Trouvé par le test qui force une
-récursion numérique et une formule algébrique à donner le même nombre.
-OBS-25.
-
-### VECM simulator
-
-```python
-pyardl.simulate.vecm_ardl(n_obs, alpha, beta, gammas=(), case=3, sigma=None, ...)
-pyardl.simulate.degenerate_system(kind, k=1, speed=-0.4)
-```
-
-One generator for every Monte Carlo study in the library, so a disagreement
-between two validation studies is a disagreement about estimators rather than
-about data. Writing `Π = α β'` makes the rank *chosen* rather than hoped for,
-and the reported `rank` is the rank of `Π` — a zero `alpha` creates no
-relation, and saying otherwise would claim one the data do not contain.
-
-`degenerate_system` builds the canonical systems the three-test framework has
-to tell apart. Stability is deliberately **not** enforced: an explosive system
-is a legitimate thing to simulate.
-
-### Engle-Granger
-
-```python
-pyardl.cointegration.engle_granger(y, x, trend="c", max_lags=None,
-                                   ic="aic", fit_ecm=False)
-```
-
-Provided for comparison, and because much of the literature reports it. Three
-limitations are structural:
-
-- **The normalisation is arbitrary.** Regressing `y` on `x` and `x` on `y` are
-  different tests and can disagree; the test suite demonstrates it.
-- **Only one relationship can be found**, with no warning that others exist.
-- **Every series must be I(1)** — as the opening example shows, that is often
-  false, and the test fails silently rather than complaining.
-
-First-step coefficients are reported without standard errors: they are
-super-consistent but non-standard, so the usual ones would be wrong.
-
-### ARDL ↔ ECM algebra
-
-`pyardl.core.transforms`
-
-`ardl_to_ecm` and `ecm_to_ardl` are exact inverses: fit either representation on
-the same data and you get identical residuals. Also `longrun_coefs`,
-`longrun_covariance` (delta method, analytical gradient), `speed_of_adjustment`
-and `half_life`. Degenerate configurations return `NaN` with a warning rather
-than a number produced by dividing by something near zero.
-
-### Utilities and datasets
-
-```python
-from pyardl.utils import diff, lag_matrix, check_series
-from pyardl.datasets import load_denmark, load_pss2001
-```
-
-`diff(x, d=1, D=0, s=4)` applies `(1-L)^d (1-L^s)^D`. A `Series` keeps the tail
-of its index, so a differenced series stays attached to its dates instead of
-silently shifting by `d + D·s` periods.
-
-`load_denmark()` — Danish money demand, quarterly.
-`load_pss2001()` — the UK wage-price data of Pesaran, Shin & Smith (2001).
+The mapping is total, and `reason` says in one sentence which test decided.
+Full account, including why two tests cannot tell the degeneracies apart, in
+[three-tests.md](docs/api/three-tests.md).
 
 ---
 
 ## Validation
 
-This is the part worth reading before trusting any number.
+This is the part worth reading before trusting any number, in full, in
+[docs/VALIDATION_OBSERVATIONS.md](docs/VALIDATION_OBSERVATIONS.md). The short
+version:
 
-**Against reference implementations.** Coefficients, standard errors and
-residuals agree with `statsmodels` to 1e-10, and with the R package `ARDL` to
-1e-6. The UK wage equation of PSS (2001) is reproduced to 1e-4 on the F and t
-statistics. DF-GLS agrees with `arch` to 1e-8 across sample sizes, trends and
-lag orders. Engle-Granger agrees with `statsmodels.tsa.stattools.coint` to
-1e-13.
-
-**Critical values.** Every shipped table documents its source, its transcription
-channel and its cross-check in
-[`PROVENANCE.md`](src/pyardl/critical_values/PROVENANCE.md). Where a second
-published source exists it is used; where none does, the table is generated by
-an in-house Monte Carlo engine with recorded seeds and verified against a
-theoretical limit. The comparison criterion is derived from the Monte Carlo
-standard error of each quantile — published tables carry their own simulation
-error, so a flat tolerance is not defensible.
-
-**What the protocol surfaced.** A typo in a published R package's transcription
-(`11.60` for `1.60`), three cells where independent sources disagree with a
-printed table, a response surface that is conservative at the edge of its fitted
-range, and two rounding conventions where reference implementations differ from
-the published rule. All documented rather than smoothed over.
-
-**Conventions settled by measurement, not by reading.** Three times, a
-specification admitted two readings and the choice was made by measuring both:
-which null the bootstrap draws from (a per-test null inflates size to 9.3% at a
-nominal 5%), what the unconditional model actually removes (only one of two
-candidate specifications reproduces `bootCT`'s own statistic, to 1e-12), and
-which Johansen statistic meets the criterion the specification itself sets.
-Each is recorded in the
-[validation register](docs/VALIDATION_OBSERVATIONS.md) with the numbers that
-decided it — including one hypothesis that the data refuted, kept in the record
-with its full trajectory rather than quietly replaced by the conclusion.
-
-**Limits, recorded rather than smoothed over.** `F_indep` is oversized at
-`T = 100` — 6.5% at a nominal 5%, where the `t` holds its size. The bootstrap's
-decisiveness costs accuracy under a type 2 degeneracy. The bounds of `F_indep`
-are simulated in-house because the published ones are behind an access barrier,
-so their cross-checks are structural rather than external, and that is weaker.
-None of this is hidden in a footnote: it is OBS-9, OBS-11 and OBS-12 of the
-same register, and the summary of OBS-12 is a page of the documentation in its
-own right — [Bootstrap or classical bounds?](docs/bootstrap-or-bounds.md).
-
-**Test suite.** 707 tests plus 38 doctests, `mypy --strict` clean, on Linux,
-Windows and macOS across Python 3.11–3.13. Monte Carlo experiments run nightly
-at full replication counts.
+- **Against reference implementations.** Coefficients and residuals agree
+  with `statsmodels` to 1e-10 and with R's `ARDL` package to 1e-6. PSS
+  (2001)'s UK wage equation is reproduced to 1e-4. Panel estimators are
+  cross-checked against `plm`, `ardlverse` and (where those tools do not
+  reach) documented Stata scripts.
+- **Critical values.** Every shipped table cites its exact source and its
+  cross-check in
+  [PROVENANCE.md](src/pyardl/critical_values/PROVENANCE.md) — a second
+  published source where one exists, an in-house Monte Carlo engine with
+  recorded seeds where none does.
+- **Conventions settled by measurement, not by reading.** Every place a
+  specification admitted two readings, the choice was made by measuring
+  both and recording the numbers that decided it — never guessed.
+- **Limits, stated rather than hidden.** Where a test is oversized, where a
+  method underperforms its own literature's claims, where a cross-check is
+  structural rather than external — each one is a numbered entry in the
+  validation register, not a footnote.
+- **Test suite.** 700+ tests plus 38 doctests, `mypy --strict` clean, on
+  Linux, Windows and macOS across Python 3.11–3.13. Monte Carlo experiments
+  re-run nightly at full replication counts (`event: schedule` in Actions —
+  the push-triggered badge above only covers the fast suite).
 
 ---
 
@@ -1223,97 +256,42 @@ at full replication counts.
 | Python | 3.11, 3.12, 3.13 |
 | OS | Linux, Windows, macOS |
 | Required | numpy, scipy, pandas, statsmodels |
-| Optional | matplotlib (`plot`), arch (`bootstrap`) |
+| Optional | matplotlib (`plot`), arch (`bootstrap`), a Rust toolchain (native backend) |
 
-Tested against numpy 2.5 and pandas 3.0.
+Tested against numpy 2.5 and pandas 3.0, and against a pinned pandas 2.1
+floor.
 
 ---
 
 ## Roadmap
 
-Released:
-
 - **0.1.0** — ARDL/UECM estimation, bounds test with the five deterministic
   cases, joint F and t decision, PSS critical values.
-- **0.2.0** — small-sample and response-surface critical values with p-values,
-  CUSUM/CUSUMSQ stability, DF-GLS and Ng-Perron pre-tests, long-run restriction
-  testing and seasonality, Engle-Granger.
+- **0.2.0** — small-sample and response-surface critical values with
+  p-values, CUSUM/CUSUMSQ stability, DF-GLS and Ng-Perron pre-tests,
+  long-run restriction testing and seasonality, Engle-Granger.
 - **0.3.0** — bootstrap ARDL with no inconclusive zone, the three-test
-  framework that names both degeneracies, the Johansen system test and its
-  regressor diagnostic, conditional/unconditional models, and one VECM
-  simulator for every Monte Carlo study.
-- **0.4.0** — NARDL: asymmetric long-run and short-run responses, the four
-  symmetry tests, dynamic multipliers with simulated bands, and critical
-  values simulated for the decomposed null.
-- **0.5.0** — the rest of the genealogy, from its roots to its frontier:
-  QARDL and QNARDL, Fourier ARDL and Fourier-ADL cointegration, the unified
-  entry point over the eight configurations, heterogeneous panels (MG, PMG,
-  DFE, CS-ARDL, CS-DL) with the Hausman test between them, the efficient
-  long-run estimators (DOLS, FMOLS, CCR), dynamic simulations, and the
-  distributed-lag models the whole family descends from (Koyck, Almon).
-
-  With that, the 28 specifications the project set out to implement are
-  implemented, each with its own external cross-validation.
-
-- **0.6.0** — performance, and three measurements that contradicted the
+  framework, the Johansen system test, conditional/unconditional models,
+  one VECM simulator for every Monte Carlo study.
+- **0.4.0** — NARDL: asymmetric responses, the four symmetry tests, dynamic
+  multipliers with simulated bands, critical values for the decomposed
+  null.
+- **0.5.0** — QARDL and QNARDL, Fourier ARDL and Fourier-ADL, the unified
+  entry point, heterogeneous panels (MG, PMG, DFE, CS-ARDL, CS-DL), the
+  efficient long-run estimators (DOLS, FMOLS, CCR), dynamic simulations,
+  and the distributed-lag models the family descends from (Koyck, Almon).
+  With this release, the 28 planned specifications are all implemented.
+- **0.6.0** — performance work, and three measurements that contradicted the
   reasoning behind them: an optional Rust kernel plus an augmented QR
-  (**1.53x to 1.80x** on a bootstrap run), the QARDL band coverage study
-  the specification had always asked for, and a declared pandas floor
-  that had stopped being true.
+  (**1.53x to 1.80x** on a bootstrap run), the QARDL band coverage study the
+  specification had always asked for, and a declared pandas floor that had
+  stopped being true. Full account in [CHANGELOG.md](CHANGELOG.md).
 
-Next:
+Next: **0.7+** — whatever the validation register turns up. The
+specifications are implemented and the performance profile is flat; what
+remains is use, and the questions use raises.
 
-- **0.7+** — whatever the validation register turns up. The 28
-  specifications are implemented and the performance profile is flat;
-  what remains is use, and the questions use raises.
-
-### Le backend natif, et ce que la mesure a dit
-
-```python
-res = bootstrap_bounds_test(y, x, case=3, backend="auto")
-```
-
-La chose évidente à accélérer dans un bootstrap, c'est « le bootstrap ».
-C'est faux ici, et le savoir demandait de profiler avant d'écrire une
-ligne de Rust. À T=1000, B=9999, k=3, le poste le plus lourd est
-`numpy.linalg.qr` — **36 %**, et c'est déjà du LAPACK : le réécrire
-appellerait le même LAPACK. Le seul endroit où Python coûte vraiment
-quelque chose est la récursion du DGP nul (**27 %**), parce qu'elle est
-séquentielle en `t` et que NumPy ne peut pas vectoriser le temps.
-
-Une seule fonction a donc été portée. Le noyau inverse les boucles — une
-réplication traversant toutes les périodes, plutôt que toutes les
-réplications traversant une période — ce qui garde son état de travail
-en cache L2 et rend les réplications parallèles sans synchronisation :
-**3,8× à 4,9×** sur cette étape.
-
-**De bout en bout, 1,39× à 1,57×.** C'est la loi d'Amdahl sur 27 % : annoncer le
-5× seul serait exact et trompeur.
-
-Le QR, lui, a été optimisé côté NumPy — factorisation de la matrice
-augmentée `[X | y]` en `mode="r"`, si bien que `Q` n'est jamais formé et
-que les trois passes qui le consommaient disparaissent. La ligne
-`numpy.linalg.qr` tombe de 9,5 s à 3,87 s.
-
-**Et j'avais prédit que ce serait le plus gros gain des deux. C'était
-faux : 1,07× à 1,22× contre 1,39× à 1,57× pour le noyau.** La part du temps ne
-suffit pas à classer des optimisations — il faut la part *multipliée par
-la fraction réellement récupérable*, et c'est ce second facteur qui se
-devine mal. Retirer 80 % de 27 % bat diviser 36 % par deux. Les deux ne
-se concurrencent pas : ensemble, **1,53× à 1,80×**. OBS-28.
-
-L'équivalence entre les deux chemins est **exacte, pas
-distributionnelle** : le noyau ne tire rien, les innovations lui sont
-passées, donc les deux backends voient les mêmes nombres et doivent
-rendre les mêmes trajectoires — mesuré à 4e-14, contractualisé à 1e-12.
-Le test de Kolmogorov-Smirnov que l'architecture prévoyait est là aussi,
-mais il ne pouvait pas être le verrou : sur 2000 tirages il ne
-distingue pas deux lois qui diffèrent de 1e-9.
-
-`backend="numpy"` reste le défaut partout, et un test l'exige : NumPy
-est la référence contre laquelle le noyau est vérifié, et un défaut qui
-basculerait tout seul rendrait cet accord tautologique. `pip install
-pyardl` n'a besoin d'aucun compilateur.
+---
 
 ## Contributing
 
@@ -1326,51 +304,24 @@ mypy src/pyardl
 pytest -m "not slow" -ra --doctest-modules src/pyardl tests docs --cov=pyardl
 ```
 
-Two expectations specific to this project. Every statistical claim needs a test
-that would fail if the claim were false — not a smoke test. And **no numerical
-value is ever written from memory**: critical values, docstring examples,
-doctest expectations and figures quoted in documentation are all computed by a
-real run and pasted from it.
+Two expectations specific to this project. Every statistical claim needs a
+test that would fail if the claim were false — not a smoke test. And **no
+numerical value is ever written from memory**: critical values, docstring
+examples, doctest expectations and figures quoted in documentation are all
+computed by a real run and pasted from it.
 
 ---
 
 ## Citing
 
 If you use `pyardl` in published work, please cite the software (see
-[`CITATION.cff`](CITATION.cff)) as well as the methodological articles behind
-the part you used — they are listed in each module's docstring.
+[CITATION.cff](CITATION.cff)) as well as the methodological articles behind
+the part you used — they are listed in each module's docstring and doc page.
 
----
-
-## References
-
-- Pesaran, M. H., Shin, Y. & Smith, R. J. (2001). Bounds testing approaches to
-  the analysis of level relationships. *Journal of Applied Econometrics*, 16(3),
-  289–326.
-- Banerjee, A., Dolado, J. & Mestre, R. (1998). Error-correction mechanism tests
-  for cointegration in a single-equation framework. *Journal of Time Series
-  Analysis*, 19(3), 267–283.
-- Narayan, P. K. (2005). The saving and investment nexus for China. *Applied
-  Economics*, 37(17), 1979–1990.
-- Kripfganz, S. & Schneider, D. C. (2020). Response surface regressions for
-  critical value bounds and approximate p-values in equilibrium correction
-  models. *Oxford Bulletin of Economics and Statistics*, 82(6), 1456–1481.
-- Brown, R. L., Durbin, J. & Evans, J. M. (1975). Techniques for testing the
-  constancy of regression relationships over time. *JRSS B*, 37(2), 149–192.
-- Elliott, G., Rothenberg, T. J. & Stock, J. H. (1996). Efficient tests for an
-  autoregressive unit root. *Econometrica*, 64(4), 813–836.
-- Ng, S. & Perron, P. (2001). Lag length selection and the construction of unit
-  root tests with good size and power. *Econometrica*, 69(6), 1519–1554.
-- Davidson, J. E. H., Hendry, D. F., Srba, F. & Yeo, S. (1978). Econometric
-  modelling of the aggregate time-series relationship between consumers'
-  expenditure and income in the United Kingdom. *The Economic Journal*, 88(352),
-  661–692.
-- Engle, R. F. & Granger, C. W. J. (1987). Co-integration and error correction.
-  *Econometrica*, 55(2), 251–276.
-- MacKinnon, J. G. (2010). Critical values for cointegration tests. Queen's
-  University Working Paper 1227.
-- Hendry, D. F., Pagan, A. R. & Sargan, J. D. (1984). Dynamic specification.
-  *Handbook of Econometrics*, vol. 2.
+The central reference is Pesaran, M. H., Shin, Y. & Smith, R. J. (2001).
+Bounds testing approaches to the analysis of level relationships. *Journal
+of Applied Econometrics*, 16(3), 289–326. Every other article this library
+implements is cited where it is used, in the linked doc page for that model.
 
 ---
 
