@@ -1,0 +1,13 @@
+{
+  "provenance": "R 4.6.1, package apt (ciTarFit), executed via validation/external/spec33_apt.R on tests/replication/data/spec29_synthetic.csv (n=200, lag=1 fixed on both sides to avoid a lag-selection-convention mismatch). Raw R output: validation/results/external_logs/spec33_apt.log. Numeric capture: validation/external/spec33_apt.json.",
+  "data_file": "tests/replication/data/spec29_synthetic.csv",
+  "lags": 1,
+  "trend": "c",
+  "tar": {"rho1": -0.0499668225917223, "rho2": -0.0761047702526665, "phi_stat": 2.1627351320397},
+  "mtar": {"rho1": -0.0394264498352131, "rho2": -0.0883534069017462, "phi_stat": 2.40013609039867},
+  "notes": "Both pyardl and apt fit the exact same regression (step-two threshold ADF at a fixed lag, threshold=0) here, unlike spec 29's automatic lag selection which diverges between implementations — hence the tight tolerance, and the fix that made this match: an earlier version of pyardl's _threshold_regression aligned the regime indicator one period ahead of the lagged residual level it multiplies (indicator_full[lags+1:] instead of indicator_full[lags:-1]), a look-ahead bias caught precisely because this external check first failed to match. See docs/QUESTIONS.md, spec 33 entry.",
+  "tolerance": {
+    "rho_abs": 1e-6,
+    "phi_abs": 1e-6
+  }
+}

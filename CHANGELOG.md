@@ -7,6 +7,37 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Added
 
+- `pyardl.threshold.threshold_ardl(y, x, transition, delay=1, trim=0.15,
+  n_boot=999, seed=None)`: Hansen (1999, 2000) threshold regression with
+  an estimated (not fixed) threshold on a generic transition variable —
+  distinct from NARDL's fixed-at-zero threshold on a regressor's own
+  change. Grid search minimising SSR over the threshold (`gamma_hat`,
+  verified against R `pdR::SMPLSplit_het`, B. E. Hansen's own code, to
+  the precision R prints); linearity test via a fixed-design residual
+  bootstrap (Hansen 1996), the correct null for this non-cointegration
+  setting (stationary regressors, not the I(1) joint-regeneration null
+  Gregory-Hansen/Enders-Siklos need). `gamma_ci`'s exact width constant
+  is derived from the known limiting distribution but not verified
+  against the original paper — see `docs/QUESTIONS.md`. New module
+  `pyardl.threshold`; `pyardl.utils.check_regressors_allow_constant`
+  extracted as a shared brique (previously duplicated in
+  `pyardl.cointegration.bai_perron`).
+- `pyardl.cointegration.enders_siklos(y, x, variant='tar', threshold=0.0,
+  trend='c', cv_source='bootstrap', n_boot=999, seed=None)`: Enders &
+  Siklos (2001) asymmetric-adjustment cointegration test (TAR and
+  Momentum-TAR, both implemented). Reuses Engle-Granger's step one
+  unchanged; step two splits the adjustment coefficient by regime and
+  tests it jointly (`phi_stat`, bootstrap critical values only — the
+  published table is not encoded, see `docs/QUESTIONS.md`) and for
+  symmetry (`symmetry_stat`, asymptotic, only under a fixed threshold).
+  `threshold='estimated'` runs Chan's (1993) grid search.
+  `res.ecm_asymmetric(y, x)` gives the regime-split step-two ECM. The
+  bootstrap null regenerates `[y, x]` jointly and reruns step one on
+  every replicate (like `gregory_hansen`) rather than resampling the
+  step-one residual's own differences in isolation — an earlier version
+  did the latter and measurably over-rejected (~24% at nominal 5%,
+  T=100); fixed and remeasured (~6%) before this entry, see
+  `docs/QUESTIONS.md`.
 - `pyardl.cointegration.bai_perron(y, x, max_breaks=5, trim=0.15,
   selection='ic', ic='bic', n_boot=199, alpha=0.05, seed=None)`: Bai &
   Perron (1998, 2003) multiple structural-change search via the O(T²)

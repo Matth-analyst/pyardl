@@ -322,6 +322,60 @@ def check_series(
     return y_arr, x_arr, index, str(y_name), x_names
 
 
+def check_regressors_allow_constant(
+    x: npt.ArrayLike, n_y: int
+) -> tuple[npt.NDArray[np.float64], list[str]]:
+    """Validate ``x`` without :func:`check_series`'s ban on a zero-variance column.
+
+    :func:`check_series` rejects a constant regressor, the right default
+    for a long-run cointegrating vector (specs 08/10) where a
+    zero-variance column is almost always a mistake. It is wrong for
+    models whose own equation explicitly allows :math:`x` to carry a
+    constant — Bai-Perron (spec 31) and Hansen's threshold regression
+    (spec 32) both do — so those reuse this lighter check instead of
+    duplicating it.
+
+    Parameters
+    ----------
+    x : array-like, shape (T,) or (T, k)
+        Regressors, as a Series, DataFrame or ndarray.
+    n_y : int
+        Expected number of observations, checked against ``x``.
+
+    Returns
+    -------
+    x_arr : ndarray, shape (T, k)
+    names : list of str
+
+    Raises
+    ------
+    ValueError
+        If ``x`` is not 1-D or 2-D, its length does not match ``n_y``,
+        or it contains a NaN.
+    """
+    names: list[str]
+    if isinstance(x, pd.DataFrame):
+        names = [str(c) for c in x.columns]
+    elif isinstance(x, pd.Series):
+        names = [str(x.name) if x.name is not None else "x0"]
+    else:
+        names = []
+    x_arr = np.asarray(x, dtype=np.float64)
+    if x_arr.ndim == 1:
+        x_arr = x_arr[:, None]
+    if x_arr.ndim != 2:
+        raise ValueError("x must be 1-D or 2-D.")
+    if not names:
+        names = [f"x{j}" for j in range(x_arr.shape[1])]
+    if x_arr.shape[0] != n_y:
+        raise ValueError(
+            f"Incompatible lengths: y has {n_y} observations, x has {x_arr.shape[0]}."
+        )
+    if np.isnan(x_arr).any():
+        raise ValueError("x must not contain NaN.")
+    return x_arr, names
+
+
 # ----------------------------------------------------------------------
 # Long-run covariance (spec 08), reused by FMOLS/CCR and by any HAC
 # standard error in the library.

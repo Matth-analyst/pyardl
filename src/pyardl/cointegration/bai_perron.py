@@ -53,7 +53,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 import pandas as pd
 
-from pyardl.utils import check_series
+from pyardl.utils import check_regressors_allow_constant, check_series
 
 if TYPE_CHECKING:  # pragma: no cover
     from numpy.typing import ArrayLike, NDArray
@@ -151,33 +151,6 @@ class BaiPerronResults:
                     f"break_added={'yes' if res['break_added'] else 'no'}"
                 )
         return "\n".join(lines)
-
-
-def _check_regressors(x: ArrayLike, n_y: int) -> tuple[FloatArray, list[str]]:
-    """Validate ``x`` without :func:`pyardl.utils.check_series`'s ban on
-    a zero-variance column — a constant is a legitimate regressor here.
-    """
-    names: list[str]
-    if isinstance(x, pd.DataFrame):
-        names = [str(c) for c in x.columns]
-    elif isinstance(x, pd.Series):
-        names = [str(x.name) if x.name is not None else "x0"]
-    else:
-        names = []
-    x_arr = np.asarray(x, dtype=np.float64)
-    if x_arr.ndim == 1:
-        x_arr = x_arr[:, None]
-    if x_arr.ndim != 2:
-        raise ValueError("x must be 1-D or 2-D.")
-    if not names:
-        names = [f"x{j}" for j in range(x_arr.shape[1])]
-    if x_arr.shape[0] != n_y:
-        raise ValueError(
-            f"Incompatible lengths: y has {n_y} observations, x has {x_arr.shape[0]}."
-        )
-    if np.isnan(x_arr).any():
-        raise ValueError("x must not contain NaN.")
-    return x_arr, names
 
 
 def _segment_ssr_and_beta(
@@ -441,7 +414,7 @@ def bai_perron(
     # allows x to carry a constant (spec 31 §2.1). y is still validated
     # through check_series; x gets its own, lighter check.
     y_arr, _, index, y_name, _ = check_series(y, None)
-    x_arr, x_names = _check_regressors(x, y_arr.shape[0])
+    x_arr, x_names = check_regressors_allow_constant(x, y_arr.shape[0])
     n, k = x_arr.shape
     h = max(int(np.ceil(trim * n)), k + 1)
     if (max_breaks + 1) * h > n:

@@ -1,4 +1,4 @@
-# Engle-Granger, Gregory-Hansen and Bai-Perron cointegration/break tests
+# Engle-Granger, Gregory-Hansen, Bai-Perron and Enders-Siklos cointegration/break tests
 
 `pyardl.cointegration`
 
@@ -265,3 +265,47 @@ implementation). Only the diagnostic use is implemented. Consequently,
 `bai_perron` at `m=1` is **not yet** guaranteed to coincide with
 `gregory_hansen` — they operate on different objects until the
 cointegration use is added.
+
+## Enders-Siklos: asymmetric (TAR / M-TAR) adjustment
+
+Engle-Granger's step-two ADF regression is **symmetric**:
+`Δû_t = ρ û_{t-1} + ...`. Enders & Siklos (2001) ask whether the
+residual reverts to zero faster after a positive deviation than after a
+negative one (or the reverse) — the "asymmetric adjustment of the
+cointegrating residual" analogue of NARDL's "asymmetric response to a
+regressor" (see [NARDL](nardl.md)). The two notions of asymmetry are
+different and should never be presented as interchangeable.
+
+```python
+from pyardl.cointegration import enders_siklos
+
+res = enders_siklos(y, x, variant="tar", n_boot=999, seed=0)
+print(res.summary())
+res.rho1, res.rho2      # adjustment speed per regime
+res.phi_stat              # joint test: H0 rho1 = rho2 = 0 (no cointegration)
+res.symmetry_stat          # conditional: H0 rho1 = rho2 (asymptotic, fixed threshold only)
+res.ecm_asymmetric(y, x)    # step-two ECM with a regime-split correction term
+```
+
+Step one is Engle-Granger's, reused unchanged. Step two splits the
+adjustment coefficient by regime:
+
+- `variant='tar'`: the regime depends on the **sign of the residual
+  itself**, `û_{t-1}`.
+- `variant='mtar'`: the regime depends on the **sign of the residual's
+  change**, `Δû_{t-1}` — a speed asymmetry (falls fast, climbs back
+  slowly, or the reverse), distinct from TAR's level asymmetry. Report
+  both variants rather than only the one that "worked": the choice
+  changes conclusions on real data (the article's own exchange-rate
+  application), and picking one after the fact is a form of
+  specification search.
+
+`threshold=0.0` (default) is fixed, matching the article's usual case;
+`threshold='estimated'` searches for it (Chan 1993, grid search
+minimising SSR) — searching it invalidates the asymptotic distribution
+`symmetry_stat` relies on, so that test is left `None` when the
+threshold is estimated.
+
+Critical values for `phi_stat` are bootstrap-only, for the same reason
+as Gregory-Hansen's `cv_source='table'`: the published Enders-Siklos
+table is not held with a verified provenance. See `docs/QUESTIONS.md`.

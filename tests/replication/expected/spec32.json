@@ -1,0 +1,13 @@
+{
+  "provenance": "R 4.6.1, package pdR 1.9.4 (SMPLSplit_het, encapsulating B. E. Hansen's own code for Hansen 2000, Econometrica), executed via validation/external/spec32_pdR.R on tests/replication/data/spec32_synthetic.csv (n=300, seed=32, known threshold at q=0). Raw R output: validation/results/external_logs/spec32_pdR.log. Numeric capture: validation/external/spec32_pdR.json.",
+  "data_file": "tests/replication/data/spec32_synthetic.csv",
+  "delay": 0,
+  "trim": 0.15,
+  "r_gamma_hat": -0.02553838,
+  "r_fstat": 285.567945525814,
+  "r_pvalue": 0.0,
+  "notes": "gamma_hat matches to the precision R prints (-0.02553838 vs pyardl's -0.0255383810909059) — a tight, direct check of the core grid-search SSR-minimisation, the part of the algorithm shared with any implementation. The test statistics are NOT expected to match: pdR::SMPLSplit_het computes a heteroskedasticity-robust (White-corrected) LM statistic by construction (the function name says so), while pyardl's linearity_stat is a classical homoskedastic F-statistic — two different, both legitimate, functional forms, not a numerical discrepancy to chase. Both reject H0 overwhelmingly on this DGP, which is the only comparison that is meaningful across the two statistics.",
+  "tolerance": {
+    "gamma_abs": 1e-4
+  }
+}

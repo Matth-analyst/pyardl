@@ -19,6 +19,7 @@ from pyardl.cointegration.efficient import (
     dols,
     fmols,
 )
+from pyardl.cointegration.enders_siklos import EndersSiklosResults, enders_siklos
 from pyardl.cointegration.engle_granger import EGResults, engle_granger
 from pyardl.cointegration.gregory_hansen import GregoryHansenResults, gregory_hansen
 from pyardl.cointegration.johansen import (
@@ -31,6 +32,7 @@ __all__ = [
     "BaiPerronResults",
     "EGResults",
     "EfficientLongRunResults",
+    "EndersSiklosResults",
     "GregoryHansenResults",
     "JohansenResults",
     "bai_perron",
@@ -39,6 +41,7 @@ __all__ = [
     "compare_longrun",
     "default_dols_lags",
     "dols",
+    "enders_siklos",
     "engle_granger",
     "fmols",
     "gregory_hansen",
