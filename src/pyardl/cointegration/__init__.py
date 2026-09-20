@@ -10,6 +10,7 @@ cointegrated data is consistent but its inference is not, and these
 three repair that by three different routes.
 """
 
+from pyardl.cointegration.bai_perron import BaiPerronResults, bai_perron
 from pyardl.cointegration.efficient import (
     EfficientLongRunResults,
     ccr,
@@ -19,6 +20,7 @@ from pyardl.cointegration.efficient import (
     fmols,
 )
 from pyardl.cointegration.engle_granger import EGResults, engle_granger
+from pyardl.cointegration.gregory_hansen import GregoryHansenResults, gregory_hansen
 from pyardl.cointegration.johansen import (
     JohansenResults,
     check_no_cointegration_among_x,
@@ -26,9 +28,12 @@ from pyardl.cointegration.johansen import (
 )
 
 __all__ = [
+    "BaiPerronResults",
     "EGResults",
     "EfficientLongRunResults",
+    "GregoryHansenResults",
     "JohansenResults",
+    "bai_perron",
     "ccr",
     "check_no_cointegration_among_x",
     "compare_longrun",
@@ -36,5 +41,6 @@ __all__ = [
     "dols",
     "engle_granger",
     "fmols",
+    "gregory_hansen",
     "johansen",
 ]

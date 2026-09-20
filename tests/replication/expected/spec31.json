@@ -1,0 +1,18 @@
+{
+  "provenance": "R 4.6.1, package strucchange (Zeileis et al.), function breakpoints(y ~ 1, h=0.15), executed via validation/external/spec31_strucchange.R on tests/replication/data/spec31_synthetic.csv (n=180, seed=31, two known level breaks at 0-indexed t=59 and t=119). Raw R output: validation/results/external_logs/spec31_strucchange.log. Numeric capture: validation/external/spec31_strucchange.json.",
+  "data_file": "tests/replication/data/spec31_synthetic.csv",
+  "max_breaks": 5,
+  "trim": 0.15,
+  "ic": "bic",
+  "r_break_indices": [60, 120],
+  "r_m_hat_by_bic": 2,
+  "r_ssr_by_m": [
+    491.144829046071, 141.496427129538, 13.7182074928384,
+    13.6329188815027, 13.5715486267609, 13.5354882444806
+  ],
+  "notes": "R's strucchange::breakpoints reports break numbers as the index of the last observation of a segment, 1-indexed but counted the same way as pyardl's 0-indexed break_indices convention (both name the observation right before the regime switch) — the raw integers 60 and 120 are directly comparable with no off-by-one adjustment, confirmed by exact SSR agreement below.",
+  "tolerance": {
+    "ssr_abs": 1e-6,
+    "break_index_abs": 0
+  }
+}

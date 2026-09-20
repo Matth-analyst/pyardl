@@ -1,0 +1,14 @@
+{
+  "provenance": "R 4.6.1, package COINT 0.0.4 (Ho Tsung-wu), function GHansen(y, x, model=1, trim=0.10, use=c('nw','ba')), executed via validation/external/spec29_ghansen.R on validation/external/spec29_synthetic.csv (n=200, seed=29, known level break at 0-indexed t=99). Raw R output: validation/results/external_logs/spec29_ghansen.log. Numeric capture: validation/external/spec29_ghansen.json.",
+  "data_file": "tests/replication/data/spec29_synthetic.csv",
+  "model": "C",
+  "trim": 0.10,
+  "r_adf_stat": -9.65029011083059,
+  "r_break_index_0indexed": 99,
+  "r_critical_values": {"0.01": -5.13, "0.05": -4.61, "0.10": -4.34},
+  "notes": "Spec 29 §5.4 named R funtimes::gh_coint as the external reference; that function does not exist in the current CRAN funtimes package (checked 2026-09-20, ls('package:funtimes') has no gh_coint) — documented as a deviation in docs/QUESTIONS.md. COINT::GHansen (Gregory & Hansen 1996A/1996B cited directly in its docs) is used instead. Lag selection differs between pyardl (MAIC-style select_lags) and R's urca::ur.df(selectlags='AIC') inside GHansen, so the ADF* statistics are not expected to match to a tight tolerance — only the break location and the decision (reject H0 at 1%) are asserted as a strict concordance; the statistic is checked only for same sign and same order of magnitude.",
+  "tolerance": {
+    "break_index_abs": 3,
+    "stat_same_order_of_magnitude_factor": 3.0
+  }
+}

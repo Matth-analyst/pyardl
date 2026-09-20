@@ -5,6 +5,59 @@ This project follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `pyardl.cointegration.bai_perron(y, x, max_breaks=5, trim=0.15,
+  selection='ic', ic='bic', n_boot=199, alpha=0.05, seed=None)`: Bai &
+  Perron (1998, 2003) multiple structural-change search via the O(T²)
+  dynamic-programming partition algorithm. Two of the spec's three
+  selection routes implemented (`'ic'`: standard AIC/BIC on `SSR(m)`;
+  `'sequential'`: bootstrap sup-F(l+1|l) tests, not a table lookup);
+  `selection='udmax'` raises `NotImplementedError` rather than ship an
+  unweighted approximation under a misleading name — see
+  `docs/QUESTIONS.md` and `docs/DEVIATIONS.md`. Scoped to the
+  "diagnostic" use (spec 31 §2.4a, a residual bootstrap on an
+  already-stationary regression); the cointegration-generalising-
+  Gregory-Hansen use (§2.4b) is not yet implemented.
+- `pyardl.cointegration.gregory_hansen(y, x, model='C', trim=0.15,
+  cv_source='bootstrap', n_boot=999, seed=None)`: Gregory & Hansen
+  (1996) residual-based cointegration test with an endogenous, single
+  regime shift. Grid search over the break fraction reusing the
+  Engle-Granger step-two ADF regression unchanged; all four break
+  specifications (level shift, level+trend, level+slope, level+slope+
+  trend) implemented, no silent fallback. Critical values come only
+  from `cv_source="bootstrap"` for now (a joint VAR-in-differences null
+  DGP on the stacked `[y, x]` system, re-searched on every replicate) —
+  the published Gregory-Hansen table is not yet encoded (see
+  `docs/QUESTIONS.md`, spec 29 §2.2.4a).
+- `pyardl.nardl.partial_sums_multi(x, thresholds, name=None)`: the
+  Greenwood-Nimmo, Shin, van Treeck & Yu (2013) multiple-asymmetry
+  decomposition (small/large rises, small/large falls, or more regimes
+  with additional thresholds) as a real function, not only a
+  documentation example composing `partial_sums` by hand. Verified by
+  an exact reconstruction identity (`multi_decomposition_error`, below
+  1e-12), by recombining to the binary `partial_sums` output at a
+  single threshold, and by recovering distinct band coefficients on a
+  simulated four-regime DGP.
+- `pyardl.nardl.multi_decomposition_error(x, bands)`: the many-band
+  analogue of `decomposition_error`.
+
+### Changed
+
+- Docstrings of the Results classes brought up to `statsmodels`
+  conventions: every public attribute/property now carries its own
+  `Returns`-typed docstring, and every Results class carries a full
+  `Attributes` summary table faithful to its actual fields — not
+  restated from memory, but read off the implementation (exact pandas
+  index/columns/dtype, exact formula). Covers `ARDLResults`,
+  `AlmonResults`, `KoyckResults`, `CSARDLResults`/`CSDLResults`,
+  `PMGResults`/`DFEResults`/`HausmanResult`, `NARDLResults`, plus the
+  smaller gaps in `PanelData`/`PanelUnit`, `DFGLSResults` and the
+  bootstrap DGP container. Found and closed by a package-wide AST scan
+  for undocumented public functions/properties (47 initially, all
+  resolved except confirmed-private nested closures with no public
+  name).
+
 ## [0.6.0] — 2026-08-29
 
 Sixth release. Performance, and three occasions where the measurement
