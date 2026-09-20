@@ -7,5 +7,11 @@ against a threshold estimated from the data — Hansen (1999, 2000).
 """
 
 from pyardl.threshold.hansen import ThresholdARDLResults, threshold_ardl
+from pyardl.threshold.star import STARARDLResults, star_ardl
 
-__all__ = ["ThresholdARDLResults", "threshold_ardl"]
+__all__ = [
+    "STARARDLResults",
+    "ThresholdARDLResults",
+    "star_ardl",
+    "threshold_ardl",
+]

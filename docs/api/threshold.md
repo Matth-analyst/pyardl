@@ -102,3 +102,65 @@ Two regimes only — multiple thresholds exist in the literature (Hansen
 not searched over). The bootstrap reruns a full grid search per
 replicate — measure a typical runtime before raising `n_boot` far past
 the default on a large sample.
+
+## STAR-ARDL: a smooth transition instead of a sharp one
+
+`threshold_ardl` (above) switches regime all at once, exactly at
+`gamma_hat`. STAR-ARDL (Teräsvirta 1994) replaces the step indicator
+with a **continuous** transition function — economically more plausible
+for aggregate phenomena — at the cost of an extra slope parameter
+(`gamma`, how fast the transition happens) that is genuinely harder to
+pin down than a sharp threshold.
+
+```python
+from pyardl.threshold import star_ardl
+
+res = star_ardl(y, x, transition_var=q, form="lstar", order=(1, 1))
+res.gamma_hat, res.c_hat     # transition speed and centre
+res.linearity_pvalue          # Terasvirta LM test — a standard asymptotic
+                                # test here, no bootstrap needed (see below)
+res.longrun_at([-1, 0, 1])      # theta(q) evaluated on a grid — the
+                                  # signature STAR output, a curve rather
+                                  # than two regime numbers
+```
+
+Two forms, both implemented — pick the one that matches the economics,
+or let `form="auto"` decide via an approximation of Teräsvirta's (1994)
+nested-test sequence on the linearity test's own auxiliary regression:
+
+- `"lstar"` (logistic): `G(q) = 1 / (1 + exp(-gamma*(q - c)))` — an
+  asymmetric regime change, one side is fundamentally different from
+  the other.
+- `"estar"` (exponential): `G(q) = 1 - exp(-gamma*(q - c)^2)` —
+  symmetric around `c`, the middle regime differs from both tails
+  equally.
+
+### Estimation: concentrated, not a general nonlinear solver
+
+For a *fixed* `(gamma, c)` the model is linear in everything else — an
+ordinary least-squares fit on `[y_{t-1}, G*y_{t-1}, x_{t-1},
+G*x_{t-1}, ...]`. `star_ardl` exploits that: it searches only over the
+two genuinely nonlinear parameters, starting from the best of a coarse
+`start_grid × start_grid` search to avoid the local optima a single
+gradient start would risk, then refines with Nelder-Mead on the
+profiled SSR.
+
+### Why the linearity test needs no bootstrap here
+
+Both `threshold_ardl` and Enders-Siklos need a bootstrap because their
+threshold/break is unidentified under the null (the "problem of
+Davies"). Teräsvirta's trick avoids it: a third-order Taylor expansion
+of `G` around `gamma=0` removes `gamma` from the null altogether, so
+the resulting LM test has a standard asymptotic F distribution — a
+genuine methodological difference from the rest of this module, not an
+oversight.
+
+### Limits
+
+Weak identification of `gamma` and `c` *separately* is common in small
+samples when the transition is nearly sharp or nearly absent — a
+property of the STAR literature generally, not specific to this
+implementation. Report both together with the linearity test rather
+than trusting a lone point estimate. The `form="auto"` decision rule
+approximates Teräsvirta's nested F-test sequence rather than
+reproducing its exact construction; see `docs/DEVIATIONS.md`.

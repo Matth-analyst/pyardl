@@ -7,6 +7,28 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Added
 
+- `pyardl.midas.MIDASARDL(y, x_high_freq, freq_ratio, k_max=12,
+  form='almon_exp', order=(1,1))` and `pyardl.midas.midas_weights(theta,
+  k_max, form)`: MIDAS-ARDL (Ghysels, Santa-Clara & Valkanov 2004), a
+  mixed-frequency long-run regressor built from the same Almon-weight
+  idea as `pyardl.distributed_lags.almon`, in exponential (`almon_exp`)
+  or Beta (`beta`) form. Concentrated NLS estimation (grid-seeded
+  Nelder-Mead over the two weight parameters, linear UECM given them —
+  the same trick as `star_ardl`). At `freq_ratio=1, k_max=0` coincides
+  with a plain `ARDL` to machine precision.
+- `pyardl.threshold.star_ardl(y, x, transition_var, form='lstar',
+  order=(1,1), start_grid=15)`: STAR-ARDL (Teräsvirta 1994), a smooth
+  (LSTAR or ESTAR) transition between regimes instead of
+  `threshold_ardl`'s sharp one. Concentrated estimation: linear in
+  every parameter but `(gamma, c)`, searched via a coarse grid seeding
+  Nelder-Mead on the profiled SSR. `res.linearity_pvalue` is
+  Teräsvirta's third-order-Taylor LM test — a standard asymptotic
+  F-test, no bootstrap needed (linearising the transition function
+  removes gamma from the null, avoiding the "problem of Davies"
+  `threshold_ardl` needs a bootstrap for). `form='auto'` approximates
+  Teräsvirta's LSTAR/ESTAR nested-test decision rule rather than
+  reproducing its exact construction, see `docs/DEVIATIONS.md`.
+  `res.longrun_at(q_values)` gives the signature theta(q) curve.
 - `pyardl.panel.pedroni(df, y, X, id, time, det='const', n_boot=499,
   seed=None)` and `pyardl.panel.westerlund(df, y, X, id, time,
   n_boot=499, seed=None, cd_pvalue=None)`: panel cointegration tests
