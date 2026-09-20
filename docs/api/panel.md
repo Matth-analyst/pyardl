@@ -698,13 +698,79 @@ no reference values have been invented in the meantime.
 
 ## What comes next
 
-The panel branch is complete: MG, PMG, DFE, CS-ARDL and CS-DL all share
-one container and one per-individual loop, and one aggregation rule.
+## Mean-Group NARDL — asymmetry, averaged across individuals
+
+`MeanGroupNARDL` composes NARDL ([nardl.md](nardl.md)) with the same
+Mean-Group aggregator above — no new estimator, only orchestration.
+There is no single founding paper for "Panel NARDL"; this documents the
+combination `pyardl` retains, not a third-party method reproduced
+identically.
+
+```python
+from pyardl.panel import MeanGroupNARDL
+
+res = MeanGroupNARDL(df, y="y", X=["x"], asym=["x"], id="id", time="t",
+                      order=(1, 1)).fit()
+res.longrun_asym          # theta+_MG, theta-_MG, and the group asymmetry test
+res.share_asymmetric()      # fraction of individuals individually asymmetric
+res.heterogeneity()          # dispersion of theta+_i - theta-_i
+res.individual                # {id: NARDLResults} — every individual fit
+```
+
+**Averaging and subtracting do not commute under heterogeneity.**
+`theta_pos`/`theta_neg` in `longrun_asym` are the group means of
+`theta+_i` and `theta-_i`, aggregated **separately** — never a group
+mean of each individual's own difference. The group asymmetry test
+(`H0: theta+_MG = theta-_MG`) follows from that: it compares two
+*independent* group means (individuals are independent under the
+standard Mean-Group assumption, even though `theta+_i` and `theta-_i`
+from the *same* individual are correlated), so the variance of the
+difference is the **sum of the two group variances** — not a delta
+method on a per-individual ratio, and not the between-individual
+variance of a pre-differenced quantity.
+
+**`share_asymmetric()` answers a different question than `longrun_asym`
+does.** A panel where half the individuals are strongly asymmetric in
+opposite directions and half are exactly symmetric can average to the
+same group point estimate as one where every individual is mildly
+asymmetric in the same direction — the group test alone cannot tell
+"the average asymmetry is non-zero" from "asymmetry is widespread".
+`share_asymmetric(alpha=0.05)` reports, per regressor, the fraction of
+individuals whose own long-run asymmetry Wald test
+(`NARDLResults.asymmetry_tests`) rejects at `alpha`.
+
+### Decomposition mode: per-individual only, for now
+
+`decomposition='per_individual'` (the default, and currently the only
+implemented mode) builds `x+`/`x-` from each individual's own `Δx_i,t`,
+consistent with MG/PMG already estimating individual by individual.
+`decomposition='pooled'` — a single pair of partial sums built on the
+pooled panel before refiltering by individual, relevant only when a
+*common* threshold has an economic meaning — is **not implemented**;
+the spec itself names it the exception rather than the default, and it
+raises `NotImplementedError` rather than a silent fallback. See
+`docs/DEVIATIONS.md`.
+
+### What's out of scope
+
+PMG-NARDL (a common, constrained long run with `theta+`/`theta-` as
+parameters of PMG's concentrated-likelihood problem, not post-hoc
+averages) needs a genuine modification of PMG's backfitting loop, not
+just orchestration — not implemented here. Combining with CS-ARDL/CS-DL
+(cross-sectional dependence) or with QARDL (which already has its own
+single-series QNARDL extension) are both explicitly out of scope.
+
+## Closing note
+
+The panel branch is complete: MG, PMG, DFE, CS-ARDL, CS-DL and
+Mean-Group NARDL all share one container and one per-individual loop,
+and one aggregation rule.
 
 What is *not* here, and is flagged rather than omitted silently: the
 strong/weak dependence exponent of Bailey, Kapetanios and Pesaran, which
-the specification places outside the first version; and an external
-reference for the dynamic half of CS-ARDL, which waits on Stata.
+the specification places outside the first version; an external
+reference for the dynamic half of CS-ARDL, which waits on Stata; and
+PMG-NARDL (see above).
 
 ## References
 

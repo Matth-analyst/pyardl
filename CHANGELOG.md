@@ -7,6 +7,28 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Added
 
+- `pyardl.panel.MeanGroupQARDL(df, y, X, id, time, taus=..., order=(1,1),
+  ...)`: Mean-Group QARDL, composing `pyardl.qardl.QARDL` (per
+  individual, same tau grid for every individual) with the Mean-Group
+  aggregator, applied separately at each quantile — output is a surface
+  `theta_MG(tau)`, not a point. Scoped to the core (individual fits +
+  per-tau aggregation, `inference='kernel'`); the group constancy/
+  symmetry tests and MBB-draws aggregation across individuals (spec 36
+  §2.3-2.4) are not implemented in this version, see
+  `docs/DEVIATIONS.md`.
+- `pyardl.panel.MeanGroupNARDL(df, y, X, asym, id, time, order=(1,1),
+  decomposition='per_individual', ...)`: Mean-Group NARDL, composing
+  `pyardl.nardl.NARDL` (per individual) with the Mean-Group aggregator
+  (`pyardl.panel.mg`, reused unchanged). `theta_pos_i`/`theta_neg_i` are
+  aggregated separately (never their per-individual difference averaged
+  directly); the group asymmetry test's variance is the sum of the two
+  independent group variances, not a delta method on a ratio.
+  `res.share_asymmetric()` reports the fraction of individuals
+  individually asymmetric, distinct from the group point estimate.
+  `decomposition='pooled'` raises `NotImplementedError` — the spec names
+  it the exception, not the default; not implemented in this version.
+  PMG-NARDL (common, constrained long run) is out of scope, see
+  `docs/DEVIATIONS.md`.
 - `pyardl.threshold.threshold_ardl(y, x, transition, delay=1, trim=0.15,
   n_boot=999, seed=None)`: Hansen (1999, 2000) threshold regression with
   an estimated (not fixed) threshold on a generic transition variable —

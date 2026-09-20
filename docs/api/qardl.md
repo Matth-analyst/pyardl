@@ -266,6 +266,32 @@ included.
 - Cost is linear in `taus × n_boot`. A 19-point grid with `n_boot=299`
   is a few minutes, not a few seconds.
 
+## Panel: Mean-Group QARDL
+
+`pyardl.panel.MeanGroupQARDL` composes QARDL with the Mean-Group
+aggregator ([panel.md](panel.md)) — no new estimator, an individual
+QARDL fit per unit on the *same* quantile grid, averaged **separately
+at each tau**, so the output is a surface `theta_MG(tau)` rather than a
+point:
+
+```python
+from pyardl.panel import MeanGroupQARDL
+
+res = MeanGroupQARDL(df, y="y", X=["x"], id="id", time="t",
+                      taus=(0.1, 0.25, 0.5, 0.75, 0.9), order=(1, 1)).fit()
+res.longrun_mg["x"]    # DataFrame indexed by tau: theta, se, t, pvalue
+res.individual            # {id: QARDLResults} — every individual fit
+```
+
+This version implements only the core (individual fits plus per-tau
+Mean-Group aggregation, `inference='kernel'`). Not implemented: the
+group constancy/symmetry tests (they need a variance construction that
+accounts for the correlation of `theta_MG(tau)` across neighbouring
+tau, since it is the same group mean varying continuously — the spec
+explicitly warns against reusing the individual-level test unchanged)
+and aggregating each individual's MBB bootstrap draws into a group
+bootstrap distribution. See `docs/DEVIATIONS.md`.
+
 ## References
 
 - Cho, J. S., Kim, T. & Shin, Y. (2015). Quantile cointegration in the
