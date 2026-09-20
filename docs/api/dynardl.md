@@ -216,6 +216,45 @@ dispersion of `ŷ*`. Two different questions about the level, neither one
 wrong. The band on the **response** is a paired difference and is
 untouched by the difference.
 
+## Generalized impulse responses and variance decomposition
+
+`generalized_irf` and `fevd` (`pyardl.simulate`) extend `dynardl_simulate`
+rather than adding a new engine — Pesaran & Shin's (1998) two classic
+follow-up questions once you have a shock response.
+
+```python
+from pyardl.simulate import generalized_irf, fevd
+
+girf = generalized_irf(res, "x", shock_size="1sd", h=40, r=200, seed=0)
+girf.girf_mean            # average GIRF across the conditioning histories
+girf.girf_by_history        # one trajectory per history
+
+out = fevd(res, "x", h=40, x_shock_variance="auto")
+out.shares                  # share of y's forecast variance from x, by horizon
+```
+
+**GIRF, in this version, is a linear-model tool.** `generalized_irf`
+orchestrates `dynardl_simulate` over a set of conditioning histories
+(each just a `dynardl_simulate` `scenario` dict). For a linear ARDL —
+or a NARDL simulated through its underlying linear ARDL on already
+partial-summed columns, the same scope `dynardl_simulate` itself
+documents — the paired-difference response does not depend on the
+baseline at all, so the GIRF is history-invariant by construction and
+coincides with `dynardl_simulate` exactly. Genuine history-*dependent*
+GIRF, where a NARDL/STAR/Threshold model's regime is recomputed at
+every simulated step as the path evolves, would need that nonlinear
+recursion built from scratch and is **not implemented** here — see
+`docs/DEVIATIONS.md`.
+
+**FEVD is a real single-equation construction**, not a placeholder: the
+MA weights of a unit shock to `x` come straight from `dynardl_simulate`
+(`shock_type='impulse'`); the MA weights of a unit shock to `y`'s own
+innovation come from the AR(p) polynomial directly, no simulation
+needed. Both squared and cumulated give the two variance sources. The
+variance assumed for a single shock to `x` (`x_shock_variance`) is
+supplied from outside the ARDL — which treats `x` as given — never
+presented as something the model itself estimated.
+
 ## References
 
 - Jordan, S. & Philips, A. Q. (2018). Cointegration testing and dynamic
@@ -224,3 +263,6 @@ untouched by the difference.
 - Philips, A. Q. (2018). Have your cake and eat it too? Cointegration
   and dynamic inference from autoregressive distributed lag models.
   *American Journal of Political Science*, 62(1), 230-244.
+- Pesaran, M. H. & Shin, Y. (1998). Generalized impulse response
+  analysis in linear multivariate models. *Economics Letters*, 58(1),
+  17-29.

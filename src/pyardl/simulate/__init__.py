@@ -10,12 +10,17 @@ coefficient table into a statement about the world.
 """
 
 from pyardl.simulate.dynardl import DynardlSimulation, dynardl_simulate
+from pyardl.simulate.girf import FEVDResults, GIRFResults, fevd, generalized_irf
 from pyardl.simulate.vecm import VECMSimulation, degenerate_system, vecm_ardl
 
 __all__ = [
     "DynardlSimulation",
+    "FEVDResults",
+    "GIRFResults",
     "VECMSimulation",
     "degenerate_system",
     "dynardl_simulate",
+    "fevd",
+    "generalized_irf",
     "vecm_ardl",
 ]

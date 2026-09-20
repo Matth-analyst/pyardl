@@ -7,6 +7,32 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Added
 
+- `pyardl.regularized.select_order_regularized(y, x, max_p=4, max_q=4,
+  method='elastic_net', l1_ratio=1.0, alpha='cv', det='const')`: LASSO/
+  Elastic Net order selection, an alternative to `ARDL.select_order` for
+  large `k`. Block-differentiated penalty weights — the deterministic
+  terms and the error-correction coefficient are never penalised.
+  `best_model` is always re-estimated by plain OLS, never with the
+  penalty. `alpha='cv'` uses rolling-origin cross-validation. Plain
+  NumPy coordinate descent, no new runtime dependency (scikit-learn/
+  glmnet used only for external validation, never at runtime). Scoped
+  to a single equation — panel and NARDL/QARDL regularization are out
+  of scope, see `docs/DEVIATIONS.md`.
+- `pyardl.simulate.generalized_irf(results, shock, histories='sample',
+  h=40, r=200, seed=None)` and `pyardl.simulate.fevd(results, shock,
+  h=40, x_shock_variance='auto')`: generalized impulse responses and
+  single-equation forecast-error variance decomposition (Pesaran & Shin
+  1998), extending `dynardl_simulate` rather than adding a new engine.
+  `generalized_irf` orchestrates `dynardl_simulate` over a set of
+  conditioning histories; for a linear ARDL (or NARDL through its
+  underlying linear ARDL) the response is history-invariant by
+  construction and matches `dynardl_simulate` exactly — verified, not
+  just claimed. `fevd` combines `dynardl_simulate`'s own MA weights for
+  a unit shock on `x` with the AR(p) polynomial's own weights for a
+  unit shock on `y`'s innovation. History-*dependent* GIRF for a model
+  whose nonlinear decomposition is recomputed at each simulated step
+  (NARDL/STAR/Threshold with an evolving regime) is not implemented in
+  this version, see `docs/DEVIATIONS.md`.
 - `pyardl.midas.MIDASARDL(y, x_high_freq, freq_ratio, k_max=12,
   form='almon_exp', order=(1,1))` and `pyardl.midas.midas_weights(theta,
   k_max, form)`: MIDAS-ARDL (Ghysels, Santa-Clara & Valkanov 2004), a

@@ -77,6 +77,61 @@ recording the p-value, the diagnostics, the cumulated F test and whether
 the step was accepted. The path makes the reduction auditable instead of
 a black box.
 
+## `pyardl.regularized.select_order_regularized(y, x, max_p=4, max_q=4, method='elastic_net', l1_ratio=1.0, alpha='cv', det='const')`
+
+An alternative to `select_order` for a large number of candidate
+regressors, where the exhaustive/sequential grid search
+(`(max_q+1)^k` candidates for `search="grid"`) becomes combinatorially
+expensive — not a replacement: `select_order` stays the right tool for
+a small `k` with a clean information-criterion reading; regularization
+is for large `k`, or for selecting *which* level regressors belong in
+the long run.
+
+```python
+from pyardl.regularized import select_order_regularized
+
+res = select_order_regularized(y, x, max_p=4, max_q=4,
+                                 method="elastic_net", alpha="cv")
+res.selected_order      # (p, {name: q_j}), retro-deduced from surviving coefficients
+res.best_model            # ARDLResults, re-estimated by plain OLS — never with the penalty
+res.coefficients_path      # theta(alpha) over the grid, for plot_regularization_path()
+```
+
+Fits **one** model at `(max_p, max_q)` with a penalty that shrinks
+irrelevant lag coefficients to zero, instead of choosing the order by
+discrete search. `method="lasso"` is the `l1_ratio=1.0` special case of
+Elastic Net, offered directly since pure LASSO's instability under
+correlated level regressors is exactly what Elastic Net (`l1_ratio<1`)
+corrects — implement both, and see the difference on correlated data
+rather than assume it (`tests/unit/regularized/test_model.py::TestElasticNetVsLasso`).
+
+**Penalty weights are block-differentiated, never uniform.** The
+deterministic terms and the error-correction coefficient `lambda*y.L1`
+are *never* penalised — penalising the adjustment speed itself would
+bias the long-run reading, exactly the quantity this whole library
+exists to get right. Only the short-run lag terms and the long-run
+levels themselves are candidates for shrinkage.
+
+**`best_model` is always re-estimated by plain OLS, never with the
+penalty.** The regularisation path chooses the order; it never produces
+the reported coefficients — reporting penalised coefficients as final
+would bias the long-run standard errors downward in an undocumented
+way, a known trap in the post-selection literature. Classical inference
+on `best_model` still ignores the selection's own uncertainty
+("post-selection inference", a distinct literature not addressed here).
+
+`alpha="cv"` selects the penalty by **rolling-origin** (expanding
+window) cross-validation, never a random split, which would break the
+time structure. Estimation is a plain NumPy cyclic coordinate descent
+(Friedman, Hastie & Tibshirani 2010) — no new runtime dependency;
+`scikit-learn`/`glmnet` are used only in the external validation
+script, never at runtime.
+
+**Out of scope**: regularization applied to a panel (specs 22-24 — each
+individual would potentially need its own `alpha`, not addressed) and
+to NARDL/QARDL (joint selection of order and asymmetry/quantile, a
+distinct combinatorial problem). See `docs/DEVIATIONS.md`.
+
 ## `ARDLResults`
 
 ### Regression output
