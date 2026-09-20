@@ -34,6 +34,8 @@ nav:
       - Fourier-ADL cointegration: api/fourier-adl.md
       - Unified analysis: api/unified.md
       - Heterogeneous panels: api/panel.md
+      - System ARDL (SUR-ECM): api/system.md
+      - Bayesian ARDL (Minnesota prior): api/bayesian.md
       - Native backend: api/backend.md
 theme:
   name: material

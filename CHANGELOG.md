@@ -7,6 +7,45 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Added
 
+- `pyardl.bayesian.BayesianARDL(y, x, order, det='const',
+  prior='minnesota', tau='cv', decay=1.0, n_draws=5000, seed=None)`:
+  Minnesota prior (Litterman 1986) on the UECM's short-run coefficients
+  only — the deterministic terms, the error-correction coefficient
+  `lambda` and the long-run levels stay diffuse, the same
+  non-penalisation discipline as `pyardl.regularized` (spec 41), for
+  the same reason. Closed-form conjugate normal-inverse-gamma
+  posterior (no MCMC); the posterior mean is an augmented
+  least-squares solve (`numpy.linalg.lstsq` on the design stacked with
+  the prior precision), never an explicit `inv(X'X)`, and posterior
+  samples reuse the same QR factor rather than inverting it.
+  `longrun_posterior` gives the posterior distribution of
+  `theta = -gamma/lambda` by direct simulation, compared side by side
+  with the delta-method interval via
+  `BayesianARDLResults.compare_to_delta_method()`. `tau` is selected by
+  rolling-origin CV or by maximising the closed-form marginal
+  likelihood ("evidence"); `tau` and `decay` are never searched
+  jointly — see `docs/DEVIATIONS.md`. Deviates from the classical
+  Minnesota convention of centering a variable's own first lag at 1:
+  here `lambda` already carries all persistence, so every informative
+  coefficient is centered at prior mean zero instead (documented, see
+  `docs/DEVIATIONS.md`).
+- `pyardl.system.SystemARDL(equations, det='const', iterate=True,
+  max_iter=50, tol=1e-8)`: SUR-ECM, joint FGLS estimation of several
+  already-specified single-equation ARDL/ECMs linked by contemporaneous
+  residual correlation (Zellner 1962) — distinct from Johansen
+  (`pyardl.cointegration.johansen`), which estimates a full VAR system
+  with an estimated cointegration rank. Reuses `pyardl.core.ardl.ARDL`
+  unchanged for the per-equation OLS step and design construction; the
+  GLS re-estimation whitens the stacked system by a Cholesky-based
+  `Sigma_hat^{-1/2}` (a small `M x M` solve) and solves it with a single
+  `numpy.linalg.lstsq` call, iterated to convergence when
+  `iterate=True`. `SystemARDLResults.efficiency_gain(name)` compares
+  FGLS to per-equation OLS standard errors;
+  `test_cross_equation_restriction(r_matrix, r)` runs a Wald test on
+  the raw stacked UECM coefficients (not the long-run ratio — see
+  `docs/DEVIATIONS.md`). Validated against R `systemfit::systemfit
+  (method="SUR")` to 1e-6 on coefficients on a shared two-equation
+  system (`tests/replication/test_spec38.py`).
 - `pyardl.regularized.select_order_regularized(y, x, max_p=4, max_q=4,
   method='elastic_net', l1_ratio=1.0, alpha='cv', det='const')`: LASSO/
   Elastic Net order selection, an alternative to `ARDL.select_order` for
