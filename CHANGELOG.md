@@ -7,6 +7,21 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Added
 
+- `pyardl.panel.pedroni(df, y, X, id, time, det='const', n_boot=499,
+  seed=None)` and `pyardl.panel.westerlund(df, y, X, id, time,
+  n_boot=499, seed=None, cd_pvalue=None)`: panel cointegration tests
+  with opposite null hypotheses (Pedroni: residual unit root; Westerlund:
+  no error correction). Bootstrap-only critical values — Pedroni's
+  published standardising moments are not encoded (not held with a
+  verified provenance, CLAUDE.md rule 9); two representative statistics
+  per test implemented rather than the full seven/four (`panel_adf`/
+  `group_adf`, `group_tau`/`panel_tau`), see `docs/DEVIATIONS.md`. The
+  bootstrap null regenerates each individual's own `[y_i, x_i]`
+  independently (per-individual VAR-in-differences), the same corrected
+  pattern as `gregory_hansen`/`enders_siklos`, not a resampled residual
+  in isolation. `westerlund(..., cd_pvalue=...)` warns when a prior
+  `cd_test` (spec 24) rejected cross-sectional independence, per spec 37
+  §2.3.
 - `pyardl.panel.MeanGroupQARDL(df, y, X, id, time, taus=..., order=(1,1),
   ...)`: Mean-Group QARDL, composing `pyardl.qardl.QARDL` (per
   individual, same tau grid for every individual) with the Mean-Group

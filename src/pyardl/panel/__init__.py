@@ -8,6 +8,12 @@ estimators here own no regression of their own — they orchestrate
 :class:`pyardl.ARDL` over individuals and aggregate what comes back.
 """
 
+from pyardl.panel.coint_tests import (
+    PedroniResults,
+    WesterlundResults,
+    pedroni,
+    westerlund,
+)
 from pyardl.panel.container import PanelData, PanelUnit, panel_from_frame
 from pyardl.panel.crosssection import (
     CDResult,
@@ -48,10 +54,14 @@ __all__ = [
     "PMGResults",
     "PanelData",
     "PanelUnit",
+    "PedroniResults",
+    "WesterlundResults",
     "cd_test",
     "compare",
     "cross_section_averages",
     "default_cs_lags",
     "hausman",
     "panel_from_frame",
+    "pedroni",
+    "westerlund",
 ]

@@ -760,11 +760,56 @@ just orchestration — not implemented here. Combining with CS-ARDL/CS-DL
 (cross-sectional dependence) or with QARDL (which already has its own
 single-series QNARDL extension) are both explicitly out of scope.
 
+## Pedroni and Westerlund — testing panel cointegration before estimating it
+
+CS-ARDL/CS-DL and MG/PMG all **estimate** a panel long run, implicitly
+assuming it exists. `pedroni` and `westerlund` **test** that assumption
+first — the panel analogue of the bounds test or Engle-Granger — with
+**opposite** null hypotheses, both worth running rather than one
+substituting for the other:
+
+```python
+from pyardl.panel import pedroni, westerlund
+
+res_p = pedroni(df, y="y", X=["x"], id="id", time="t")
+res_p.panel_adf, res_p.group_adf    # within- and between-dimension statistics
+res_p.decision("panel_adf", alpha=0.05)
+
+res_w = westerlund(df, y="y", X=["x"], id="id", time="t", cd_pvalue=cd_test(...).pvalue)
+res_w.group_tau, res_w.panel_tau
+```
+
+- **Pedroni**: `H0` = no cointegration — a residual unit root for every
+  individual, the panel analogue of Engle-Granger, with a
+  **heterogeneous** first-stage `beta_i` (consistent with this
+  project's Mean-Group philosophy, not a pooled regression).
+- **Westerlund**: `H0` = no cointegration, built on the existence of an
+  **error-correction term** rather than a residual unit root — closer
+  in spirit to the ECM t-test transposed to a panel.
+
+Both are bootstrap-only: Pedroni's published standardising moments
+(needed to interpret `v`/`rho`-type statistics against an asymptotic
+table) are not held with a verified provenance, so only the two
+statistics per family that need no such moments to construct —
+`panel_adf`/`group_adf` and `group_tau`/`panel_tau`, the t-type
+statistics most reported in applied work — are implemented, and their
+critical values come from a bootstrap that regenerates each
+individual's own `[y_i, x_i]` independently (the corrected null pattern
+[Gregory-Hansen](cointegration.md#gregory-hansen-cointegration-with-an-unknown-regime-shift)
+uses, not a resampled residual in isolation). See `docs/DEVIATIONS.md`.
+
+**Pass `cd_pvalue` from a prior `cd_test` (spec 24).** Both tests
+assume cross-sectional independence in their classical form — the
+assumption CS-ARDL's augmented cross-section averages exist to relax.
+`westerlund(..., cd_pvalue=...)` warns explicitly when that assumption
+was rejected rather than letting it pass silently.
+
 ## Closing note
 
-The panel branch is complete: MG, PMG, DFE, CS-ARDL, CS-DL and
-Mean-Group NARDL all share one container and one per-individual loop,
-and one aggregation rule.
+The panel branch is complete: MG, PMG, DFE, CS-ARDL, CS-DL, Mean-Group
+NARDL, Mean-Group QARDL, and the Pedroni/Westerlund cointegration tests
+all share one container and one per-individual loop, and one
+aggregation rule.
 
 What is *not* here, and is flagged rather than omitted silently: the
 strong/weak dependence exponent of Bailey, Kapetanios and Pesaran, which
