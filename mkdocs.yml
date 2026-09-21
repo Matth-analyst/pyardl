@@ -36,6 +36,8 @@ nav:
       - Heterogeneous panels: api/panel.md
       - System ARDL (SUR-ECM): api/system.md
       - Bayesian ARDL (Minnesota prior): api/bayesian.md
+      - Markov-Switching ARDL: api/markov_switching.md
+      - ARDL-GARCH: api/volatility.md
       - Native backend: api/backend.md
 theme:
   name: material

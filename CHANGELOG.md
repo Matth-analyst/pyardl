@@ -7,6 +7,37 @@ This project follows [semantic versioning](https://semver.org/).
 
 ### Added
 
+- `pyardl.volatility.ARDLGarch(y, x, order=(1, 1), det='const',
+  garch_order=(1, 1), garch_type='garch', in_mean=False)`: joint
+  maximum-likelihood estimation of a UECM conditional mean and a
+  GARCH/EGARCH/GJR-GARCH conditional variance (Engle 1982, Bollerslev
+  1986). Reuses `arch.univariate.LS` as the estimation engine (`arch`
+  stays an optional, lazily-imported dependency, the same status it
+  already had for bootstrap validation). `longrun` standard errors use
+  the delta method on the **joint** MLE covariance matrix, not the OLS
+  covariance `ARDLResults.longrun` (spec 03) uses. Warns
+  (`PyardlMethodologyWarning`) when `alpha+beta` persistence exceeds
+  0.98 (near-integrated variance, IGARCH). `garch_order=(0, 0)` fits a
+  constant variance and matches plain `ARDL` on the mean parameters
+  exactly. GARCH-in-mean (`in_mean=True`) is not implemented — raises
+  `NotImplementedError`, see `docs/DEVIATIONS.md`.
+- `pyardl.markov_switching.ms_ardl(y, x, order=(1, 1), n_states=2,
+  det='const', method='em', n_starts=3, max_iter=1000, tol=1e-6,
+  seed=None)`: Markov-switching UECM (Hamilton 1989) — coefficients and
+  residual variance driven by an unobserved regime following a
+  first-order Markov chain, distinct from STAR (spec 34, observed
+  transition variable). Wraps
+  `statsmodels.tsa.regime_switching.markov_regression.MarkovRegression`
+  as the estimation engine (the Hamilton filter/Kim 1994 smoother/EM
+  loop this spec calls for is a genuinely new engine absent elsewhere
+  in the library; `statsmodels` is an existing required dependency).
+  `method='em'` fits by pure EM to convergence rather than a short EM
+  warm-up plus direct BFGS, which was found to diverge on ordinary
+  synthetic data. Restarts (`n_starts`) are drawn with an explicit
+  `numpy.random.Generator`, never `statsmodels`' own global-state
+  `search_reps`. Warns above `n_states=3` (identification degrades
+  fast). The regime-specific long-run ratio is out of scope, see
+  `docs/DEVIATIONS.md`.
 - `pyardl.bayesian.BayesianARDL(y, x, order, det='const',
   prior='minnesota', tau='cv', decay=1.0, n_draws=5000, seed=None)`:
   Minnesota prior (Litterman 1986) on the UECM's short-run coefficients
