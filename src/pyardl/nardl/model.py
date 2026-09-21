@@ -169,7 +169,46 @@ def _multiplier_path(
 
 @dataclass(frozen=True)
 class NARDLResults:
-    """Outcome of a NARDL fit."""
+    """Outcome of a NARDL fit.
+
+    Parameters
+    ----------
+    model : NARDL
+        The model instance that produced this fit.
+    asym : tuple of str
+        Names of the regressors decomposed into positive/negative
+        partial sums (see :func:`~pyardl.nardl.decompose.partial_sums`).
+    threshold : Threshold
+        Threshold(s) used for the decomposition of each variable in
+        ``asym``.
+
+    Attributes
+    ----------
+    params : pandas.Series
+        Coefficients of the fitted unrestricted error-correction model
+        (UECM), indexed by term name — includes ``"{base}_pos.L*"`` and
+        ``"{base}_neg.L*"`` for each decomposed regressor.
+    uecm : pandas.DataFrame
+        :attr:`params` alongside standard errors (``se``) and t-ratios
+        (``t``), one row per term.
+    nobs : int
+        Number of observations in the estimation sample.
+    lam : float
+        Error-correction speed :math:`\\lambda` (negative under error
+        correction).
+    longrun_asym : pandas.DataFrame
+        Asymmetric long-run coefficients :math:`\\theta^+, \\theta^-`
+        (and their difference) for every decomposed regressor, with
+        delta-method standard errors that account for the joint
+        covariance of :math:`\\gamma^+, \\gamma^-, \\lambda`.
+
+    See Also
+    --------
+    NARDL.fit : produces this object.
+    asymmetry_tests : Wald tests of short- and long-run symmetry.
+    bounds_test : cointegration test with critical values simulated for
+        the decomposed null.
+    """
 
     model: NARDL
     _fit: Any = field(repr=False)
@@ -192,6 +231,12 @@ class NARDLResults:
 
     @property
     def nobs(self) -> int:
+        """Number of observations in the estimation sample.
+
+        Returns
+        -------
+        int
+        """
         return int(self._fit.nobs)
 
     @property
@@ -700,6 +745,13 @@ class NARDLBoundsResults:
 
     @property
     def decision(self) -> str:
+        """Verdict at :attr:`alpha` (see class docstring).
+
+        Returns
+        -------
+        str
+            ``"cointegration"`` or ``"no_cointegration"``.
+        """
         return (
             "cointegration"
             if self.f_stat > self.critical[self.alpha]

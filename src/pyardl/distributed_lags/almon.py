@@ -366,7 +366,69 @@ class AlmonModel:
 
 @dataclass(frozen=True)
 class AlmonResults:
-    """Outcome of an :class:`AlmonModel` fit."""
+    r"""Outcome of an :class:`AlmonModel` fit.
+
+    Parameters
+    ----------
+    model : AlmonModel
+        The model instance that produced this fit (carries ``q``, ``r``,
+        ``basis``, the endpoint constraints, ...).
+    cov_type : str
+        Covariance estimator used, ``"nonrobust"`` by default.
+    extra : dict
+        Diagnostic extras not part of the public contract (kept for
+        internal/debugging use).
+
+    Attributes
+    ----------
+    params_gamma : pandas.Series
+        Estimated polynomial coefficients :math:`\hat\gamma`, in the
+        internal (reparameterised) basis — see *Notes*.
+    intercept : float
+        Estimated constant term :math:`\hat\alpha`.
+    lag_weights : pandas.Series
+        The reconstructed lag weights :math:`\hat\beta_i`,
+        ``i = 0..q`` — the quantity of actual interest, basis-invariant.
+    bse_lag_weights : pandas.Series
+        Standard errors of :attr:`lag_weights`, same index.
+    resid : pandas.Series
+        OLS residuals of the Almon-variable regression.
+    nobs : int
+        Number of observations in :attr:`resid`.
+    ssr : float
+        Sum of squared residuals, ``resid @ resid``.
+    llf : float
+        Gaussian log-likelihood at the ML variance ``ssr / nobs``.
+    aic, bic, hqic : float
+        Information criteria on the same convention as
+        :attr:`~pyardl.core.ardl.ARDLResults.aic`
+        (``k = len(params_gamma) + 1``).
+    impact_multiplier : float
+        Contemporaneous effect, :math:`\hat\beta_0`.
+    longrun_multiplier : float
+        Total long-run effect, :math:`\sum_i \hat\beta_i` — a linear
+        form, so its standard error (:attr:`se_longrun_multiplier`) is
+        exact, unlike a Koyck-style ratio.
+    se_longrun_multiplier : float
+        Standard error of :attr:`longrun_multiplier`,
+        :math:`\sqrt{\iota' \hat V(\hat\beta) \iota}`.
+
+    Notes
+    -----
+    ``params_gamma`` lives in the internal basis (``(i/q)^j``, or
+    Chebyshev on request) used for numerical conditioning; its *values*
+    depend on that basis and on the endpoint reparameterisation.
+    ``lag_weights = H @ params_gamma`` does not depend on either, and is
+    the quantity every downstream method (:meth:`interim_multiplier`,
+    :meth:`mean_lag`, :attr:`longrun_multiplier`) is built from — read
+    the weights, not the raw gammas.
+
+    See Also
+    --------
+    AlmonModel.fit : produces this object.
+    polynomial_restriction_test : tests the polynomial restriction
+        against the unrestricted finite lag model.
+    """
 
     model: AlmonModel
     _coefs: FloatArray = field(repr=False)
@@ -382,6 +444,12 @@ class AlmonResults:
     # -------------------------- basics --------------------------------
     @property
     def nobs(self) -> int:
+        """Number of observations in :attr:`resid`.
+
+        Returns
+        -------
+        int
+        """
         return int(self._resid.shape[0])
 
     @property
@@ -391,17 +459,36 @@ class AlmonResults:
         Their *values* depend on ``basis`` and on the endpoint
         reparameterisation; :attr:`lag_weights` does not. Read the
         weights, not these.
+
+        Returns
+        -------
+        pandas.Series
+            Indexed ``["const", "gamma0", "gamma1", ...]``, named
+            ``"coef"``.
         """
         names = ["const"] + [f"gamma{j}" for j in range(self._coefs.size - 1)]
         return pd.Series(self._coefs, index=names, name="coef")
 
     @property
     def intercept(self) -> float:
+        """Estimated constant term.
+
+        Returns
+        -------
+        float
+        """
         return float(self._coefs[0])
 
     @property
     def lag_weights(self) -> pd.Series:
-        r"""The :math:`\hat\beta_i`, ``i = 0 .. q``."""
+        r"""The :math:`\hat\beta_i`, ``i = 0 .. q``.
+
+        Returns
+        -------
+        pandas.Series
+            Indexed by lag ``0..q`` (``RangeIndex``, name ``"lag"``),
+            named ``"beta"``.
+        """
         return pd.Series(
             self._weights,
             index=pd.RangeIndex(self.model.q + 1, name="lag"),
@@ -410,6 +497,13 @@ class AlmonResults:
 
     @property
     def bse_lag_weights(self) -> pd.Series:
+        """Standard errors of :attr:`lag_weights`.
+
+        Returns
+        -------
+        pandas.Series
+            Same index as :attr:`lag_weights`, named ``"se"``.
+        """
         return pd.Series(
             np.sqrt(np.diag(self._cov_weights)),
             index=pd.RangeIndex(self.model.q + 1, name="lag"),
@@ -418,14 +512,33 @@ class AlmonResults:
 
     @property
     def resid(self) -> pd.Series:
+        """OLS residuals of the Almon-variable regression.
+
+        Returns
+        -------
+        pandas.Series
+            Named ``"resid"``, length :attr:`nobs`.
+        """
         return pd.Series(self._resid, name="resid")
 
     @property
     def ssr(self) -> float:
+        """Sum of squared residuals, ``resid @ resid``.
+
+        Returns
+        -------
+        float
+        """
         return float(self._resid @ self._resid)
 
     @property
     def llf(self) -> float:
+        """Gaussian log-likelihood at the ML variance ``ssr / nobs``.
+
+        Returns
+        -------
+        float
+        """
         n = self.nobs
         return float(-n / 2 * (np.log(2 * np.pi * self.ssr / n) + 1))
 
@@ -435,19 +548,46 @@ class AlmonResults:
 
     @property
     def aic(self) -> float:
+        """Akaike information criterion.
+
+        ``k = len(params_gamma) + 1``, same convention as
+        :attr:`~pyardl.core.ardl.ARDLResults.aic`.
+
+        Returns
+        -------
+        float
+        """
         return float(-2 * self.llf + 2 * self._k_ic)
 
     @property
     def bic(self) -> float:
+        """Bayesian (Schwarz) information criterion.
+
+        Returns
+        -------
+        float
+        """
         return float(-2 * self.llf + np.log(self.nobs) * self._k_ic)
 
     @property
     def hqic(self) -> float:
+        """Hannan-Quinn information criterion.
+
+        Returns
+        -------
+        float
+        """
         return float(-2 * self.llf + 2 * np.log(np.log(self.nobs)) * self._k_ic)
 
     # -------------------------- multipliers ---------------------------
     @property
     def impact_multiplier(self) -> float:
+        r"""Contemporaneous effect, :math:`\hat\beta_0`.
+
+        Returns
+        -------
+        float
+        """
         return float(self._weights[0])
 
     @property
@@ -458,11 +598,24 @@ class AlmonResults:
         method, this one is a sum of the estimated weights. Its variance
         is :math:`\iota' V(\hat\beta) \iota` with no approximation
         anywhere.
+
+        Returns
+        -------
+        float
         """
         return float(np.sum(self._weights))
 
     @property
     def se_longrun_multiplier(self) -> float:
+        """Standard error of :attr:`longrun_multiplier`.
+
+        ``sqrt(ones @ cov_weights @ ones)`` — exact, since the long-run
+        multiplier is a linear form in :attr:`lag_weights`.
+
+        Returns
+        -------
+        float
+        """
         ones = np.ones(self._weights.size, dtype=np.float64)
         return float(np.sqrt(ones @ self._cov_weights @ ones))
 

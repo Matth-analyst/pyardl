@@ -696,12 +696,96 @@ class GETSResults:
 
 @dataclass(frozen=True)
 class ARDLResults:
-    """Results of an ARDL fit.
+    """Results of an ARDL fit, estimated by :meth:`ARDL.fit`.
 
-    Besides the usual regression output (``params``, ``bse``, ``tvalues``,
-    ``pvalues``, ``resid``, ``aic``/``bic``/``hqic``, ``rsquared``), this
-    object exposes the error-correction views of the same fit:
-    :meth:`to_ecm`, :attr:`longrun` and :attr:`adjustment`.
+    An immutable container: every quantity below is derived, on access,
+    from the four private arrays stored on the instance (``_params``,
+    ``_cov_params``, ``_param_names``, ``_resid``) plus a back-reference
+    to the fitted :class:`ARDL` model. Nothing here mutates the model or
+    is mutated after ``fit()`` returns.
+
+    Parameters
+    ----------
+    model : ARDL
+        The model instance that produced this fit (carries ``y``, ``x``,
+        ``order``, ``det``, ``hold_back``, ...).
+    cov_type : str
+        Covariance estimator actually used, one of ``"nonrobust"``,
+        ``"HC0"``-``"HC3"`` or ``"HAC"`` — echoes the ``cov_type``
+        argument passed to :meth:`ARDL.fit`.
+
+    Attributes
+    ----------
+    params : pandas.Series
+        Estimated coefficients, indexed by parameter name (see *Notes*).
+    cov_params_matrix : pandas.DataFrame
+        Full covariance matrix of ``params``, same index and columns.
+    bse : pandas.Series
+        Standard errors, ``sqrt(diag(cov_params_matrix))``.
+    tvalues : pandas.Series
+        ``params / bse``.
+    pvalues : pandas.Series
+        Two-sided p-values from a Student-t distribution with
+        ``nobs - k`` degrees of freedom, ``k = len(params)``.
+    resid : pandas.Series
+        Residuals on the estimation sample, indexed like the input
+        series restricted to ``[hold_back:]``.
+    fittedvalues : pandas.Series
+        ``y - resid`` on the same index as ``resid``.
+    nobs : int
+        Number of observations actually used in estimation.
+    ssr : float
+        Sum of squared residuals.
+    sigma2 : float
+        Maximum-likelihood error variance, ``ssr / nobs`` (divides by
+        ``nobs``, not ``nobs - k``).
+    llf : float
+        Gaussian log-likelihood evaluated at ``sigma2``.
+    aic, bic, hqic : float
+        Information criteria, ``-2 * llf + 2 * k`` (AIC),
+        ``-2 * llf + log(nobs) * k`` (BIC) and
+        ``-2 * llf + 2 * k * log(log(nobs))`` (HQIC), with
+        ``k = len(params) + 1`` (the ``+1`` counts ``sigma2`` itself,
+        matching the ``statsmodels`` convention).
+    rsquared, rsquared_adj : float
+        Coefficient of determination and its degrees-of-freedom-adjusted
+        version, computed against the total sum of squares of the
+        dependent variable on the estimation sample.
+    ar_roots : numpy.ndarray of complex128
+        Roots of the autoregressive polynomial
+        ``1 - phi_1 L - ... - phi_p L^p``. Empty when ``p == 0``.
+    is_stable : bool
+        ``True`` iff every root in ``ar_roots`` lies strictly outside the
+        unit circle; issues a
+        :class:`~pyardl.exceptions.PyardlMethodologyWarning` when it does
+        not, since the long-run quantities below then have no
+        equilibrium interpretation.
+    ardl_params : pyardl.core.transforms.ARDLParams
+        Coefficients repackaged for the error-correction algebra
+        (:func:`~pyardl.core.transforms.ardl_to_ecm` and the long-run
+        helpers). Raises if ``p == 0`` or the model has
+        ``fixed_regressors``.
+    longrun : pandas.DataFrame
+        Long-run coefficients ``theta`` with delta-method standard
+        errors ``se``, one row per regressor.
+    adjustment : pandas.Series
+        ``lambda`` (the error-correction speed, negative when the model
+        is stable), its delta-method ``se``, and ``half_life`` in
+        periods.
+
+    Notes
+    -----
+    Parameter names follow ``statsmodels.tsa.ardl.ARDL``: ``"const"``,
+    ``"trend"``, ``"season.k"`` (seasonal dummies, only the periods not
+    absorbed by the intercept), ``"{y_name}.L{i}"`` for ``i = 1..p``,
+    ``"{x_name}.L{i}"`` for ``i = 0..q_j`` per regressor, then any fixed
+    regressor names — in that column order. Use ``params.index`` to read
+    off the exact names for a given fit rather than reconstructing them.
+
+    See Also
+    --------
+    ARDL.fit : produces this object.
+    to_ecm : the same fit, reparameterised as an error-correction model.
     """
 
     model: ARDL
@@ -716,26 +800,70 @@ class ARDLResults:
     # -------------------------- basic statistics ----------------------
     @property
     def params(self) -> pd.Series:
+        """Estimated coefficients.
+
+        Returns
+        -------
+        pandas.Series
+            Indexed by parameter name (see the class *Notes*), named
+            ``"coef"``.
+        """
         return pd.Series(self._params, index=self._param_names, name="coef")
 
     @property
     def cov_params_matrix(self) -> pd.DataFrame:
+        """Covariance matrix of :attr:`params`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Square, indexed and columned by parameter name, in the same
+            order as :attr:`params`.
+        """
         return pd.DataFrame(
             self._cov_params, index=self._param_names, columns=self._param_names
         )
 
     @property
     def bse(self) -> pd.Series:
+        """Standard errors of :attr:`params`.
+
+        Returns
+        -------
+        pandas.Series
+            ``sqrt(diag(cov_params_matrix))``, same index as
+            :attr:`params`, named ``"se"``.
+        """
         return pd.Series(
             np.sqrt(np.diag(self._cov_params)), index=self._param_names, name="se"
         )
 
     @property
     def tvalues(self) -> pd.Series:
+        """t-statistics for :attr:`params`, ``params / bse``.
+
+        Returns
+        -------
+        pandas.Series
+            Same index as :attr:`params`.
+        """
         return self.params / self.bse
 
     @property
     def pvalues(self) -> pd.Series:
+        """Two-sided p-values for :attr:`tvalues`.
+
+        Computed against a Student-t distribution with
+        ``nobs - len(params)`` degrees of freedom — the usual OLS
+        reference distribution, valid whatever ``cov_type`` was used to
+        build :attr:`bse` (only the variance estimator changes, not the
+        reference distribution).
+
+        Returns
+        -------
+        pandas.Series
+            Same index as :attr:`params`, named ``"pvalue"``.
+        """
         from scipy.stats import t as t_dist
 
         df = self.nobs - len(self._params)
@@ -747,6 +875,16 @@ class ARDLResults:
 
     @property
     def resid(self) -> pd.Series:
+        """Residuals on the estimation sample.
+
+        Returns
+        -------
+        pandas.Series
+            Named ``"resid"``, indexed like the input ``y`` restricted to
+            ``[hold_back:]`` (the original ``DatetimeIndex``/``Index`` if
+            ``y`` carried one, otherwise a ``RangeIndex`` starting at
+            ``hold_back``). Length equals :attr:`nobs`.
+        """
         index = (
             self.model._index[self.model.hold_back :]
             if self.model._index is not None
@@ -756,6 +894,13 @@ class ARDLResults:
 
     @property
     def fittedvalues(self) -> pd.Series:
+        """Fitted values on the estimation sample, ``y - resid``.
+
+        Returns
+        -------
+        pandas.Series
+            Named ``"fitted"``, same index as :attr:`resid`.
+        """
         return pd.Series(
             self.model._y[self.model.hold_back :] - self._resid,
             index=self.resid.index,
@@ -764,24 +909,52 @@ class ARDLResults:
 
     @property
     def nobs(self) -> int:
-        """Size of the actual estimation sample.
+        """Size of the actual estimation sample, ``T - hold_back``.
 
-        Differs from the statsmodels convention when ``max(q) > p``; see
-        the module documentation.
+        Differs from the ``statsmodels`` convention (which reports
+        ``T - p``) when ``max(q_j) > p``; see the module documentation.
+
+        Returns
+        -------
+        int
         """
         return len(self._resid)
 
     @property
     def ssr(self) -> float:
+        """Sum of squared residuals, ``sum(resid ** 2)``.
+
+        Returns
+        -------
+        float
+        """
         return self._ssr
 
     @property
     def sigma2(self) -> float:
-        """Variance ML des erreurs : SSR / nobs."""
+        """Maximum-likelihood error variance, ``ssr / nobs``.
+
+        Divides by ``nobs``, not the unbiased ``nobs - k``; this is the
+        variance implied by the Gaussian likelihood used in :attr:`llf`
+        and the information criteria, matching ``statsmodels``.
+
+        Returns
+        -------
+        float
+        """
         return self._ssr / self.nobs
 
     @property
     def llf(self) -> float:
+        """Gaussian log-likelihood at the ML estimates.
+
+        ``-nobs / 2 * (log(2 * pi * sigma2) + 1)``, i.e. the exact
+        maximum of the Gaussian log-likelihood given :attr:`sigma2`.
+
+        Returns
+        -------
+        float
+        """
         return float(-self.nobs / 2 * (np.log(2 * np.pi * self.sigma2) + 1))
 
     @property
@@ -790,24 +963,69 @@ class ARDLResults:
 
     @property
     def aic(self) -> float:
+        """Akaike information criterion, ``-2 * llf + 2 * k``.
+
+        ``k = len(params) + 1``, the ``+1`` counting :attr:`sigma2` as an
+        estimated parameter (the ``statsmodels`` convention).
+
+        Returns
+        -------
+        float
+        """
         return -2 * self.llf + 2 * self._k_ic
 
     @property
     def bic(self) -> float:
+        """Bayesian (Schwarz) information criterion.
+
+        ``-2 * llf + log(nobs) * k``, with ``k`` as in :attr:`aic`.
+
+        Returns
+        -------
+        float
+        """
         return -2 * self.llf + float(np.log(self.nobs)) * self._k_ic
 
     @property
     def hqic(self) -> float:
+        """Hannan-Quinn information criterion.
+
+        ``-2 * llf + 2 * k * log(log(nobs))``, with ``k`` as in
+        :attr:`aic`.
+
+        Returns
+        -------
+        float
+        """
         return -2 * self.llf + 2 * self._k_ic * float(np.log(np.log(self.nobs)))
 
     @property
     def rsquared(self) -> float:
+        """Coefficient of determination, ``1 - ssr / tss``.
+
+        ``tss`` is the total sum of squares of the dependent variable on
+        the estimation sample, ``sum((y - mean(y)) ** 2)``.
+
+        Returns
+        -------
+        float
+        """
         y_dep = self.model._y[self.model.hold_back :]
         tss = float(np.sum((y_dep - y_dep.mean()) ** 2))
         return 1.0 - self._ssr / tss
 
     @property
     def rsquared_adj(self) -> float:
+        """Degrees-of-freedom-adjusted :attr:`rsquared`.
+
+        ``1 - (1 - rsquared) * (nobs - 1) / (nobs - k)``, ``k =
+        len(params)`` (unlike :attr:`aic`'s ``k``, ``sigma2`` is not
+        counted here — the usual adjusted-:math:`R^2` convention).
+
+        Returns
+        -------
+        float
+        """
         k = len(self._params)
         return 1.0 - (1.0 - self.rsquared) * (self.nobs - 1) / (self.nobs - k)
 

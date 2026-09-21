@@ -79,10 +79,25 @@ class PanelUnit:
 
     @property
     def nobs(self) -> int:
+        """Rows available before any lag is taken.
+
+        Returns
+        -------
+        int
+        """
         return int(self.y.shape[0])
 
     @property
     def has_time_gaps(self) -> bool:
+        """Whether the time index skips periods.
+
+        A dynamic model lags by row position, so a gap makes some
+        "lags" span more than one period.
+
+        Returns
+        -------
+        bool
+        """
         idx = self.y.index
         if idx.size < 3:
             return False
@@ -112,6 +127,8 @@ class PanelData:
         validation. Never empty silently: a results table reporting
         ``N = 22`` out of 24 can always say which two are missing and
         why.
+    n_units : int
+        Number of retained individuals, ``len(units)``.
     unbalanced : bool
         Whether the retained individuals have different sample lengths.
     """
@@ -144,6 +161,12 @@ class PanelData:
 
     @property
     def n_units(self) -> int:
+        """Number of retained individuals.
+
+        Returns
+        -------
+        int
+        """
         return len(self.units)
 
     @property
@@ -157,6 +180,12 @@ class PanelData:
 
     @property
     def unbalanced(self) -> bool:
+        """Whether the retained individuals have different sample lengths.
+
+        Returns
+        -------
+        bool
+        """
         return bool(self.sample_sizes.nunique() > 1)
 
     @property

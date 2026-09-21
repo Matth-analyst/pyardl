@@ -166,6 +166,12 @@ class NullDGP:
 
     @property
     def var_order(self) -> int:
+        """Lag order of the marginal VAR generating the regressors.
+
+        Returns
+        -------
+        int
+        """
         return int(self.x_ar.shape[0])
 
 

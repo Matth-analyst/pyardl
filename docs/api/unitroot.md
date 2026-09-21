@@ -32,16 +32,14 @@ The everyday entry point: pre-test every column and tabulate the
 verdicts.
 
 ```python
-from pyardl.unitroot import report
+>>> from pyardl.unitroot import report
+>>> from pyardl.datasets import load_denmark
+>>> data = load_denmark()[["LRM", "LRY"]]
+>>> print(report(data).reset_index().to_string(index=False))
+variable order dfgls_level decision_level dfgls_diff decision_diff mzt_level lags_level
+     LRM  I(1)   -1.047542      unit_root  -2.378078    stationary -1.152137          2
+     LRY  I(1)   -0.819062      unit_root  -4.630152    stationary -0.813225          0
 
-print(report(data))
-```
-
-```text
-          order  dfgls_level decision_level  dfgls_diff  mzt_level  lags_level
-variable
-LRM        I(1)      -1.4322      unit_root     -6.9187    -1.5573           0
-LRY        I(1)      -0.8410      unit_root     -8.2044    -0.9127           0
 ```
 
 A `PyardlMethodologyWarning` is raised as soon as one series is
@@ -67,17 +65,17 @@ asserting an order of integration the data cannot establish.
 ## `dfgls(y, trend='c', lags=None, method='maic', max_lags=None)`
 
 ```python
-from pyardl.unitroot import dfgls
-
-res = dfgls(y, trend="ct")
-print(res.summary())
-```
-
-```text
-DF-GLS (Elliott, Rothenberg & Stock 1996) - trend 'ct', lags=1 (maic), nobs=198
-  statistic = -1.9333   decision (5%): unit_root
-  critical values (left tail)   1%: -3.6070  5%: -3.0194  10%: -2.7307
+>>> import numpy as np
+>>> from pyardl.unitroot import dfgls
+>>> rng = np.random.default_rng(0)
+>>> y = np.cumsum(rng.standard_normal(200))
+>>> res = dfgls(y, trend="ct")
+>>> print(res.summary())
+DF-GLS (Elliott, Rothenberg & Stock 1996) - trend 'ct', lags=0 (maic), nobs=199
+  statistic = -1.5443   decision (5%): unit_root
+  critical values (left tail)   1%: -3.5142  5%: -2.9390  10%: -2.6494
   H0: the series has a unit root
+
 ```
 
 Left-tailed: a large negative statistic is evidence *against* the unit
@@ -90,19 +88,24 @@ series under `"c"` will almost never reject, whatever the truth.
 
 ## `ng_perron(y, trend='c', lags=None, method='maic', max_lags=None)`
 
-Four statistics sharing one long-run variance estimate.
+Four statistics sharing one long-run variance estimate — same `y` as
+above, this time with `trend="c"`:
 
-```text
+```python
+>>> from pyardl.unitroot import ng_perron
+>>> res = ng_perron(y, trend="c")
+>>> print(res.summary())
 Ng-Perron M tests (2001) - trend 'c', lags=0 (maic), nobs=199
-  long-run variance (autoregressive): 0.9812
-
-  statistic          value    5% bound  decision (5%)
-  MZa              -3.4211    -8.0399   unit_root
-  MZt              -1.2617    -2.0150   unit_root
-  MSB               0.3688     0.2337   unit_root
-  MPT               7.2415     3.1704   unit_root
-
+  long-run variance (autoregressive): 0.9272
+<BLANKLINE>
+  statistic        value    5% bound  decision (5%)
+  MZa            -2.6804     -8.6303  unit_root
+  MZt            -1.1461     -2.0150  unit_root
+  MSB             0.4276      0.2295  unit_root
+  MPT             9.0981      3.0866  unit_root
+<BLANKLINE>
   H0: the series has a unit root (reject when below)
+
 ```
 
 All four are lower-tail: reject when the statistic falls below its

@@ -233,24 +233,41 @@ The economics is that long-run relations often come from theory — a
 budget constraint, an arbitrage condition — which applies to everyone,
 while the speed at which each country returns to it plainly does not.
 
+A panel where `theta` is genuinely common across individuals and only
+the short-run dynamics (`lambda_i`, the intercept, the noise scale)
+differ — exactly the world PMG is built for:
+
 ```python
-from pyardl.panel import PMG
-
-res = PMG(df, y="y", X=["x"], id="id", time="t", order=(1, 1)).fit()
-print(res.summary())
-```
-
-```text
+>>> import numpy as np, pandas as pd
+>>> from pyardl.panel import PMG
+>>> rng = np.random.default_rng(20260829)
+>>> n_units, n_obs, theta = 25, 60, 0.75
+>>> rows = []
+>>> for i in range(n_units):
+...     lam = min(-0.45 + 0.10 * rng.normal(), -0.05)
+...     mu = 0.30 * rng.normal()
+...     sigma = abs(0.40 + 0.10 * rng.normal())
+...     x = np.cumsum(rng.normal(size=n_obs))
+...     y = np.zeros(n_obs)
+...     for t in range(1, n_obs):
+...         y[t] = y[t - 1] + mu + lam * (y[t - 1] - theta * x[t - 1]) + rng.normal(scale=sigma)
+...     rows.append(pd.DataFrame({"id": f"u{i:02d}", "t": np.arange(n_obs), "y": y, "x": x}))
+>>> df = pd.concat(rows, ignore_index=True)
+>>> res = PMG(df, y="y", X=["x"], id="id", time="t", order=(1, 1)).fit()
+>>> print(res.summary())
 Pooled Mean Group (Pesaran, Shin & Smith 1999) - 25 individuals, 1475 observations
   method: backfitting, converged in 29 iterations
   log-likelihood: -636.177651
   long-run coefficients POOLED; short-run dynamics free
-
+<BLANKLINE>
   Long-run coefficients (common)
                        theta          se         z         p
     x                 0.7520      0.0065   115.652    0.0000
-
+<BLANKLINE>
   Mean adjustment speed: -0.4344 (se 0.0142, between-individual)
+<BLANKLINE>
+  Assumes individuals are independent of each other. Common shocks (a world cycle, a commodity price) break it and bias both PMG and MG. Nothing in this module corrects for that yet; a CD test on the residuals is the usual way to find out whether it bites.
+
 ```
 
 ### How it is estimated

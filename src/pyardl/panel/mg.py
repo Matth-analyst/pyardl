@@ -182,6 +182,12 @@ class MeanGroupResults:
 
     @property
     def n_units(self) -> int:
+        """Individuals actually averaged into :attr:`longrun` (excludes :attr:`failed`).
+
+        Returns
+        -------
+        int
+        """
         return int(self.theta_i.shape[0])
 
     @property

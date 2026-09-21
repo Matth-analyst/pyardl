@@ -25,42 +25,52 @@ change the hypothesis.
 
 ## Use
 
+A true cointegrating relationship with a logistic break of amplitude 4
+in the long-run intercept (`T = 150`, `λ = -0.3`, seed `20260824`):
+
 ```python
-from pyardl.fourier import fourier_bounds_test
-
-res = fourier_bounds_test(y, x, case=3, n_sims=2000, seed=42)
-print(res.summary())
-```
-
-```text
+>>> import numpy as np, pandas as pd
+>>> from pyardl.fourier import fourier_bounds_test
+>>> rng = np.random.default_rng(20260824)
+>>> n = 150
+>>> t = np.arange(1, n + 1)
+>>> x = np.cumsum(rng.normal(size=n))
+>>> shift = 4.0 / (1 + np.exp(-0.1 * (t - n / 2)))
+>>> y = np.zeros(n)
+>>> for i in range(1, n):
+...     y[i] = y[i - 1] - 0.3 * (y[i - 1] - x[i - 1] - shift[i - 1]) + rng.normal(
+...         scale=0.3)
+>>> res = fourier_bounds_test(pd.Series(y, name="y"),
+...                           pd.DataFrame({"x": x}), case=3, n_sims=2000, seed=42)
+>>> print(res.summary())
 Fourier-ADL cointegration test (Banerjee, Arcabic & Lee 2017) - case 3, k=1, ECM(1; x:1)
   frequency 1 (selected), 149 observations
   critical values: simulated WITH the frequency search inside the loop, n_sims=2000, seed=42
-
-  t_BDM = -11.0935   simulated p = 0.0005   decision (5%): cointegration
-
+<BLANKLINE>
+  t_BDM = -13.2363   simulated p = 0.0005   decision (5%): cointegration
+<BLANKLINE>
     alpha    critical
       0.1     -3.9263
      0.05     -4.2303
      0.01     -4.8164
-
-  pre-test on the Fourier terms: F = 44.1613, p = 0.0005, critical (5%) = 7.9807
+<BLANKLINE>
+  pre-test on the Fourier terms: F = 68.1075, p = 0.0005, critical (5%) = 7.9807
   The Fourier terms are significant: a smooth break is present and this test is the right one for it.
-```
 
-*(T = 150, λ = −0.3, logistic break of amplitude 4 in the long-run
-intercept, seed 20260824.)*
+```
 
 `res.selection` carries the whole grid, so the margin of the winning
 frequency is visible rather than implied:
 
-```text
+```python
+>>> print(res.selection.to_string(index=False))
  freq       ssr
-  1.0 26.667115
-  3.0 41.871068
-  4.0 42.767916
-  2.0 42.872908
-  5.0 43.078421
+  1.0 16.462453
+  3.0 30.709057
+  4.0 31.487421
+  2.0 31.830769
+  5.0 32.091650
+
 ```
 
 All five PSS deterministic cases are supported, and `freq=1.0` fixes the

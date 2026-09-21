@@ -364,6 +364,15 @@ class HausmanResult:
         return "do not reject homogeneity: PMG is consistent and efficient"
 
     def summary(self) -> str:
+        """Publication-style text summary of the test.
+
+        Returns
+        -------
+        str
+            Multi-line report: hypotheses, the chi-squared statistic and
+            p-value, the decision, and a note when a pseudo-inverse was
+            needed for the variance difference.
+        """
         lines = [
             "Hausman test, MG versus PMG (Pesaran, Shin & Smith 1999)",
             "  H0: the long-run coefficients are common across individuals",
@@ -459,7 +468,75 @@ def hausman(mg: MeanGroupResults, pmg: PMGResults) -> HausmanResult:
 
 @dataclass(frozen=True)
 class PMGResults:
-    """Pooled Mean Group estimates."""
+    """Pooled Mean Group estimates (Pesaran, Shin & Smith, 1999).
+
+    A single long-run vector ``theta`` is imposed across every
+    individual and estimated by concentrated maximum likelihood
+    (backfitting); the short-run dynamics (``lambda_i``, the lagged
+    -difference coefficients) stay free per individual. Contrast with
+    :class:`~pyardl.panel.mg.MeanGroupResults`, where nothing is pooled.
+
+    Attributes
+    ----------
+    longrun : pandas.DataFrame
+        The pooled long-run coefficients ``theta``, common to every
+        individual, with columns ``theta``, ``se``, ``z``, ``pvalue``,
+        ``ci_lower``, ``ci_upper``. Standard errors come from the
+        likelihood (``cov_theta``), **not** between-individual
+        dispersion — unlike :class:`~pyardl.panel.mg.MeanGroupResults`.
+    cov_theta : numpy.ndarray
+        Covariance matrix of ``longrun["theta"]``, same order as
+        ``longrun.index``. What :attr:`longrun`'s ``se`` column is
+        computed from.
+    adjustment : pandas.Series
+        ``{"lambda", "se", "share_non_adjusting"}`` — the mean of
+        :attr:`lambda_i` across individuals, its **between-individual**
+        standard error (a group average like Mean Group's, even though
+        ``theta`` itself is pooled), and the fraction of individuals
+        with ``lambda_i >= 0``.
+    lambda_i : pandas.Series
+        Individual error-correction speeds, indexed by unit key.
+    shortrun : pandas.DataFrame
+        One row per individual: ``lambda``, ``sigma2``, ``ssr``,
+        ``nobs``, and one column per short-run (lagged-difference)
+        regressor name.
+    sigma2_i : pandas.Series
+        Individual residual variances, indexed by unit key.
+    loglik : float
+        Concentrated log-likelihood at convergence (or at the last
+        iterate, if :attr:`converged` is ``False``).
+    vcov_kind : str
+        Covariance estimator used for :attr:`cov_theta`, echoing
+        :attr:`PMG.vcov`.
+    n_iter : int
+        Number of backfitting iterations run.
+    converged : bool
+        Whether the iteration met its convergence tolerance. When
+        ``False``, every quantity above is evaluated at wherever the
+        iteration stopped, not at a maximum.
+    iterations : pandas.DataFrame
+        One row per iteration, with the convergence criterion tracked at
+        each step — for diagnosing slow or failed convergence.
+    panel : pyardl.panel.container.PanelData
+        The validated panel the estimation ran on.
+    method : str
+        Estimation method, ``"backfitting"`` (the only one implemented).
+    n_units : int
+        Individuals in the panel (``lambda_i.size``).
+    nobs : int
+        Total observations pooled across individuals,
+        ``shortrun["nobs"].sum()``.
+    non_adjusting : pandas.Index
+        Keys of individuals with ``lambda_i >= 0``: they do not
+        error-correct, which the pooled ``theta`` is still partly
+        identified from since it is common across all individuals.
+
+    See Also
+    --------
+    PMG.fit : produces this object.
+    hausman : tests whether pooling the long run is warranted, against
+        :class:`~pyardl.panel.mg.MeanGroupResults`.
+    """
 
     longrun: pd.DataFrame
     cov_theta: FloatArray = field(repr=False)
@@ -477,22 +554,60 @@ class PMGResults:
 
     @property
     def n_units(self) -> int:
+        """Individuals in the panel, ``lambda_i.size``.
+
+        Returns
+        -------
+        int
+        """
         return int(self.lambda_i.size)
 
     @property
     def nobs(self) -> int:
+        """Total observations pooled across individuals.
+
+        Returns
+        -------
+        int
+            ``shortrun["nobs"].sum()``.
+        """
         return int(self.shortrun["nobs"].sum())
 
     @property
     def non_adjusting(self) -> pd.Index:
-        """Individuals whose adjustment speed is not negative."""
+        """Keys of individuals with ``lambda_i >= 0`` (see class docstring).
+
+        Returns
+        -------
+        pandas.Index
+        """
         return self.lambda_i.index[self.lambda_i >= 0]
 
     def hausman_vs_mg(self, mg: MeanGroupResults) -> HausmanResult:
-        """Convenience wrapper over :func:`hausman`."""
+        """Convenience wrapper over :func:`hausman`.
+
+        Parameters
+        ----------
+        mg : MeanGroupResults
+            Fitted on the same panel and the same regressors as this fit.
+
+        Returns
+        -------
+        HausmanResult
+        """
         return hausman(mg, self)
 
     def summary(self) -> str:
+        """Publication-style text summary of the fit.
+
+        Returns
+        -------
+        str
+            Multi-line report: convergence status, log-likelihood, the
+            pooled long-run table, mean adjustment speed, and warnings
+            for non-convergence, non-adjusting individuals, or
+            unmodelled cross-sectional dependence.
+        """
         lines = [
             f"Pooled Mean Group (Pesaran, Shin & Smith 1999) - "
             f"{self.n_units} individuals, {self.nobs} observations",
@@ -830,7 +945,43 @@ class PMG:
 
 @dataclass(frozen=True)
 class DFEResults:
-    """Dynamic fixed effects estimates."""
+    """Dynamic fixed effects estimates.
+
+    Every slope (the error-correction speed, the short-run and long-run
+    coefficients) is pooled across individuals; only the intercepts are
+    individual-specific, and are absorbed exactly by the within
+    (demeaning) transformation rather than estimated.
+
+    Attributes
+    ----------
+    longrun : pandas.DataFrame
+        Pooled long-run coefficients ``theta``, delta-method ``se``, one
+        row per regressor.
+    adjustment : pandas.Series
+        ``{"lambda", "se"}``, the pooled error-correction speed.
+    params : pandas.Series
+        Raw pooled short-run coefficients from the within-transformed
+        regression: ``"ec"`` (the error-correction term, ``lambda``
+        itself), ``"theta.{x}"`` for each regressor's contemporaneous
+        term, then the remaining short-run regressors (lagged
+        differences), indexed by term name.
+    bse : pandas.Series
+        Standard errors of :attr:`params`, same index.
+    loglik : float
+        Gaussian log-likelihood of the within-transformed model.
+    nobs : int
+        Total observations pooled across individuals, after the within
+        transformation.
+    n_units : int
+        Individuals included.
+    panel : pyardl.panel.container.PanelData
+        The validated panel the estimation ran on.
+
+    See Also
+    --------
+    DFE.fit : produces this object.
+    PMGResults : short-run dynamics free per individual instead of pooled.
+    """
 
     longrun: pd.DataFrame
     adjustment: pd.Series
@@ -842,6 +993,15 @@ class DFEResults:
     panel: PanelData = field(repr=False)
 
     def summary(self) -> str:
+        """Publication-style text summary of the fit.
+
+        Returns
+        -------
+        str
+            Multi-line report: the pooled long-run table, adjustment
+            speed, and a standing caveat that DFE is only consistent
+            under slope homogeneity.
+        """
         lines = [
             f"Dynamic fixed effects - {self.n_units} individuals, "
             f"{self.nobs} observations",

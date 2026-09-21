@@ -81,22 +81,27 @@ its own null sample, exactly as the real call does. The result carries
 ## Is a smooth component there at all?
 
 ```python
-from pyardl.fourier import fourier_f_test
-
-res = fourier_f_test(y, n_sims=2000, seed=42)
-print(res.summary())
-```
-
-```text
+>>> import numpy as np
+>>> from pyardl.fourier import fourier_f_test
+>>> rng = np.random.default_rng(42)
+>>> t = np.arange(1, 201)
+>>> y = (
+...     0.6 * np.sin(2 * np.pi * t / 200)
+...     + 0.3 * np.cos(2 * np.pi * t / 200)
+...     + rng.normal(scale=0.3, size=200)
+... )
+>>> res = fourier_f_test(y, n_sims=2000, seed=42)
+>>> print(res.summary())
 Fourier F test (Becker, Enders & Lee 2006) - 200 observations, frequency 1 (selected)
   critical values: simulated WITH the frequency search inside the loop, n_sims=2000, seed=42
-
-  statistic = 393.7174   simulated p = 0.0005   decision (5%): reject
-
+<BLANKLINE>
+  statistic = 349.7391   simulated p = 0.0005   decision (5%): reject
+<BLANKLINE>
     alpha    critical
       0.1      3.8811
      0.05      4.4725
      0.01      5.7306
+
 ```
 
 `H₀: a_f = b_f = 0`. Set `freq_estimated=False` with an explicit `freq`

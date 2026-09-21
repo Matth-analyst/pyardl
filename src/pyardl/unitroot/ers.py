@@ -68,6 +68,12 @@ class DFGLSResults:
 
     @property
     def null_hypothesis(self) -> str:
+        """Statement of :math:`H_0` for this test.
+
+        Returns
+        -------
+        str
+        """
         return "the series has a unit root"
 
     def decision(self, alpha: float = 0.05) -> str:

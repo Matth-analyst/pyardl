@@ -352,7 +352,50 @@ class KoyckModel:
 
 @dataclass(frozen=True)
 class KoyckResults:
-    r"""Outcome of a :class:`KoyckModel` fit."""
+    r"""Outcome of a :class:`KoyckModel` fit.
+
+    Parameters
+    ----------
+    model : KoyckModel
+        The model instance that produced this fit (carries ``method``,
+        the ``"ols"``/``"iv"``/``"ml"`` estimator actually used).
+    extra : dict
+        Diagnostic extras not part of the public contract.
+
+    Attributes
+    ----------
+    params : pandas.Series
+        The three structural parameters
+        :math:`(\hat\alpha, \hat\beta_0, \hat\lambda)`, indexed
+        ``["alpha", "beta0", "lam"]``.
+    bse : pandas.Series
+        Standard errors of :attr:`params`, same index.
+    tvalues : pandas.Series
+        ``params / bse``, same index.
+    resid : pandas.Series
+        Residuals of the fitted Koyck regression
+        (``y_t = alpha + beta0 x_t + lam y_{t-1} + eps_t``).
+    nobs : int
+        Number of observations in :attr:`resid`.
+    lam : float
+        :math:`\hat\lambda`, the geometric decay rate (``params[2]``).
+        Multipliers and lag statistics below are only defined for
+        ``0 < lam < 1``; outside that range they return ``nan``.
+    impact_multiplier : float
+        Contemporaneous effect, :math:`\hat\beta_0`.
+    longrun_multiplier : float
+        Total long-run effect, :math:`\hat\beta_0 / (1 - \hat\lambda)`.
+    mean_lag : float
+        Weighted average delay, :math:`\hat\lambda / (1 - \hat\lambda)`.
+    median_lag : float
+        Periods until half the long-run effect has landed,
+        :math:`\ln(0.5) / \ln(\hat\lambda)`.
+
+    See Also
+    --------
+    KoyckModel.fit : produces this object.
+    conf_int : normal confidence intervals for ``params``.
+    """
 
     model: KoyckModel
     _params: FloatArray = field(repr=False)
@@ -364,29 +407,68 @@ class KoyckResults:
     # -------------------------- basics --------------------------------
     @property
     def params(self) -> pd.Series:
-        r"""The structural :math:`(\alpha, \beta_0, \lambda)`."""
+        r"""The structural :math:`(\alpha, \beta_0, \lambda)`.
+
+        Returns
+        -------
+        pandas.Series
+            Indexed ``["alpha", "beta0", "lam"]``, named ``"coef"``.
+        """
         return pd.Series(self._params, index=list(_PARAM_NAMES), name="coef")
 
     @property
     def bse(self) -> pd.Series:
+        """Standard errors of :attr:`params`.
+
+        Returns
+        -------
+        pandas.Series
+            Same index as :attr:`params`, named ``"se"``.
+        """
         return pd.Series(
             np.sqrt(np.diag(self._cov)), index=list(_PARAM_NAMES), name="se"
         )
 
     @property
     def tvalues(self) -> pd.Series:
+        """t-statistics, ``params / bse``.
+
+        Returns
+        -------
+        pandas.Series
+            Same index as :attr:`params`.
+        """
         return pd.Series(self._params / self.bse.to_numpy(), index=list(_PARAM_NAMES))
 
     @property
     def nobs(self) -> int:
+        """Number of observations in :attr:`resid`.
+
+        Returns
+        -------
+        int
+        """
         return int(self._resid.shape[0])
 
     @property
     def resid(self) -> pd.Series:
+        """Residuals of the fitted Koyck regression.
+
+        Returns
+        -------
+        pandas.Series
+            Named ``"resid"``, length :attr:`nobs`.
+        """
         return pd.Series(self._resid, name="resid")
 
     @property
     def lam(self) -> float:
+        r"""Geometric decay rate :math:`\hat\lambda`, ``params[2]``.
+
+        Returns
+        -------
+        float
+        """
         return float(self._params[2])
 
     def conf_int(self, alpha: float = 0.05) -> pd.DataFrame:

@@ -257,34 +257,28 @@ Greenwood-Nimmo, Shin, van Treeck and Yu extend the partial-sum
 decomposition to **several thresholds**, splitting changes into more
 than two regimes — small rises, large rises, small falls, large falls.
 
-pyardl exposes the building block rather than a dedicated API: apply
-`partial_sums` at each threshold and pass the resulting columns as
-ordinary regressors.
+`partial_sums_multi` implements this directly, one call per regressor:
 
 ```pycon
->>> import numpy as np, pandas as pd
->>> from pyardl.nardl import partial_sums
+>>> import numpy as np
+>>> from pyardl.nardl import partial_sums_multi, multi_decomposition_error
 >>> ibo = d["IBO"]
->>> lo_pos, lo_neg = partial_sums(ibo, threshold=0.0, name="IBO_lo")
->>> hi_pos, hi_neg = partial_sums(ibo, threshold=0.01, name="IBO_hi")
->>> multi = pd.DataFrame({
-...     "IBO_small_up": lo_pos - hi_pos,
-...     "IBO_large_up": hi_pos,
-...     "IBO_down": lo_neg,
-... })
+>>> multi = partial_sums_multi(ibo, thresholds=[0.01], name="IBO")
 >>> list(multi.columns)
-['IBO_small_up', 'IBO_large_up', 'IBO_down']
->>> bool(np.isfinite(multi.to_numpy()).all())
+['IBO_pos_1', 'IBO_pos_2', 'IBO_neg_1', 'IBO_neg_2']
+>>> bool(multi_decomposition_error(ibo, multi) < 1e-12)
 True
 
 ```
 
-`IBO_large_up` accumulates the rises above one percentage point;
-`IBO_small_up` the rest. A non-zero threshold introduces a deterministic
-drift into the decomposition — the library warns about it — so the
-long-run coefficients are read net of a trend. That is a modelling
-choice, not a detail, which is why there is no one-line API for it in
-this version.
+`IBO_pos_1` is the small-rise band, up to the threshold; `IBO_pos_2`
+the large-rise band, the excess beyond one percentage point. `k`
+thresholds give `k + 1` bands per side. Pass the columns as ordinary
+regressors, exactly as with `partial_sums` — nothing about the ARDL
+that consumes them changes. Unlike a non-zero `threshold` on the binary
+decomposition, no drift enters this identity: the bottom edge of the
+bottom band is always 0, so the bands add back to the series exactly,
+not to the series net of a trend.
 
 ## Where to go next
 

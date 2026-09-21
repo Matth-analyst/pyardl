@@ -26,29 +26,40 @@ each other.
 
 ## Fitting
 
+A DGP where the long-run response genuinely depends on the sign of the
+shock — `theta = 1.0` after a negative shock, `1.5` after a positive one
+— so the constancy test should, and does, see it:
+
 ```python
-from pyardl.qardl import QARDL
-
-res = QARDL(y, x, order=(1, 1), taus=(0.1, 0.25, 0.5, 0.75, 0.9)).fit(
-    inference="mbb", n_boot=199, seed=42
-)
-print(res.summary())
-```
-
-```text
+>>> import numpy as np, pandas as pd
+>>> from pyardl.qardl import QARDL
+>>> rng = np.random.default_rng(20260823)
+>>> n = 300
+>>> x = np.cumsum(rng.normal(size=n))
+>>> y = np.zeros(n)
+>>> for t in range(1, n):
+...     shock = rng.normal(scale=0.5)
+...     theta = 1.0 if shock <= 0 else 1.5
+...     y[t] = y[t - 1] - 0.4 * (y[t - 1] - theta * x[t - 1]) + shock
+>>> res = QARDL(pd.Series(y, name="y"), pd.DataFrame({"x": x}),
+...             order=(1, 1), taus=(0.1, 0.25, 0.5, 0.75, 0.9)).fit(
+...     inference="mbb", n_boot=199, seed=42
+... )
+>>> print(res.summary())
 QARDL (Cho, Kim & Shin 2015) - case 3, 5 quantiles, 299 observations
   inference: mbb, B=199, block=7, seed=42
-
+<BLANKLINE>
      tau    lambda       theta_x
      0.1   -0.3690        1.3433
     0.25   -0.3807        1.3557
      0.5   -0.4319        1.2771
     0.75   -0.4305        1.1745
      0.9   -0.4229        1.1493
-
+<BLANKLINE>
   joint tests across quantiles
-   constancy           x  chi2(4) = 35.3844   p = 0.0000   varies with tau
-    symmetry           x  chi2(2) = 32.5288   p = 0.0000   asymmetric
+   constancy           x  chi2(4) = 35.3844   p = 0.0300   varies with tau
+    symmetry           x  chi2(2) = 32.5288   p = 0.0150   asymmetric
+
 ```
 
 ## What the estimator had to be told

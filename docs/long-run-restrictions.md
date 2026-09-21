@@ -26,22 +26,18 @@ model that results.
 ## 1. Estimate the relationship
 
 ```python
-from pyardl.core import ARDL
-from pyardl.datasets import load_denmark
-
-data = load_denmark()
-y = data["LRM"]                      # log real money
-x = data[["LRY", "IBO", "IDE"]]      # income, bond rate, deposit rate
-
-res = ARDL(y, x, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2})).fit()
-print(res.longrun.round(4))
-```
-
-```text
+>>> from pyardl.core import ARDL
+>>> from pyardl.datasets import load_denmark
+>>> data = load_denmark()
+>>> y = data["LRM"]                      # log real money
+>>> x = data[["LRY", "IBO", "IDE"]]      # income, bond rate, deposit rate
+>>> res = ARDL(y, x, order=(3, {"LRY": 1, "IBO": 3, "IDE": 2})).fit()
+>>> print(res.longrun.round(4))
       theta      se
 LRY  0.9965  0.1239
 IBO -4.5381  0.5203
 IDE  2.8915  0.9951
+
 ```
 
 The income elasticity is 0.9965. That is strikingly close to one — but
@@ -63,14 +59,12 @@ R = [1  0  0],    r = 1
 ## 3. Test it
 
 ```python
-out = res.test_longrun_restriction([[1.0, 0.0, 0.0]], 1.0)
-print(out.summary())
-```
-
-```text
+>>> out = res.test_longrun_restriction([[1.0, 0.0, 0.0]], 1.0)
+>>> print(out.summary())
 Long-run restriction test - Wald chi2(1) = 0.0008, p = 0.9773
   decision (5%): not_rejected
   R.theta - r = [-0.0035]
+
 ```
 
 The restriction is not rejected, and not by a narrow margin.
@@ -89,15 +83,14 @@ failed to reject unit elasticity, DHSY rewrote their model around the
 ratio. The same move here:
 
 ```python
-out = res.test_longrun_restriction([[1.0, 0.0, 0.0]], 1.0, impose=True)
-print(out.restricted_params.round(4).head(4))
-```
-
-```text
+>>> out = res.test_longrun_restriction([[1.0, 0.0, 0.0]], 1.0, impose=True)
+>>> print(out.restricted_params.round(4).head(4))
 const           2.6159
 (LRM-LRY).L1   -0.4176
 IBO.L1         -1.8925
 IDE.L1          1.2070
+Name: coef, dtype: float64
+
 ```
 
 The two level terms `LRM_{t-1}` and `LRY_{t-1}` have collapsed into a
@@ -113,12 +106,14 @@ quarter.
 ## 5. Check what the restriction cost
 
 ```python
-print(out.summary())
-```
-
-```text
+>>> print(out.summary())
+Long-run restriction test - Wald chi2(1) = 0.0008, p = 0.9773
+  decision (5%): not_rejected
+  R.theta - r = [-0.0035]
+<BLANKLINE>
   imposed: F = 0.0008, p = 0.9774
   SSR unrestricted = 0.014228, restricted = 0.014229
+
 ```
 
 The residual sum of squares moved from 0.014228 to 0.014229 — the fourth
@@ -143,14 +138,12 @@ A long-run coefficient estimated across a structural break is an average
 of two regimes, not an equilibrium. Before believing any of the above:
 
 ```python
-print(res.stability())
-```
-
-```text
+>>> print(res.stability())
                   stable  max_excess  first_crossing
-test
+test                                                
 CUSUM               True         0.0             NaN
 CUSUM-of-squares    True         0.0             NaN
+
 ```
 
 Both tests pass, and both matter: they detect different failures, and

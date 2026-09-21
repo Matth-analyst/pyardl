@@ -157,7 +157,44 @@ def _mg_table(values: pd.DataFrame, names: Sequence[str]) -> tuple[pd.DataFrame,
 
 @dataclass(frozen=True)
 class _CSResultsBase:
-    """What CS-ARDL and CS-DL share."""
+    """What CS-ARDL and CS-DL share.
+
+    Attributes
+    ----------
+    longrun : pandas.DataFrame
+        Mean Group long-run coefficients, one row per regressor, columns
+        ``theta``, ``se``, ``t``, ``pvalue``, ``ci_lower``, ``ci_upper``
+        (see :func:`_mg_table`). Standard errors are the
+        **between-individual** dispersion of the ``theta_i`` below, not
+        anything pooled within an individual.
+    theta_i : pandas.DataFrame
+        Individual long-run coefficients, one row per retained
+        individual, one column per regressor. The raw material
+        :attr:`longrun` is averaged from.
+    residuals : pandas.DataFrame
+        Residuals of each individual's augmented regression, one column
+        per individual, aligned on the panel's time index (``NaN`` where
+        an individual has no observation).
+    individual : dict
+        ``{key: _Fit}`` for every successfully fitted individual — the
+        augmented-regression coefficients, residuals, sample size and
+        dropped columns behind :attr:`theta_i` and :attr:`residuals`.
+    panel : pyardl.panel.container.PanelData
+        The validated panel the estimation ran on.
+    cs_lags : int
+        Number of lags of the cross-sectional averages included in every
+        individual regression (``p_z``).
+    dropped_columns : dict
+        ``{key: [names]}`` for individuals where one or more
+        cross-sectional-average columns were dropped for collinearity
+        (see the module documentation for the deterministic drop rule).
+        Empty when nothing was dropped.
+    failed : dict
+        ``{key: reason}`` for individuals that could not be fitted at
+        all (e.g. too few usable observations after adding the
+        averages). Excluded from :attr:`theta_i`, :attr:`longrun` and
+        :attr:`n_units`.
+    """
 
     longrun: pd.DataFrame
     theta_i: pd.DataFrame
@@ -170,6 +207,14 @@ class _CSResultsBase:
 
     @property
     def n_units(self) -> int:
+        """Number of individuals actually averaged into :attr:`longrun`.
+
+        Excludes anything listed in :attr:`failed`.
+
+        Returns
+        -------
+        int
+        """
         return int(self.theta_i.shape[0])
 
     def cd_test(self, min_overlap: int = 5) -> CDResult:
@@ -193,7 +238,34 @@ class _CSResultsBase:
 
 @dataclass(frozen=True)
 class CSARDLResults(_CSResultsBase):
-    """CS-ARDL estimates."""
+    """CS-ARDL estimates: dynamic panel, augmented, long run by ratio.
+
+    Adds to :class:`_CSResultsBase` the error-correction quantities that
+    only exist because CS-ARDL keeps the dynamics: an adjustment speed
+    per individual, and its Mean Group average.
+
+    Attributes
+    ----------
+    adjustment : pandas.Series
+        Mean Group average adjustment speed, ``{"lambda", "se"}`` —
+        analogous to :attr:`~pyardl.core.ardl.ARDLResults.adjustment`
+        but averaged across individuals.
+    lambda_i : pandas.Series
+        Individual adjustment speeds, indexed like :attr:`theta_i`'s
+        rows. Negative under error correction.
+    order : tuple of int
+        ``(p, q)`` lag orders imposed on every individual's ARDL part
+        (before the cross-sectional augmentation).
+    non_adjusting : pandas.Index
+        Keys of the individuals with ``lambda_i >= 0``: their ``theta_i``
+        is not a long-run coefficient in the sense being averaged, since
+        their own series never error-corrects.
+
+    See Also
+    --------
+    CSARDL.fit : produces this object.
+    CSDLResults : the dynamics-free alternative.
+    """
 
     adjustment: pd.Series = field(default_factory=pd.Series)
     lambda_i: pd.Series = field(default_factory=pd.Series)
@@ -201,9 +273,23 @@ class CSARDLResults(_CSResultsBase):
 
     @property
     def non_adjusting(self) -> pd.Index:
+        """Keys of individuals with ``lambda_i >= 0`` (see class docstring).
+
+        Returns
+        -------
+        pandas.Index
+        """
         return self.lambda_i.index[self.lambda_i >= 0]
 
     def summary(self) -> str:
+        """Publication-style text summary of the fit.
+
+        Returns
+        -------
+        str
+            Multi-line report: long-run table, mean adjustment speed,
+            and warnings for non-adjusting or dropped individuals.
+        """
         lines = [
             f"CS-ARDL (Chudik & Pesaran 2015) - {self.n_units} individuals",
             f"  ARDL{self.order} augmented with cross-sectional averages and "
@@ -242,11 +328,36 @@ class CSARDLResults(_CSResultsBase):
 
 @dataclass(frozen=True)
 class CSDLResults(_CSResultsBase):
-    """CS-DL estimates."""
+    """CS-DL estimates: no dynamics, long run read directly off x.
+
+    Adds nothing to :class:`_CSResultsBase`'s error-correction machinery
+    on purpose — CS-DL never forms a ratio, so it has no adjustment
+    speed to report.
+
+    Attributes
+    ----------
+    trunc_lags : int
+        Number of lagged first differences of ``x`` included in every
+        individual regression, truncating what would otherwise be an
+        infinite distributed lag.
+
+    See Also
+    --------
+    CSDL.fit : produces this object.
+    CSARDLResults : the dynamic alternative, with an adjustment speed.
+    """
 
     trunc_lags: int = 0
 
     def summary(self) -> str:
+        """Publication-style text summary of the fit.
+
+        Returns
+        -------
+        str
+            Multi-line report: long-run table and warnings for dropped
+            or unfitted individuals.
+        """
         lines = [
             f"CS-DL (Chudik, Mohaddes, Pesaran & Raissi 2016) - "
             f"{self.n_units} individuals",

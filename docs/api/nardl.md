@@ -234,9 +234,41 @@ its measurement rather than offered as a choice.
 | `res.uecm`, `res.params`, `res.lam` | the fitted model |
 | `partial_sums(x, threshold)` | the decomposition on its own |
 | `decomposition_error(x, pos, neg)` | the identity, as a number to assert |
+| `partial_sums_multi(x, thresholds)` | more than two regimes, see below |
+| `multi_decomposition_error(x, bands)` | its identity, as a number to assert |
+
+## Multiple asymmetries
+
+Greenwood-Nimmo, Shin, van Treeck & Yu (2013) split each side further,
+by one or more magnitude thresholds, into more than two regimes: small
+rises, large rises, small falls, large falls. `partial_sums_multi`
+implements this directly.
+
+```pycon
+>>> import pandas as pd
+>>> from pyardl.nardl import partial_sums_multi, multi_decomposition_error
+>>> oil = pd.Series([1.0, 1.005, 1.03, 1.02, 0.98], name="oil")
+>>> bands = partial_sums_multi(oil, thresholds=[0.01])
+>>> list(bands.columns)
+['oil_pos_1', 'oil_pos_2', 'oil_neg_1', 'oil_neg_2']
+>>> bool(multi_decomposition_error(oil, bands) < 1e-12)
+True
+
+```
+
+`oil_pos_1` is the small-rise band (up to the threshold), `oil_pos_2`
+the large-rise band (the excess beyond it); `k` thresholds produce
+`k + 1` bands per side. Pass the resulting columns as ordinary
+regressors — nothing about the model that consumes them changes,
+`NARDL` and `QARDL` included. As with `partial_sums`, the bottom edge
+of the bottom band is always 0, so no threshold-driven drift enters the
+identity, unlike a non-zero `threshold` on the binary decomposition.
 
 ## References
 
 - Shin, Y., Yu, B. & Greenwood-Nimmo, M. (2014). Modelling asymmetric
   cointegration and dynamic multipliers in a nonlinear ARDL framework.
   In *Festschrift in Honor of Peter Schmidt* (pp. 281-314). Springer.
+- Greenwood-Nimmo, M., Shin, Y., van Treeck, T. & Yu, B. (2013). The
+  decoupling of monetary policy from long-term rates in the U.S. and
+  Germany. Working paper.

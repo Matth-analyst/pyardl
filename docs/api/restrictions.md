@@ -14,15 +14,20 @@ original paper.
 A Wald test of `R θ = r` on the long-run coefficients.
 
 ```python
-res = ARDL(y, x, order=(2, 2)).fit()
-out = res.test_longrun_restriction([[1.0]], 1.0)
-print(out.summary())
-```
-
-```text
-Long-run restriction test - Wald chi2(1) = 0.4187, p = 0.5176
+>>> import numpy as np, pandas as pd
+>>> from pyardl.core.ardl import ARDL
+>>> rng = np.random.default_rng(0)
+>>> x = pd.Series(np.cumsum(rng.standard_normal(200)), name="x")
+>>> y = pd.Series(np.zeros(200), name="y")
+>>> for t in range(1, 200):
+...     y.iloc[t] = 0.6 * y.iloc[t - 1] + 0.4 * x.iloc[t] + rng.standard_normal()
+>>> res = ARDL(y, x, order=(1, 1)).fit()
+>>> out = res.test_longrun_restriction([[1.0]], 1.0)
+>>> print(out.summary())
+Long-run restriction test - Wald chi2(1) = 0.0016, p = 0.9676
   decision (5%): not_rejected
-  R.theta - r = [0.0731]
+  R.theta - r = [-0.0015]
+
 ```
 
 The covariance of `θ̂` comes from the delta method with the analytical

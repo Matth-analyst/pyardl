@@ -7,7 +7,12 @@ the whole apparatus of the library reusable here, rather than
 reimplemented.
 """
 
-from pyardl.nardl.decompose import decomposition_error, partial_sums
+from pyardl.nardl.decompose import (
+    decomposition_error,
+    multi_decomposition_error,
+    partial_sums,
+    partial_sums_multi,
+)
 from pyardl.nardl.model import NARDL, NARDLBoundsResults, NARDLResults
 
 __all__ = [
@@ -15,5 +20,7 @@ __all__ = [
     "NARDLBoundsResults",
     "NARDLResults",
     "decomposition_error",
+    "multi_decomposition_error",
     "partial_sums",
+    "partial_sums_multi",
 ]
