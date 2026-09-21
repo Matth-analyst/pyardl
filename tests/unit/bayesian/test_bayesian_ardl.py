@@ -196,8 +196,8 @@ class TestConjugateFormulaManualCheck:
         v0 = np.array([tau2])
         a0, b0 = 2.0, 1.0
 
-        xtx = float(design.T @ design)
-        xty = float(design.T @ target)
+        xtx = float((design.T @ design).item())
+        xty = float((design.T @ target).item())
         vn_manual = 1.0 / (1.0 / tau2 + xtx)
         mean_manual = vn_manual * xty
         an_manual = a0 + n / 2.0
