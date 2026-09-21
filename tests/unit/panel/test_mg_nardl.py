@@ -117,7 +117,19 @@ class TestAsymmetryRecovery:
         assert row["theta_neg"] == pytest.approx(0.5, abs=0.1)
         assert row["pvalue_diff"] < 0.01
 
+    @pytest.mark.needs_review
     def test_symmetric_dgp_does_not_reject(self) -> None:
+        """Spec 30 §2.3 : sous un DGP symétrique, ne rejette pas H0 à 5 %.
+
+        Marqué needs_review : validation/spec30_montecarlo.py (2026-09-20,
+        n_mc=300) mesure ce test comme nettement conservateur (0/300
+        rejets contre ~15/300 attendus), probablement parce que
+        `Var(diff) = Var(theta+_MG) + Var(theta-_MG)` (spec 30 §2.3)
+        ignore une covariance intra-individu a priori non négligeable
+        (O(1/N), pas O(1/N^2)). Cette assertion passe donc pour la
+        mauvaise raison si la conservativité mesurée est confirmée — pas
+        une preuve de calibration à 5 %. Voir docs/QUESTIONS.md.
+        """
         df = _symmetric_panel(20, 150, 3)
         res = MeanGroupNARDL(
             df, y="y", X=["x"], asym=["x"], id="id", time="t", order=(1, 1)
