@@ -196,6 +196,16 @@ map — the pages are where the detail lives.
 | **Dynamic simulation** | Trace what happens to `y` if a regressor moves and stays there | [dynardl.md](docs/api/dynardl.md) |
 | **VECM simulator** | One reproducible data generator behind every Monte Carlo study in the library | [simulate.md](docs/api/simulate.md) |
 | **Native backend** | An optional Rust kernel for the bootstrap — what profiling said to port, and by how much | [backend.md](docs/api/backend.md) |
+| **GIRF / FEVD** | Does the shock response depend on history, and what share of `y`'s forecast variance comes from `x`? | [dynardl.md](docs/api/dynardl.md) |
+| **Regularized ARDL** | Order selection by LASSO/Elastic Net when the regressor count makes a grid search too expensive | [ardl.md](docs/api/ardl.md) |
+| **System ARDL (SUR)** | Several ECMs, estimated jointly when their residuals are correlated — distinct from Johansen | [system.md](docs/api/system.md) |
+| **Bayesian ARDL** | A Minnesota prior on short-run dynamics, and the long-run posterior by direct simulation, no delta method | [bayesian.md](docs/api/bayesian.md) |
+| **MIDAS-ARDL** | `y` and `x` observed at different frequencies, without throwing away the fine-frequency information | [midas.md](docs/api/midas.md) |
+| **Panel NARDL / QARDL, Pedroni / Westerlund** | Mean-Group asymmetry and quantiles across a panel, and testing panel cointegration before estimating it | [panel.md](docs/api/panel.md) |
+| **Gregory-Hansen / Bai-Perron / Enders-Siklos** | Cointegration with an unknown or multiple regime shifts, and asymmetric residual adjustment | [cointegration.md](docs/api/cointegration.md) |
+| **Hansen threshold / STAR-ARDL** | A regime split estimated from the data, sharp or smooth, on any transition variable | [threshold.md](docs/api/threshold.md) |
+| **Markov-Switching ARDL** | Coefficients driven by an unobserved regime, inferred with the Hamilton filter | [markov_switching.md](docs/api/markov_switching.md) |
+| **ARDL-GARCH** | A conditional mean and a conditional variance, estimated jointly by maximum likelihood | [volatility.md](docs/api/volatility.md) |
 
 A representative taste, so the table above is not just names: on the
 Danish data, three tests must all reject for `bounds_test` to call it
@@ -242,10 +252,10 @@ version:
   method underperforms its own literature's claims, where a cross-check is
   structural rather than external — each one is a numbered entry in the
   validation register, not a footnote.
-- **Test suite.** 700+ tests plus 38 doctests, `mypy --strict` clean, on
-  Linux, Windows and macOS across Python 3.11–3.13. Monte Carlo experiments
-  re-run nightly at full replication counts (`event: schedule` in Actions —
-  the push-triggered badge above only covers the fast suite).
+- **Test suite.** 1800+ tests and doctests combined, `mypy --strict` clean,
+  on Linux, Windows and macOS across Python 3.11–3.13. Monte Carlo
+  experiments re-run nightly at full replication counts (`event: schedule`
+  in Actions — the push-triggered badge above only covers the fast suite).
 
 ---
 
@@ -287,9 +297,22 @@ floor.
   specification had always asked for, and a declared pandas floor that had
   stopped being true. Full account in [CHANGELOG.md](CHANGELOG.md).
 
-Next: **0.7+** — whatever the validation register turns up. The
-specifications are implemented and the performance profile is flat; what
-remains is use, and the questions use raises.
+- **Unreleased** — 15 further specifications beyond the original 28,
+  grouped by implementation effort: break/threshold/asymmetric-adjustment
+  tests reusing existing engines (Gregory-Hansen, Bai-Perron, Hansen
+  threshold, Enders-Siklos), panel×series compositions with no new numeric
+  engine (Mean-Group NARDL and QARDL, Pedroni/Westerlund), light nonlinear
+  optimisation (STAR-ARDL, MIDAS-ARDL), and four genuinely new statistical
+  engines (regularized ARDL, system ARDL/SUR, GIRF/FEVD, Bayesian ARDL) —
+  plus two that break with the rest of the library's compose-don't-rebuild
+  philosophy and wrap an already-validated external engine instead of
+  reimplementing one: Markov-Switching ARDL (`statsmodels`' Hamilton
+  filter) and ARDL-GARCH (`arch`, still an optional dependency). Full
+  account in [CHANGELOG.md](CHANGELOG.md).
+
+Next: whatever the validation register turns up. The specifications are
+implemented and the performance profile is flat; what remains is use, and
+the questions use raises.
 
 ---
 
